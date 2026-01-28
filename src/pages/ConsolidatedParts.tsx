@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Package, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, ClipboardList, CheckCircle2, Clock, Layers } from 'lucide-react';
+import { Search, Package, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, ClipboardList, CheckCircle2, Clock, Layers, Filter } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -13,31 +13,150 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useConsolidatedParts, type OrderStatusFilter } from '@/hooks/useConsolidatedParts';
-import { cn } from '@/lib/utils';
+import { cn, getLocationPrefix, alphanumericCompare } from '@/lib/utils';
 import { exportConsolidatedPartsToExcel } from '@/lib/excelExport';
 import { MultiOrderPickDialog } from '@/components/picking/MultiOrderPickDialog';
 import type { ConsolidatedPart } from '@/types';
 
 type SortMode = 'part_number' | 'location';
 
+// Shared PartCard component to avoid code duplication
+interface PartCardProps {
+  part: ConsolidatedPart;
+  isExpanded: boolean;
+  onToggleExpand: (partNumber: string) => void;
+  onPickClick: (part: ConsolidatedPart, e: React.MouseEvent) => void;
+}
+
+function PartCard({ part, isExpanded, onToggleExpand, onPickClick }: PartCardProps) {
+  const isComplete = part.remaining === 0;
+  const progressPercent =
+    part.total_needed > 0
+      ? Math.round((part.total_picked / part.total_needed) * 100)
+      : 0;
+
+  return (
+    <Card className={cn(isComplete && 'bg-green-50 border-green-200')}>
+      <CardContent className="pt-4">
+        {/* Main Row */}
+        <div
+          className="flex items-center gap-4 cursor-pointer"
+          onClick={() => onToggleExpand(part.part_number)}
+        >
+          <Button variant="ghost" size="icon" className="shrink-0">
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </Button>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono font-semibold text-lg">
+                {part.part_number}
+              </span>
+              {part.location && (
+                <Badge variant="outline" className="gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {part.location}
+                </Badge>
+              )}
+              {isComplete && <Badge variant="success">Complete</Badge>}
+            </div>
+            {part.description && (
+              <p className="text-sm text-muted-foreground truncate">
+                {part.description}
+              </p>
+            )}
+          </div>
+
+          <div className="text-right shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-bold">
+                {part.total_picked}
+              </span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-lg">{part.total_needed}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {part.remaining} remaining
+            </p>
+          </div>
+
+          <div className="w-24 shrink-0">
+            <Progress value={progressPercent} className="h-2" />
+            <p className="text-xs text-center mt-1">{progressPercent}%</p>
+          </div>
+
+          {/* Pick Button */}
+          {!isComplete && (
+            <Button
+              size="sm"
+              variant="default"
+              className="shrink-0"
+              onClick={(e) => onPickClick(part, e)}
+            >
+              <ClipboardList className="h-4 w-4 mr-1" />
+              Pick
+            </Button>
+          )}
+        </div>
+
+        {/* Expanded: Per-Order Breakdown */}
+        {isExpanded && (
+          <div className="mt-4 ml-12 border-t pt-4">
+            <p className="text-sm font-medium mb-2">
+              Orders using this part:
+            </p>
+            <div className="space-y-2">
+              {part.orders.map((orderInfo) => {
+                const orderComplete = orderInfo.picked >= orderInfo.needed;
+                return (
+                  <div
+                    key={orderInfo.order_id}
+                    className="flex items-center justify-between p-2 bg-muted/50 rounded"
+                  >
+                    <Link
+                      to={`/orders/${orderInfo.order_id}`}
+                      className="font-medium hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      SO-{orderInfo.so_number}
+                    </Link>
+                    <div className="flex items-center gap-4">
+                      <span
+                        className={cn(
+                          'font-mono',
+                          orderComplete && 'text-green-600'
+                        )}
+                      >
+                        {orderInfo.picked} / {orderInfo.needed}
+                      </span>
+                      {orderComplete ? (
+                        <Badge variant="success">Done</Badge>
+                      ) : (
+                        <Badge variant="outline">
+                          {orderInfo.needed - orderInfo.picked} left
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 const CONSOLIDATED_SORT_PREFERENCE_KEY = 'consolidated-parts-sort-preference';
 const CONSOLIDATED_STATUS_FILTER_KEY = 'consolidated-parts-status-filter';
-
-// Extract location prefix (e.g., "A-01" -> "A", "B-02-03" -> "B-02")
-function getLocationPrefix(location: string | null | undefined): string {
-  if (!location) return '';
-  const parts = location.split('-');
-  if (parts.length >= 2) {
-    return `${parts[0]}-${parts[1]}`;
-  }
-  return parts[0] || '';
-}
-
-// Alphanumeric sort comparison
-function alphanumericCompare(a: string, b: string): number {
-  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-}
 
 export function ConsolidatedParts() {
   const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>(() => {
@@ -52,6 +171,7 @@ export function ConsolidatedParts() {
     const saved = localStorage.getItem(CONSOLIDATED_SORT_PREFERENCE_KEY);
     return (saved as SortMode) || 'part_number';
   });
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
 
   // Persist status filter preference
   useEffect(() => {
@@ -73,6 +193,41 @@ export function ConsolidatedParts() {
     localStorage.setItem(CONSOLIDATED_SORT_PREFERENCE_KEY, sortMode);
   }, [sortMode]);
 
+  // Compute unique orders for filter dropdown
+  const uniqueOrders = useMemo(() => {
+    const ordersMap = new Map<string, string>(); // order_id -> so_number
+    parts.forEach(part => {
+      part.orders.forEach(o => ordersMap.set(o.order_id, o.so_number));
+    });
+    return Array.from(ordersMap.entries())
+      .map(([id, so_number]) => ({ id, so_number }))
+      .sort((a, b) => a.so_number.localeCompare(b.so_number, undefined, { numeric: true }));
+  }, [parts]);
+
+  const hasActiveFilters = selectedOrders.size > 0;
+
+  const clearFilters = () => {
+    setSelectedOrders(new Set());
+  };
+
+  const toggleOrder = (orderId: string) => {
+    const newSelected = new Set(selectedOrders);
+    if (newSelected.has(orderId)) {
+      newSelected.delete(orderId);
+    } else {
+      newSelected.add(orderId);
+    }
+    setSelectedOrders(newSelected);
+  };
+
+  const selectAllOrders = () => {
+    setSelectedOrders(new Set(uniqueOrders.map(o => o.id)));
+  };
+
+  const deselectAllOrders = () => {
+    setSelectedOrders(new Set());
+  };
+
   const filteredParts = parts.filter((part) => {
     const matchesSearch =
       part.part_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -81,7 +236,10 @@ export function ConsolidatedParts() {
 
     const matchesCompleted = showCompleted || part.remaining > 0;
 
-    return matchesSearch && matchesCompleted;
+    const matchesOrder = selectedOrders.size === 0
+      || part.orders.some(o => selectedOrders.has(o.order_id));
+
+    return matchesSearch && matchesCompleted && matchesOrder;
   });
 
   // Sort and group filtered parts
@@ -244,8 +402,8 @@ export function ConsolidatedParts() {
                 })}
               </div>
 
-              {/* Sort dropdown */}
-              <div className="flex items-center gap-2">
+              {/* Sort and filter dropdowns */}
+              <div className="flex flex-wrap items-center gap-2">
                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                 <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
                   <SelectTrigger className="w-48">
@@ -256,6 +414,66 @@ export function ConsolidatedParts() {
                     <SelectItem value="location">Sort by Location</SelectItem>
                   </SelectContent>
                 </Select>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-48 justify-between">
+                      <span className="flex items-center gap-2">
+                        <Filter className="h-4 w-4" />
+                        {selectedOrders.size === 0
+                          ? 'All Orders'
+                          : `${selectedOrders.size} Order${selectedOrders.size !== 1 ? 's' : ''}`}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-0" align="start">
+                    <div className="p-2 border-b flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1 h-8"
+                        onClick={selectAllOrders}
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1 h-8"
+                        onClick={deselectAllOrders}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto p-2">
+                      {uniqueOrders.map((order) => (
+                        <label
+                          key={order.id}
+                          className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted rounded cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={selectedOrders.has(order.id)}
+                            onCheckedChange={() => toggleOrder(order.id)}
+                          />
+                          <span className="text-sm">SO-{order.so_number}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="h-9 px-2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -268,7 +486,7 @@ export function ConsolidatedParts() {
               >
                 {showCompleted ? 'Showing All Parts' : 'Hide Picked Parts'}
               </Button>
-              {searchQuery && (
+              {(searchQuery || hasActiveFilters) && (
                 <span className="text-sm text-muted-foreground">
                   {filteredParts.length} result{filteredParts.length !== 1 ? 's' : ''}
                 </span>
@@ -290,7 +508,7 @@ export function ConsolidatedParts() {
           <CardContent className="py-8 text-center">
             <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground">
-              {searchQuery || !showCompleted
+              {searchQuery || !showCompleted || hasActiveFilters
                 ? 'No parts match your filters'
                 : statusFilter === 'active'
                   ? 'No active orders with parts. Try switching to "All" orders.'
@@ -298,7 +516,16 @@ export function ConsolidatedParts() {
                     ? 'No completed orders with parts.'
                     : 'No parts found. Import orders to see consolidated parts.'}
             </p>
-            {parts.length === 0 && !searchQuery && showCompleted && statusFilter !== 'all' && (
+            {hasActiveFilters && (
+              <Button
+                variant="link"
+                onClick={clearFilters}
+                className="mt-2"
+              >
+                Clear filters
+              </Button>
+            )}
+            {parts.length === 0 && !searchQuery && showCompleted && statusFilter !== 'all' && !hasActiveFilters && (
               <Button
                 variant="outline"
                 className="mt-4"
@@ -323,266 +550,30 @@ export function ConsolidatedParts() {
                 </Badge>
               </div>
               {/* Parts in this group */}
-              {groupParts.map((part) => {
-                const isExpanded = expandedParts.has(part.part_number);
-                const isComplete = part.remaining === 0;
-                const progressPercent =
-                  part.total_needed > 0
-                    ? Math.round((part.total_picked / part.total_needed) * 100)
-                    : 0;
-
-                return (
-                  <Card
-                    key={part.part_number}
-                    className={cn(isComplete && 'bg-green-50 border-green-200')}
-                  >
-                    <CardContent className="pt-4">
-                      {/* Main Row */}
-                      <div
-                        className="flex items-center gap-4 cursor-pointer"
-                        onClick={() => toggleExpanded(part.part_number)}
-                      >
-                        <Button variant="ghost" size="icon" className="shrink-0">
-                          {isExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </Button>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-semibold text-lg">
-                              {part.part_number}
-                            </span>
-                            {part.location && (
-                              <Badge variant="outline" className="gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {part.location}
-                              </Badge>
-                            )}
-                            {isComplete && <Badge variant="success">Complete</Badge>}
-                          </div>
-                          {part.description && (
-                            <p className="text-sm text-muted-foreground truncate">
-                              {part.description}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold">
-                              {part.total_picked}
-                            </span>
-                            <span className="text-muted-foreground">/</span>
-                            <span className="text-lg">{part.total_needed}</span>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {part.remaining} remaining
-                          </p>
-                        </div>
-
-                        <div className="w-24 shrink-0">
-                          <Progress value={progressPercent} className="h-2" />
-                          <p className="text-xs text-center mt-1">{progressPercent}%</p>
-                        </div>
-
-                        {/* Pick Button */}
-                        {!isComplete && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="shrink-0"
-                            onClick={(e) => handlePickClick(part, e)}
-                          >
-                            <ClipboardList className="h-4 w-4 mr-1" />
-                            Pick
-                          </Button>
-                        )}
-                      </div>
-
-                      {/* Expanded: Per-Order Breakdown */}
-                      {isExpanded && (
-                        <div className="mt-4 ml-12 border-t pt-4">
-                          <p className="text-sm font-medium mb-2">
-                            Orders using this part:
-                          </p>
-                          <div className="space-y-2">
-                            {part.orders.map((orderInfo) => {
-                              const orderComplete = orderInfo.picked >= orderInfo.needed;
-                              return (
-                                <div
-                                  key={orderInfo.order_id}
-                                  className="flex items-center justify-between p-2 bg-muted/50 rounded"
-                                >
-                                  <Link
-                                    to={`/orders/${orderInfo.order_id}`}
-                                    className="font-medium hover:underline"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    SO-{orderInfo.so_number}
-                                  </Link>
-                                  <div className="flex items-center gap-4">
-                                    <span
-                                      className={cn(
-                                        'font-mono',
-                                        orderComplete && 'text-green-600'
-                                      )}
-                                    >
-                                      {orderInfo.picked} / {orderInfo.needed}
-                                    </span>
-                                    {orderComplete ? (
-                                      <Badge variant="success">Done</Badge>
-                                    ) : (
-                                      <Badge variant="outline">
-                                        {orderInfo.needed - orderInfo.picked} left
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+              {groupParts.map((part) => (
+                <PartCard
+                  key={part.part_number}
+                  part={part}
+                  isExpanded={expandedParts.has(part.part_number)}
+                  onToggleExpand={toggleExpanded}
+                  onPickClick={handlePickClick}
+                />
+              ))}
             </div>
           ))}
         </div>
       ) : (
         // Render flat list sorted by part number
         <div className="space-y-2">
-          {sortedParts.map((part) => {
-            const isExpanded = expandedParts.has(part.part_number);
-            const isComplete = part.remaining === 0;
-            const progressPercent =
-              part.total_needed > 0
-                ? Math.round((part.total_picked / part.total_needed) * 100)
-                : 0;
-
-            return (
-              <Card
-                key={part.part_number}
-                className={cn(isComplete && 'bg-green-50 border-green-200')}
-              >
-                <CardContent className="pt-4">
-                  {/* Main Row */}
-                  <div
-                    className="flex items-center gap-4 cursor-pointer"
-                    onClick={() => toggleExpanded(part.part_number)}
-                  >
-                    <Button variant="ghost" size="icon" className="shrink-0">
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </Button>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono font-semibold text-lg">
-                          {part.part_number}
-                        </span>
-                        {part.location && (
-                          <Badge variant="outline" className="gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {part.location}
-                          </Badge>
-                        )}
-                        {isComplete && <Badge variant="success">Complete</Badge>}
-                      </div>
-                      {part.description && (
-                        <p className="text-sm text-muted-foreground truncate">
-                          {part.description}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl font-bold">
-                          {part.total_picked}
-                        </span>
-                        <span className="text-muted-foreground">/</span>
-                        <span className="text-lg">{part.total_needed}</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {part.remaining} remaining
-                      </p>
-                    </div>
-
-                    <div className="w-24 shrink-0">
-                      <Progress value={progressPercent} className="h-2" />
-                      <p className="text-xs text-center mt-1">{progressPercent}%</p>
-                    </div>
-
-                    {/* Pick Button */}
-                    {!isComplete && (
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="shrink-0"
-                        onClick={(e) => handlePickClick(part, e)}
-                      >
-                        <ClipboardList className="h-4 w-4 mr-1" />
-                        Pick
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Expanded: Per-Order Breakdown */}
-                  {isExpanded && (
-                    <div className="mt-4 ml-12 border-t pt-4">
-                      <p className="text-sm font-medium mb-2">
-                        Orders using this part:
-                      </p>
-                      <div className="space-y-2">
-                        {part.orders.map((orderInfo) => {
-                          const orderComplete = orderInfo.picked >= orderInfo.needed;
-                          return (
-                            <div
-                              key={orderInfo.order_id}
-                              className="flex items-center justify-between p-2 bg-muted/50 rounded"
-                            >
-                              <Link
-                                to={`/orders/${orderInfo.order_id}`}
-                                className="font-medium hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                SO-{orderInfo.so_number}
-                              </Link>
-                              <div className="flex items-center gap-4">
-                                <span
-                                  className={cn(
-                                    'font-mono',
-                                    orderComplete && 'text-green-600'
-                                  )}
-                                >
-                                  {orderInfo.picked} / {orderInfo.needed}
-                                </span>
-                                {orderComplete ? (
-                                  <Badge variant="success">Done</Badge>
-                                ) : (
-                                  <Badge variant="outline">
-                                    {orderInfo.needed - orderInfo.picked} left
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+          {sortedParts.map((part) => (
+            <PartCard
+              key={part.part_number}
+              part={part}
+              isExpanded={expandedParts.has(part.part_number)}
+              onToggleExpand={toggleExpanded}
+              onPickClick={handlePickClick}
+            />
+          ))}
         </div>
       )}
 

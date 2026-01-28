@@ -23,7 +23,7 @@ import { Label } from '@/components/ui/label';
 import type { Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '@/types';
 import { Layers, SplitSquareVertical } from 'lucide-react';
 import { useSettings } from '@/hooks/useSettings';
-import { cn, formatDateTime } from '@/lib/utils';
+import { cn, formatDateTime, getLocationPrefix, alphanumericCompare } from '@/lib/utils';
 import { ReportIssueDialog } from './ReportIssueDialog';
 import { DistributeInventoryDialog } from './DistributeInventoryDialog';
 
@@ -33,21 +33,6 @@ const SORT_PREFERENCE_KEY = 'picking-sort-preference';
 
 // Swipe threshold in pixels for touch gestures
 const SWIPE_THRESHOLD = 100;
-
-// Extract location prefix (e.g., "A-01" -> "A", "B-02-03" -> "B-02")
-function getLocationPrefix(location: string | null | undefined): string {
-  if (!location) return '';
-  const parts = location.split('-');
-  if (parts.length >= 2) {
-    return `${parts[0]}-${parts[1]}`;
-  }
-  return parts[0] || '';
-}
-
-// Alphanumeric sort comparison
-function alphanumericCompare(a: string, b: string): number {
-  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-}
 
 interface PickingInterfaceProps {
   tool: Tool;

@@ -406,6 +406,7 @@ export function exportItemsToOrderToExcel(items: ItemToOrder[]) {
     'Total Needed',
     'Total Picked',
     'Remaining',
+    'Qty to Order',
     'Orders Affected',
   ];
 
@@ -417,11 +418,12 @@ export function exportItemsToOrderToExcel(items: ItemToOrder[]) {
     item.total_needed,
     item.total_picked,
     item.remaining,
+    item.qty_to_order,
     item.orders.map(o => `SO-${o.so_number}`).join(', '),
   ]);
 
   const itemsSheet = XLSX.utils.aoa_to_sheet([itemsHeader, ...itemsData]);
-  setColumnWidths(itemsSheet, [20, 40, 15, 12, 12, 12, 12, 40]);
+  setColumnWidths(itemsSheet, [20, 40, 15, 12, 12, 12, 12, 12, 40]);
   XLSX.utils.book_append_sheet(workbook, itemsSheet, 'Items to Order');
 
   // Detailed Breakdown Sheet (item by order)

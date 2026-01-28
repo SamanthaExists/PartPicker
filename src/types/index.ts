@@ -110,7 +110,7 @@ export interface ConsolidatedPart {
   }[];
 }
 
-// Items to order (parts with qty_available = 0 that still need picking)
+// Items to order (parts with insufficient stock to complete active orders)
 
 export interface ItemToOrder {
   part_number: string;
@@ -120,6 +120,7 @@ export interface ItemToOrder {
   total_needed: number;
   total_picked: number;
   remaining: number;
+  qty_to_order: number; // How many we need to order (remaining - qty_available)
   orders: {
     order_id: string;
     so_number: string;

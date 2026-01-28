@@ -155,3 +155,24 @@ export function getStatusColor(status: string): string {
 export function generateId(): string {
   return crypto.randomUUID();
 }
+
+/**
+ * Extract location prefix (e.g., "A-01" -> "A", "B-02-03" -> "B-02")
+ * Used for grouping items by location area
+ */
+export function getLocationPrefix(location: string | null | undefined): string {
+  if (!location) return '';
+  const parts = location.split('-');
+  if (parts.length >= 2) {
+    return `${parts[0]}-${parts[1]}`;
+  }
+  return parts[0] || '';
+}
+
+/**
+ * Alphanumeric sort comparison that handles mixed numeric/string values naturally
+ * e.g., "A-2" comes before "A-10"
+ */
+export function alphanumericCompare(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}

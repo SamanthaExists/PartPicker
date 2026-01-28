@@ -108,6 +108,34 @@ UI components use shadcn/ui patterns:
 - Use `overflow-x-auto scrollbar-hide` for horizontal scroll areas
 - Use `flex-shrink-0` on items that shouldn't compress
 
+## Key Page Logic
+
+### Items to Order Page (`/items-to-order`)
+
+Shows parts that have **insufficient stock** to complete active orders. This includes:
+- **Out of Stock**: `qty_available = 0`
+- **Low Stock**: `qty_available > 0` but less than remaining quantity needed
+
+**Logic** (`src/hooks/useItemsToOrder.ts`):
+1. Fetch all line items from active orders (not complete/cancelled)
+2. Calculate `remaining = total_qty_needed - total_picked` for each
+3. Filter to items where `qty_available < remaining` (not enough stock)
+4. Group by part number, aggregating across orders
+5. Calculate `qty_to_order = remaining - qty_available`
+
+**Key fields in `ItemToOrder` type**:
+- `remaining`: Total quantity still needed to pick (across all orders)
+- `qty_available`: Current stock on hand
+- `qty_to_order`: How many we need to order (`remaining - qty_available`)
+
+### Inventory Sync (`src/hooks/useInventorySync.ts`)
+
+Updates `qty_available` on line items from external Excel inventory files:
+1. Parse Excel with columns: Product ID, Lot ID, Location, Qty Available
+2. Skip certain locations (AWAITING INSPECTION, QA, QUARANTINE)
+3. Keep only newest lot per part (highest Lot ID)
+4. Update all line_items with matching part numbers
+
 ## Scripts
 
 Utility scripts in `scripts/` for database operations:

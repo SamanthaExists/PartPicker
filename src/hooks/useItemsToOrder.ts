@@ -12,7 +12,7 @@ export function useItemsToOrder() {
       setLoading(true);
       setError(null);
 
-      // Fetch line items with qty_available = 0 from active orders
+      // Fetch all line items from active orders (we'll filter by insufficient stock after calculating picks)
       const { data: lineItemsData, error: lineItemsError } = await supabase
         .from('line_items')
         .select(`
@@ -29,8 +29,7 @@ export function useItemsToOrder() {
             status
           )
         `)
-        .eq('orders.status', 'active')
-        .eq('qty_available', 0);
+        .eq('orders.status', 'active');
 
       if (lineItemsError) throw lineItemsError;
 
@@ -55,9 +54,13 @@ export function useItemsToOrder() {
         const orderInfo = item.orders as any;
         const picked = picksByLineItem.get(item.id) || 0;
         const remaining = item.total_qty_needed - picked;
+        const qtyAvailable = item.qty_available ?? 0;
 
         // Skip items that are fully picked
         if (remaining <= 0) continue;
+
+        // Skip items where we have enough stock to cover remaining need
+        if (qtyAvailable >= remaining) continue;
 
         const existing = itemsMap.get(item.part_number);
 
@@ -65,6 +68,7 @@ export function useItemsToOrder() {
           existing.total_needed += item.total_qty_needed;
           existing.total_picked += picked;
           existing.remaining = existing.total_needed - existing.total_picked;
+          existing.qty_to_order = Math.max(0, existing.remaining - existing.qty_available);
           existing.orders.push({
             order_id: item.order_id,
             so_number: orderInfo.so_number,
@@ -72,14 +76,17 @@ export function useItemsToOrder() {
             picked: picked,
           });
         } else {
+          const newRemaining = remaining;
+          const newQtyAvailable = item.qty_available ?? 0;
           itemsMap.set(item.part_number, {
             part_number: item.part_number,
             description: item.description,
             location: item.location,
-            qty_available: item.qty_available ?? 0,
+            qty_available: newQtyAvailable,
             total_needed: item.total_qty_needed,
             total_picked: picked,
-            remaining: remaining,
+            remaining: newRemaining,
+            qty_to_order: Math.max(0, newRemaining - newQtyAvailable),
             orders: [{
               order_id: item.order_id,
               so_number: orderInfo.so_number,

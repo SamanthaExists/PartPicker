@@ -47,15 +47,31 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
       const lineItemIds = (lineItemsData || []).map(item => item.id);
 
       // Fetch picks only for the relevant line items (server-side filtering)
+      // Batch the requests to avoid URL length limits
       let picksData: { line_item_id: string; qty_picked: number }[] = [];
       if (lineItemIds.length > 0) {
-        const { data, error: picksError } = await supabase
-          .from('picks')
-          .select('line_item_id, qty_picked')
-          .in('line_item_id', lineItemIds);
+        const BATCH_SIZE = 50; // Supabase URL length limit workaround
+        const batches: string[][] = [];
 
-        if (picksError) throw picksError;
-        picksData = data || [];
+        for (let i = 0; i < lineItemIds.length; i += BATCH_SIZE) {
+          batches.push(lineItemIds.slice(i, i + BATCH_SIZE));
+        }
+
+        const batchResults = await Promise.all(
+          batches.map(batch =>
+            supabase
+              .from('picks')
+              .select('line_item_id, qty_picked')
+              .in('line_item_id', batch)
+          )
+        );
+
+        for (const result of batchResults) {
+          if (result.error) throw result.error;
+          if (result.data) {
+            picksData.push(...result.data);
+          }
+        }
       }
 
       // Calculate picks per line item

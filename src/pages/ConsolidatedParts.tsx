@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Package, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, ClipboardList, CheckCircle2, Clock, Layers, Filter } from 'lucide-react';
+import { Search, Package, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, ClipboardList, CheckCircle2, Clock, Layers, Filter, List } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -378,28 +378,26 @@ export function ConsolidatedParts() {
               <div className="flex items-center gap-2 flex-wrap">
                 <Layers className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground mr-1">Orders:</span>
-                {(['all', 'active', 'complete'] as const).map((status) => {
-                  const getStatusIcon = () => {
-                    switch (status) {
-                      case 'complete': return <CheckCircle2 className="h-3.5 w-3.5 sm:mr-1 flex-shrink-0" />;
-                      case 'active': return <Clock className="h-3.5 w-3.5 sm:mr-1 flex-shrink-0" />;
-                      default: return null;
-                    }
-                  };
-                  return (
-                    <Button
-                      key={status}
-                      variant={statusFilter === status ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setStatusFilter(status)}
-                      className="flex items-center"
-                    >
-                      {getStatusIcon()}
-                      <span className="hidden sm:inline">{status.charAt(0).toUpperCase() + status.slice(1)}</span>
-                      <span className="sm:hidden">{status === 'complete' ? 'Done' : status.charAt(0).toUpperCase()}</span>
-                    </Button>
-                  );
-                })}
+                {[
+                  { key: 'all' as const, label: 'All', shortLabel: 'All', icon: List, title: 'Show parts from all orders' },
+                  { key: 'active' as const, label: 'Active', shortLabel: 'Active', icon: Clock, title: 'Show parts from active orders only' },
+                  { key: 'complete' as const, label: 'Complete', shortLabel: 'Done', icon: CheckCircle2, title: 'Show parts from completed orders only' },
+                ].map(({ key, label, shortLabel, icon: Icon, title }) => (
+                  <Button
+                    key={key}
+                    variant={statusFilter === key ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setStatusFilter(key)}
+                    className="flex items-center gap-1.5"
+                    title={title}
+                    aria-label={title}
+                    aria-pressed={statusFilter === key}
+                  >
+                    <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span className="hidden sm:inline">{label}</span>
+                    <span className="sm:hidden">{shortLabel}</span>
+                  </Button>
+                ))}
               </div>
 
               {/* Sort and filter dropdowns */}

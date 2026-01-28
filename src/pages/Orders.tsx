@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Upload, Trash2, ArrowUpDown, AlertCircle, Clock, CheckCircle2, XCircle, Eye, EyeOff, Download } from 'lucide-react';
+import { Plus, Search, Upload, Trash2, ArrowUpDown, AlertCircle, Clock, CheckCircle2, Ban, Eye, EyeOff, Download, List } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -156,29 +156,27 @@ export function Orders() {
 
             {/* Status Filter Buttons - Scrollable on mobile */}
             <div className="flex gap-2 overflow-x-auto pb-2 -mb-2 scrollbar-hide">
-              {['all', 'active', 'complete', 'cancelled'].map((status) => {
-                const getStatusIcon = () => {
-                  switch (status) {
-                    case 'complete': return <CheckCircle2 className="h-3.5 w-3.5 sm:mr-1 flex-shrink-0" />;
-                    case 'cancelled': return <XCircle className="h-3.5 w-3.5 sm:mr-1 flex-shrink-0" />;
-                    case 'active': return <Clock className="h-3.5 w-3.5 sm:mr-1 flex-shrink-0" />;
-                    default: return null;
-                  }
-                };
-                return (
-                  <Button
-                    key={status}
-                    variant={statusFilter === status ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setStatusFilter(status)}
-                    className="flex items-center flex-shrink-0"
-                  >
-                    {getStatusIcon()}
-                    <span className="hidden sm:inline">{status.charAt(0).toUpperCase() + status.slice(1)}</span>
-                    <span className="sm:hidden">{status === 'cancelled' ? 'X' : status.charAt(0).toUpperCase()}</span>
-                  </Button>
-                );
-              })}
+              {[
+                { key: 'all', label: 'All', shortLabel: 'All', icon: List, title: 'Show all orders' },
+                { key: 'active', label: 'Active', shortLabel: 'Active', icon: Clock, title: 'Show orders in progress' },
+                { key: 'complete', label: 'Complete', shortLabel: 'Done', icon: CheckCircle2, title: 'Show completed orders' },
+                { key: 'cancelled', label: 'Cancelled', shortLabel: 'Canc.', icon: Ban, title: 'Show cancelled orders' },
+              ].map(({ key, label, shortLabel, icon: Icon, title }) => (
+                <Button
+                  key={key}
+                  variant={statusFilter === key ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setStatusFilter(key)}
+                  className="flex items-center gap-1.5 flex-shrink-0"
+                  title={title}
+                  aria-label={title}
+                  aria-pressed={statusFilter === key}
+                >
+                  <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span className="hidden sm:inline">{label}</span>
+                  <span className="sm:hidden">{shortLabel}</span>
+                </Button>
+              ))}
 
               {/* Divider - visible on larger screens */}
               <div className="border-l ml-1 pl-1 sm:ml-2 sm:pl-2 flex gap-2 flex-shrink-0">

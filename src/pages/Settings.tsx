@@ -8,7 +8,8 @@ import { useState, useRef } from 'react';
 import { usePWA, useServiceWorker } from '@/hooks/usePWA';
 import { useOnlineStatus, useOfflineQueue } from '@/hooks/useOffline';
 import { useInventorySync } from '@/hooks/useInventorySync';
-import { Download, RefreshCw, Wifi, WifiOff, Trash2, CloudOff, Upload, FileSpreadsheet, CheckCircle, AlertCircle } from 'lucide-react';
+import { useBackupExport } from '@/hooks/useBackupExport';
+import { Download, RefreshCw, Wifi, WifiOff, Trash2, CloudOff, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Database, HardDrive } from 'lucide-react';
 
 export function Settings() {
   const { settings, updateSettings } = useSettings();
@@ -26,6 +27,19 @@ export function Settings() {
   // Inventory sync
   const { syncInventory, syncing, lastSyncResult } = useInventorySync();
   const inventoryFileRef = useRef<HTMLInputElement>(null);
+
+  // Backup export
+  const { exportBackup, exporting: exportingBackup, error: backupError } = useBackupExport();
+  const [backupSuccess, setBackupSuccess] = useState(false);
+
+  const handleExportBackup = async () => {
+    setBackupSuccess(false);
+    const success = await exportBackup();
+    if (success) {
+      setBackupSuccess(true);
+      setTimeout(() => setBackupSuccess(false), 3000);
+    }
+  };
 
   const handleCopySchema = async () => {
     await navigator.clipboard.writeText(SCHEMA_SQL);
@@ -192,6 +206,75 @@ export function Settings() {
                 </pre>
               </div>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Data Backup */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HardDrive className="h-5 w-5" />
+            Data Backup
+          </CardTitle>
+          <CardDescription>
+            Export all data to an Excel file for backup or recovery
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Button
+              onClick={handleExportBackup}
+              disabled={exportingBackup}
+              className="gap-2"
+            >
+              {exportingBackup ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Database className="h-4 w-4" />
+                  Export Full Backup
+                </>
+              )}
+            </Button>
+            {backupSuccess && (
+              <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                <CheckCircle className="h-4 w-4" />
+                Backup exported successfully!
+              </span>
+            )}
+          </div>
+
+          {backupError && (
+            <div className="p-4 rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                <div>
+                  <p className="font-medium text-red-800 dark:text-red-200">Backup Failed</p>
+                  <p className="text-sm text-red-700 dark:text-red-300 mt-1">{backupError}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p className="font-medium text-foreground">What gets exported:</p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li><strong>Orders</strong> - All sales orders with status and dates</li>
+              <li><strong>Tools</strong> - All tools within orders</li>
+              <li><strong>Line Items</strong> - All parts with quantities and locations</li>
+              <li><strong>Picks</strong> - Complete pick history (who, what, when)</li>
+              <li><strong>Issues</strong> - Reported issues and resolutions</li>
+              <li><strong>Parts Catalog</strong> - Saved part numbers and descriptions</li>
+              <li><strong>BOM Templates</strong> - Saved bill of materials templates</li>
+            </ul>
+            <p className="text-xs mt-3 p-2 bg-muted rounded">
+              Tip: Export a backup regularly (weekly) and save the files to a safe location
+              like OneDrive, Google Drive, or an external drive.
+            </p>
           </div>
         </CardContent>
       </Card>

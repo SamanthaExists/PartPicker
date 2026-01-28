@@ -11,12 +11,19 @@ import {
   Wifi,
   WifiOff,
   AlertTriangle,
+  History,
+  User,
+  Check,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { GlobalSearch } from '@/components/layout/GlobalSearch';
 import { useOnlineStatus } from '@/hooks/useOffline';
+import { useSettings } from '@/hooks/useSettings';
 import { InstallButton } from '@/components/pwa/InstallPrompt';
 
 interface MainLayoutProps {
@@ -29,6 +36,7 @@ const navItems = [
   { path: '/parts', label: 'Parts', icon: Package },
   { path: '/items-to-order', label: 'Items to Order', icon: ShoppingCart },
   { path: '/issues', label: 'Issues', icon: AlertTriangle },
+  { path: '/activity', label: 'Activity Log', icon: History },
   { path: '/import', label: 'Import', icon: Upload },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -61,6 +69,76 @@ function OnlineStatusBadge({ className }: { className?: string }) {
   );
 }
 
+function UserBadge({ className }: { className?: string }) {
+  const { settings, updateSettings } = useSettings();
+  const [open, setOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+
+  if (!settings.user_name) return null;
+
+  const handleOpen = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen) {
+      setNewName(settings.user_name);
+    }
+  };
+
+  const handleSave = () => {
+    if (newName.trim()) {
+      updateSettings({ user_name: newName.trim() });
+      setOpen(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={handleOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer',
+            className
+          )}
+          title="Click to change user"
+        >
+          <User className="h-3 w-3" />
+          <span className="max-w-[100px] truncate">{settings.user_name}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72" align="end">
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="change-name" className="text-sm font-medium">
+              Change User
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Enter your name to track your picks
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              id="change-name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Enter your name"
+              autoFocus
+            />
+            <Button size="sm" onClick={handleSave} disabled={!newName.trim()}>
+              <Check className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function MainLayout({ children }: MainLayoutProps) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -77,6 +155,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
         <h1 className="ml-3 text-lg font-semibold flex-1 truncate">Tool Pick List</h1>
+        <UserBadge className="mr-2" />
         <OnlineStatusBadge className="mr-2" />
         <GlobalSearch />
       </header>
@@ -138,6 +217,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Desktop header with global search */}
           <header className="sticky top-0 z-30 hidden lg:flex h-14 items-center justify-end gap-4 border-b bg-background px-6 shrink-0">
+            <UserBadge />
             <OnlineStatusBadge />
             <GlobalSearch />
           </header>

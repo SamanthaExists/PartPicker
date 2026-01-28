@@ -540,13 +540,13 @@ export function ConsolidatedParts() {
 
             {/* Additional Filters Row */}
             <div className="flex items-center gap-4 justify-between">
-              <Button
-                variant={showCompleted ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setShowCompleted(!showCompleted)}
-              >
-                {showCompleted ? 'Showing All Parts' : 'Hide Picked Parts'}
-              </Button>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <Checkbox
+                  checked={showCompleted}
+                  onCheckedChange={(checked) => setShowCompleted(checked === true)}
+                />
+                <span className="text-sm font-medium">Show completed parts</span>
+              </label>
               {(searchQuery || hasActiveFilters) && (
                 <span className="text-sm text-muted-foreground">
                   {filteredParts.length} result{filteredParts.length !== 1 ? 's' : ''}

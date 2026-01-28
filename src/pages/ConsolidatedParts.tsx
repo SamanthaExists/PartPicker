@@ -40,10 +40,73 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick }: PartCardPro
 
   return (
     <Card className={cn(isComplete && 'bg-green-50 border-green-200')}>
-      <CardContent className="pt-4">
-        {/* Main Row */}
+      <CardContent className="pt-4 pb-4">
+        {/* Mobile Layout */}
         <div
-          className="flex items-center gap-4 cursor-pointer"
+          className="flex flex-col gap-3 cursor-pointer sm:hidden"
+          onClick={() => onToggleExpand(part.part_number)}
+        >
+          {/* Row 1: Part number and expand icon */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono font-semibold text-base">
+                  {part.part_number}
+                </span>
+                {isComplete && <Badge variant="success" className="text-xs">Complete</Badge>}
+              </div>
+              {part.description && (
+                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                  {part.description}
+                </p>
+              )}
+            </div>
+            <Button variant="ghost" size="icon" className="shrink-0 -mt-1 -mr-2">
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+
+          {/* Row 2: Location */}
+          {part.location && (
+            <Badge variant="outline" className="gap-1 w-fit">
+              <MapPin className="h-3 w-3" />
+              {part.location}
+            </Badge>
+          )}
+
+          {/* Row 3: Progress and quantities */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <Progress value={progressPercent} className="h-2" />
+            </div>
+            <div className="text-right shrink-0">
+              <span className="font-bold">{part.total_picked}</span>
+              <span className="text-muted-foreground"> / {part.total_needed}</span>
+              <span className="text-xs text-muted-foreground ml-2">({part.remaining} left)</span>
+            </div>
+          </div>
+
+          {/* Row 4: Pick button */}
+          {!isComplete && (
+            <Button
+              size="sm"
+              variant="default"
+              className="w-full"
+              onClick={(e) => onPickClick(part, e)}
+            >
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Pick Parts
+            </Button>
+          )}
+        </div>
+
+        {/* Desktop Layout */}
+        <div
+          className="hidden sm:flex items-center gap-4 cursor-pointer"
           onClick={() => onToggleExpand(part.part_number)}
         >
           <Button variant="ghost" size="icon" className="shrink-0">

@@ -15,8 +15,10 @@ A warehouse tool picking application built with React, TypeScript, and Supabase.
 ```
 src/
 ├── components/
+│   ├── common/           # Reusable UI components (EmptyState, SearchInput, OrderFilterPopover)
 │   ├── dialogs/          # Modal dialogs (ManageTools, SaveAsTemplate, etc.)
 │   ├── layout/           # MainLayout, GlobalSearch
+│   ├── order/            # Order page components (OrderStatusAlerts, OrderInfoCard, PickingSection)
 │   ├── picking/          # PickingInterface, LineItemDialog, PrintPickList
 │   ├── pwa/              # PWA components (InstallPrompt, UpdatePrompt)
 │   └── ui/               # shadcn/ui base components
@@ -25,12 +27,14 @@ src/
 │   ├── usePicks.ts       # Pick recording and history
 │   ├── useLineItems.ts   # Line item management
 │   ├── useIssues.ts      # Issue reporting
+│   ├── useDebouncedValue.ts  # Debounce hook for search inputs
+│   ├── useKeyboardNavigation.ts  # Keyboard navigation for lists
 │   └── ...
 ├── lib/
 │   ├── supabase.ts       # Supabase client configuration
 │   ├── excelParser.ts    # Excel/CSV import parsing
 │   ├── excelExport.ts    # Excel export functionality
-│   └── utils.ts          # Utility functions (cn, formatDate, etc.)
+│   └── utils.ts          # Utility functions (cn, formatDate, alphanumericCompare, etc.)
 ├── pages/                # Route components
 │   ├── Dashboard.tsx     # Home dashboard with stats
 │   ├── Orders.tsx        # Order list with filters
@@ -45,6 +49,10 @@ src/
 - **Order Management**: Create, import, and track sales orders
 - **Multi-Tool Support**: Orders can have multiple tools, each with independent picking
 - **Picking Interface**: Touch-optimized with swipe gestures on mobile
+- **Keyboard Navigation**: Arrow keys or j/k to navigate, Enter/Space to pick (desktop)
+- **Batch Picking**: "Pick all in location" feature for efficient warehouse operations
+- **Low Stock Warnings**: Amber highlighting for items with insufficient stock
+- **Hide Completed**: Toggle to hide fully-picked items during picking
 - **Real-time Sync**: Changes sync across devices via Supabase
 - **Offline Support**: PWA with service worker for offline picking
 - **Excel Import/Export**: Import orders from Excel, export pick lists
@@ -108,6 +116,23 @@ UI components use shadcn/ui patterns:
 - Use `overflow-x-auto scrollbar-hide` for horizontal scroll areas
 - Use `flex-shrink-0` on items that shouldn't compress
 
+### Reusable Components (`src/components/common/`)
+
+- **EmptyState**: Consistent empty state display with icon, message, and optional actions
+- **SearchInput**: Search input with clear button, supports `large` variant
+- **OrderFilterPopover**: Multi-select order filter dropdown with select all/clear
+
+### Order Page Components (`src/components/order/`)
+
+- **OrderStatusAlerts**: Alert banners for completion, cancelled, overdue, due-soon states
+- **OrderInfoCard**: Collapsible order information card with inline edit mode
+- **PickingSection**: Tool progress pills, filters, and picking interface wrapper
+
+### Utility Hooks (`src/hooks/`)
+
+- **useDebouncedValue**: Debounces rapidly changing values (search inputs)
+- **useKeyboardNavigation**: Keyboard navigation for lists (↑/↓ or j/k, Enter/Space, Escape)
+
 ## Key Page Logic
 
 ### Items to Order Page (`/items-to-order`)
@@ -135,6 +160,23 @@ Updates `qty_available` on line items from external Excel inventory files:
 2. Skip certain locations (AWAITING INSPECTION, QA, QUARANTINE)
 3. Keep only newest lot per part (highest Lot ID)
 4. Update all line_items with matching part numbers
+
+## Picking Interface Features
+
+### Keyboard Shortcuts (Desktop)
+- `↑` / `k` - Move selection up
+- `↓` / `j` - Move selection down
+- `Enter` / `Space` - Quick pick selected item
+- `Escape` - Clear selection
+
+### Visual Indicators
+- **Green background**: Item fully picked for current tool
+- **Amber background**: Low stock warning (qty_available < remaining needed)
+- **Blue ring**: Keyboard-selected item
+
+### Batch Operations
+- **Pick All in Location**: Button in location group headers to pick all remaining items in that location
+- **Hide Completed Toggle**: Filter out fully-picked items to focus on remaining work
 
 ## Scripts
 

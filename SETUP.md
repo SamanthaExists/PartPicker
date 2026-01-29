@@ -121,16 +121,32 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 
 ## Deployment
 
-### Vercel
+### Current Production Setup
+The app is deployed to **Netlify** with automatic builds from GitHub:
+- **Live URL**: https://partpick.netlify.app
+- **Admin**: https://app.netlify.com/projects/partpick
+
+### Deploy to Netlify (Current Setup)
+```bash
+# Install Netlify CLI (if not installed)
+npm install -g netlify-cli
+
+# Login to Netlify
+netlify login
+
+# Deploy to production
+netlify deploy --prod
+```
+
+### Environment Variables in Netlify
+Set these in Netlify Dashboard > Site settings > Environment variables:
+- `VITE_SUPABASE_URL` - Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Your Supabase anon key
+
+### Alternative: Vercel
 ```bash
 npm install -g vercel
 vercel
 ```
 
-### Netlify
-```bash
-npm install -g netlify-cli
-netlify deploy --prod
-```
-
-Set the environment variables in your deployment platform's settings.
+Set the environment variables in Vercel project settings.

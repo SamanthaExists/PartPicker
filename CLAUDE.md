@@ -2,6 +2,48 @@
 
 A warehouse tool picking application built with React, TypeScript, and Supabase.
 
+## Hosting & Infrastructure
+
+### Production URLs
+| Service | URL |
+|---------|-----|
+| **Live App** | https://partpick.netlify.app |
+| **GitHub Repo** | https://github.com/Jbcox1988/PartPicker.git |
+
+### Netlify (Frontend Hosting)
+- **Project Name**: partpick
+- **Production URL**: https://partpick.netlify.app
+- **Admin Dashboard**: https://app.netlify.com/projects/partpick
+- **Site ID**: `870749d5-40dd-4bfa-8fb6-6d792f53423e`
+- **Account**: josh.cox@corvaer.com
+- **Team**: josh-cox-1hujq7m's team
+- **Build Command**: `npm run build`
+- **Publish Directory**: `dist`
+
+### Supabase (Backend/Database)
+- **Project URL**: https://uewypezgyyyfanltoyfv.supabase.co
+- **Dashboard**: https://supabase.com/dashboard/project/uewypezgyyyfanltoyfv
+- **Project Ref**: `uewypezgyyyfanltoyfv`
+- **Region**: (check dashboard for region)
+- **Features Used**: PostgreSQL, Real-time subscriptions, Row Level Security
+
+### GitHub (Source Control)
+- **Repository**: https://github.com/Jbcox1988/PartPicker.git
+- **Branch**: `main`
+- **Owner**: Jbcox1988
+
+### Environment Variables
+Required environment variables (set in Netlify dashboard and local `.env`):
+```
+VITE_SUPABASE_URL=https://uewypezgyyyfanltoyfv.supabase.co
+VITE_SUPABASE_ANON_KEY=<your-anon-key>
+```
+
+### Deployment Workflow
+1. Push changes to `main` branch on GitHub
+2. Netlify auto-deploys from GitHub (if connected) or run `netlify deploy --prod`
+3. PWA service worker updates automatically
+
 ## Tech Stack
 
 - **Frontend**: React 18 + TypeScript + Vite

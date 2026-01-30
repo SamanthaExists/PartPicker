@@ -82,7 +82,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
               </div>
             </div>
             <div class="col-md-6">
-              <div class="d-flex gap-2 flex-wrap">
+              <div class="d-flex gap-2 flex-wrap align-items-center">
                 <button class="btn btn-sm"
                         [class.btn-primary]="filter === 'all'"
                         [class.btn-outline-secondary]="filter !== 'all'"
@@ -103,6 +103,11 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                         [class.btn-success]="filter === 'complete'"
                         [class.btn-outline-success]="filter !== 'complete'"
                         (click)="setFilter('complete')">Complete</button>
+                <div class="form-check ms-3">
+                  <input class="form-check-input" type="checkbox" id="hideOutOfStock"
+                         [(ngModel)]="hideOutOfStock">
+                  <label class="form-check-label" for="hideOutOfStock">Hide out of stock</label>
+                </div>
               </div>
             </div>
           </div>
@@ -213,6 +218,7 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   searchQuery = '';
   filter: FilterType = 'all';
   copyMessage = '';
+  hideOutOfStock = false;
 
   // Multi-order pick dialog
   showMultiOrderPick = false;
@@ -284,7 +290,10 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
           break;
       }
 
-      return matchesSearch && matchesFilter;
+      // Hide out of stock filter - excludes parts where qty_available is 0
+      const matchesStock = !this.hideOutOfStock || (this.getQtyAvailable(part) !== 0);
+
+      return matchesSearch && matchesFilter && matchesStock;
     });
   }
 

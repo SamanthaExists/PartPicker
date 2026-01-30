@@ -517,96 +517,7 @@ export interface BackupData {
 export function exportFullBackupToExcel(data: BackupData) {
   const workbook = XLSX.utils.book_new();
 
-  // Sheet 1: Orders
-  const ordersHeader = [
-    'ID', 'SO Number', 'PO Number', 'Customer', 'Tool Model', 'Quantity',
-    'Status', 'Order Date', 'Due Date', 'Notes', 'Created At', 'Updated At'
-  ];
-  const ordersData = data.orders.map(o => [
-    o.id, o.so_number, o.po_number || '', o.customer_name || '', o.tool_model || '',
-    o.quantity || 1, o.status, formatDateForExport(o.order_date), formatDateForExport(o.due_date),
-    o.notes || '', formatTimestamp(o.created_at), formatTimestamp(o.updated_at)
-  ]);
-  const ordersSheet = XLSX.utils.aoa_to_sheet([ordersHeader, ...ordersData]);
-  setColumnWidths(ordersSheet, [36, 15, 15, 25, 15, 10, 12, 12, 12, 30, 20, 20]);
-  XLSX.utils.book_append_sheet(workbook, ordersSheet, 'Orders');
-
-  // Sheet 2: Tools
-  const toolsHeader = ['ID', 'Order ID', 'Tool Number', 'Serial Number', 'Tool Model', 'Status', 'Created At'];
-  const toolsData = data.tools.map(t => [
-    t.id, t.order_id, t.tool_number, t.serial_number || '', t.tool_model || '', t.status, formatTimestamp(t.created_at)
-  ]);
-  const toolsSheet = XLSX.utils.aoa_to_sheet([toolsHeader, ...toolsData]);
-  setColumnWidths(toolsSheet, [36, 36, 20, 20, 15, 15, 20]);
-  XLSX.utils.book_append_sheet(workbook, toolsSheet, 'Tools');
-
-  // Sheet 3: Line Items
-  const lineItemsHeader = [
-    'ID', 'Order ID', 'Part Number', 'Description', 'Location',
-    'Qty Per Unit', 'Total Qty Needed', 'Qty Available', 'Tool IDs', 'Created At'
-  ];
-  const lineItemsData = data.lineItems.map(li => [
-    li.id, li.order_id, li.part_number, li.description || '', li.location || '',
-    li.qty_per_unit, li.total_qty_needed, li.qty_available ?? '',
-    li.tool_ids ? li.tool_ids.join(', ') : '', formatTimestamp(li.created_at)
-  ]);
-  const lineItemsSheet = XLSX.utils.aoa_to_sheet([lineItemsHeader, ...lineItemsData]);
-  setColumnWidths(lineItemsSheet, [36, 36, 20, 40, 15, 12, 15, 12, 40, 20]);
-  XLSX.utils.book_append_sheet(workbook, lineItemsSheet, 'Line Items');
-
-  // Sheet 4: Picks
-  const picksHeader = ['ID', 'Line Item ID', 'Tool ID', 'Qty Picked', 'Picked By', 'Notes', 'Picked At'];
-  const picksData = data.picks.map(p => [
-    p.id, p.line_item_id, p.tool_id, p.qty_picked, p.picked_by || '', p.notes || '', formatTimestamp(p.picked_at)
-  ]);
-  const picksSheet = XLSX.utils.aoa_to_sheet([picksHeader, ...picksData]);
-  setColumnWidths(picksSheet, [36, 36, 36, 12, 20, 40, 20]);
-  XLSX.utils.book_append_sheet(workbook, picksSheet, 'Picks');
-
-  // Sheet 5: Issues
-  const issuesHeader = [
-    'ID', 'Line Item ID', 'Order ID', 'Issue Type', 'Description',
-    'Reported By', 'Status', 'Created At', 'Resolved At', 'Resolved By'
-  ];
-  const issuesData = data.issues.map(i => [
-    i.id, i.line_item_id, i.order_id, i.issue_type, i.description || '',
-    i.reported_by || '', i.status, formatTimestamp(i.created_at),
-    i.resolved_at ? formatTimestamp(i.resolved_at) : '', i.resolved_by || ''
-  ]);
-  const issuesSheet = XLSX.utils.aoa_to_sheet([issuesHeader, ...issuesData]);
-  setColumnWidths(issuesSheet, [36, 36, 36, 15, 40, 20, 12, 20, 20, 20]);
-  XLSX.utils.book_append_sheet(workbook, issuesSheet, 'Issues');
-
-  // Sheet 6: Parts Catalog
-  const catalogHeader = ['ID', 'Part Number', 'Description', 'Default Location', 'Created At', 'Updated At'];
-  const catalogData = data.partsCatalog.map(p => [
-    p.id, p.part_number, p.description || '', p.default_location || '',
-    formatTimestamp(p.created_at), formatTimestamp(p.updated_at)
-  ]);
-  const catalogSheet = XLSX.utils.aoa_to_sheet([catalogHeader, ...catalogData]);
-  setColumnWidths(catalogSheet, [36, 20, 40, 20, 20, 20]);
-  XLSX.utils.book_append_sheet(workbook, catalogSheet, 'Parts Catalog');
-
-  // Sheet 7: BOM Templates
-  const templatesHeader = ['ID', 'Name', 'Tool Model', 'Created At', 'Updated At'];
-  const templatesData = data.bomTemplates.map(t => [
-    t.id, t.name, t.tool_model || '', formatTimestamp(t.created_at), formatTimestamp(t.updated_at)
-  ]);
-  const templatesSheet = XLSX.utils.aoa_to_sheet([templatesHeader, ...templatesData]);
-  setColumnWidths(templatesSheet, [36, 30, 20, 20, 20]);
-  XLSX.utils.book_append_sheet(workbook, templatesSheet, 'BOM Templates');
-
-  // Sheet 8: BOM Template Items
-  const templateItemsHeader = ['ID', 'Template ID', 'Part Number', 'Description', 'Location', 'Qty Per Unit'];
-  const templateItemsData = data.bomTemplateItems.map(ti => [
-    ti.id, ti.template_id, ti.part_number, ti.description || '', ti.location || '', ti.qty_per_unit
-  ]);
-  const templateItemsSheet = XLSX.utils.aoa_to_sheet([templateItemsHeader, ...templateItemsData]);
-  setColumnWidths(templateItemsSheet, [36, 36, 20, 40, 20, 12]);
-  XLSX.utils.book_append_sheet(workbook, templateItemsSheet, 'BOM Template Items');
-
-  // Sheet 9: Pick History Detail (Human & AI readable - all data joined)
-  // Create lookup maps for joining data
+  // Create lookup maps for human-readable references
   const orderMap = new Map<string, Order>();
   for (const order of data.orders) {
     orderMap.set(order.id, order);
@@ -622,52 +533,163 @@ export function exportFullBackupToExcel(data: BackupData) {
     lineItemMap.set(lineItem.id, lineItem);
   }
 
-  const pickDetailHeader = [
-    'Picked At',
-    'SO Number',
-    'Customer',
-    'Tool Number',
-    'Part Number',
-    'Description',
-    'Location',
-    'Qty Picked',
-    'Picked By',
-    'Notes'
+  // Sheet 1: Orders
+  const ordersHeader = [
+    'SO Number', 'PO Number', 'Customer', 'Tool Model', 'Quantity',
+    'Status', 'Order Date', 'Due Date', 'Notes', 'Created At', 'Updated At'
   ];
+  const ordersData = data.orders.map(o => [
+    `SO-${o.so_number}`, o.po_number || '', o.customer_name || '', o.tool_model || '',
+    o.quantity || 1, o.status, formatDateForExport(o.order_date), formatDateForExport(o.due_date),
+    o.notes || '', formatTimestamp(o.created_at), formatTimestamp(o.updated_at)
+  ]);
+  const ordersSheet = XLSX.utils.aoa_to_sheet([ordersHeader, ...ordersData]);
+  setColumnWidths(ordersSheet, [15, 15, 25, 15, 10, 12, 12, 12, 30, 20, 20]);
+  XLSX.utils.book_append_sheet(workbook, ordersSheet, 'Orders');
 
-  // Sort picks by picked_at (oldest first for chronological order)
-  const sortedPicks = [...data.picks].sort((a, b) =>
-    new Date(a.picked_at).getTime() - new Date(b.picked_at).getTime()
-  );
-
-  const pickDetailData = sortedPicks.map(pick => {
-    const lineItem = lineItemMap.get(pick.line_item_id);
-    const tool = toolMap.get(pick.tool_id);
-    const order = tool ? orderMap.get(tool.order_id) : null;
-
+  // Sheet 2: Tools (with SO Number instead of Order ID)
+  const toolsHeader = ['SO Number', 'Customer', 'Tool Number', 'Serial Number', 'Tool Model', 'Status', 'Created At'];
+  const toolsData = data.tools.map(t => {
+    const order = orderMap.get(t.order_id);
     return [
-      formatTimestamp(pick.picked_at),
+      order ? `SO-${order.so_number}` : '',
+      order?.customer_name || '',
+      t.tool_number,
+      t.serial_number || '',
+      t.tool_model || '',
+      t.status,
+      formatTimestamp(t.created_at)
+    ];
+  });
+  const toolsSheet = XLSX.utils.aoa_to_sheet([toolsHeader, ...toolsData]);
+  setColumnWidths(toolsSheet, [15, 25, 20, 20, 15, 15, 20]);
+  XLSX.utils.book_append_sheet(workbook, toolsSheet, 'Tools');
+
+  // Sheet 3: Line Items (with SO Number and Tool Numbers instead of IDs)
+  const lineItemsHeader = [
+    'SO Number', 'Customer', 'Part Number', 'Description', 'Location',
+    'Qty Per Unit', 'Total Qty Needed', 'Qty Available', 'Qty On Order', 'Tools', 'Created At'
+  ];
+  const lineItemsData = data.lineItems.map(li => {
+    const order = orderMap.get(li.order_id);
+    // Convert tool IDs to tool numbers
+    const toolNumbers = li.tool_ids
+      ? li.tool_ids.map(tid => toolMap.get(tid)?.tool_number || '').filter(Boolean).join(', ')
+      : '';
+    return [
+      order ? `SO-${order.so_number}` : '',
+      order?.customer_name || '',
+      li.part_number,
+      li.description || '',
+      li.location || '',
+      li.qty_per_unit,
+      li.total_qty_needed,
+      li.qty_available ?? '',
+      (li as LineItem & { qty_on_order?: number }).qty_on_order ?? '',
+      toolNumbers,
+      formatTimestamp(li.created_at)
+    ];
+  });
+  const lineItemsSheet = XLSX.utils.aoa_to_sheet([lineItemsHeader, ...lineItemsData]);
+  setColumnWidths(lineItemsSheet, [15, 25, 20, 40, 15, 12, 15, 12, 12, 30, 20]);
+  XLSX.utils.book_append_sheet(workbook, lineItemsSheet, 'Line Items');
+
+  // Sheet 4: Picks (with human-readable references)
+  const picksHeader = ['Picked At', 'SO Number', 'Customer', 'Tool Number', 'Part Number', 'Description', 'Location', 'Qty Picked', 'Picked By', 'Notes'];
+  const picksData = data.picks.map(p => {
+    const lineItem = lineItemMap.get(p.line_item_id);
+    const tool = toolMap.get(p.tool_id);
+    const order = tool ? orderMap.get(tool.order_id) : null;
+    return [
+      formatTimestamp(p.picked_at),
       order ? `SO-${order.so_number}` : '',
       order?.customer_name || '',
       tool?.tool_number || '',
       lineItem?.part_number || '',
       lineItem?.description || '',
       lineItem?.location || '',
-      pick.qty_picked,
-      pick.picked_by || '',
-      pick.notes || ''
+      p.qty_picked,
+      p.picked_by || '',
+      p.notes || ''
     ];
   });
+  const picksSheet = XLSX.utils.aoa_to_sheet([picksHeader, ...picksData]);
+  setColumnWidths(picksSheet, [20, 15, 25, 15, 20, 40, 15, 12, 20, 40]);
+  XLSX.utils.book_append_sheet(workbook, picksSheet, 'Picks');
 
-  const pickDetailSheet = XLSX.utils.aoa_to_sheet([pickDetailHeader, ...pickDetailData]);
-  setColumnWidths(pickDetailSheet, [20, 15, 25, 15, 20, 40, 15, 12, 20, 40]);
-  XLSX.utils.book_append_sheet(workbook, pickDetailSheet, 'Pick History Detail');
+  // Sheet 5: Issues (with human-readable references)
+  const issuesHeader = [
+    'SO Number', 'Customer', 'Part Number', 'Description', 'Location', 'Issue Type', 'Issue Description',
+    'Reported By', 'Status', 'Created At', 'Resolved At', 'Resolved By'
+  ];
+  const issuesData = data.issues.map(i => {
+    const order = orderMap.get(i.order_id);
+    const lineItem = lineItemMap.get(i.line_item_id);
+    return [
+      order ? `SO-${order.so_number}` : '',
+      order?.customer_name || '',
+      lineItem?.part_number || '',
+      lineItem?.description || '',
+      lineItem?.location || '',
+      i.issue_type,
+      i.description || '',
+      i.reported_by || '',
+      i.status,
+      formatTimestamp(i.created_at),
+      i.resolved_at ? formatTimestamp(i.resolved_at) : '',
+      i.resolved_by || ''
+    ];
+  });
+  const issuesSheet = XLSX.utils.aoa_to_sheet([issuesHeader, ...issuesData]);
+  setColumnWidths(issuesSheet, [15, 25, 20, 40, 15, 15, 40, 20, 12, 20, 20, 20]);
+  XLSX.utils.book_append_sheet(workbook, issuesSheet, 'Issues');
 
-  // Sheet 10: Summary
+  // Sheet 6: Parts Catalog
+  const catalogHeader = ['ID', 'Part Number', 'Description', 'Default Location', 'Created At', 'Updated At'];
+  const catalogData = data.partsCatalog.map(p => [
+    p.id, p.part_number, p.description || '', p.default_location || '',
+    formatTimestamp(p.created_at), formatTimestamp(p.updated_at)
+  ]);
+  const catalogSheet = XLSX.utils.aoa_to_sheet([catalogHeader, ...catalogData]);
+  setColumnWidths(catalogSheet, [36, 20, 40, 20, 20, 20]);
+  XLSX.utils.book_append_sheet(workbook, catalogSheet, 'Parts Catalog');
+
+  // Sheet 7: BOM Templates
+  const templatesHeader = ['Name', 'Tool Model', 'Created At', 'Updated At'];
+  const templatesData = data.bomTemplates.map(t => [
+    t.name, t.tool_model || '', formatTimestamp(t.created_at), formatTimestamp(t.updated_at)
+  ]);
+  const templatesSheet = XLSX.utils.aoa_to_sheet([templatesHeader, ...templatesData]);
+  setColumnWidths(templatesSheet, [30, 20, 20, 20]);
+  XLSX.utils.book_append_sheet(workbook, templatesSheet, 'BOM Templates');
+
+  // Sheet 8: BOM Template Items (with template name instead of ID)
+  const templateMap = new Map<string, BOMTemplate>();
+  for (const template of data.bomTemplates) {
+    templateMap.set(template.id, template);
+  }
+
+  const templateItemsHeader = ['Template Name', 'Tool Model', 'Part Number', 'Description', 'Location', 'Qty Per Unit'];
+  const templateItemsData = data.bomTemplateItems.map(ti => {
+    const template = templateMap.get(ti.template_id);
+    return [
+      template?.name || '',
+      template?.tool_model || '',
+      ti.part_number,
+      ti.description || '',
+      ti.location || '',
+      ti.qty_per_unit
+    ];
+  });
+  const templateItemsSheet = XLSX.utils.aoa_to_sheet([templateItemsHeader, ...templateItemsData]);
+  setColumnWidths(templateItemsSheet, [30, 20, 20, 40, 20, 12]);
+  XLSX.utils.book_append_sheet(workbook, templateItemsSheet, 'BOM Template Items');
+
+  // Sheet 9: Summary
   const summaryData = [
     ['Full Database Backup'],
     [],
-    ['Table', 'Record Count'],
+    ['Sheet', 'Record Count'],
     ['Orders', data.orders.length],
     ['Tools', data.tools.length],
     ['Line Items', data.lineItems.length],
@@ -679,8 +701,8 @@ export function exportFullBackupToExcel(data: BackupData) {
     [],
     ['Backup Date', formatTimestamp(new Date().toISOString())],
     [],
-    ['Note: The "Pick History Detail" sheet contains all pick records with'],
-    ['order, tool, and part information joined for easy reading by humans or AI.'],
+    ['All sheets use human-readable names (SO Numbers, Part Numbers, Tool Numbers)'],
+    ['instead of database IDs for easy reading and analysis.'],
   ];
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
   setColumnWidths(summarySheet, [55, 15]);

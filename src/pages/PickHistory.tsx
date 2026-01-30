@@ -497,22 +497,73 @@ export function PickHistory() {
     })();
   }, []);
 
-  // Export to Excel
-  const handleExport = () => {
-    const picksOnly = filteredActivities.filter((a): a is PickRecord => a.type === 'pick');
+  // Export to Excel - fetches ALL picks in date range, not just current page
+  const [exporting, setExporting] = useState(false);
 
-    const exportData: PickHistoryItem[] = picksOnly.map(pick => ({
-      picked_at: pick.picked_at,
-      picked_by: pick.picked_by,
-      qty_picked: pick.qty_picked,
-      notes: pick.notes,
-      part_number: pick.part_number,
-      tool_number: pick.tool_number,
-      so_number: pick.so_number,
-    }));
+  const handleExport = async () => {
+    try {
+      setExporting(true);
 
-    const dateRange = `${format(new Date(startDate), 'MMM d')} - ${format(new Date(endDate), 'MMM d, yyyy')}`;
-    exportPickHistoryToExcel(exportData, `Activity History: ${dateRange}`);
+      const startISO = new Date(startDate).toISOString();
+      const endISO = new Date(endDate).toISOString();
+
+      // Fetch ALL picks in date range (no pagination limit)
+      const { data: allPicksData, error } = await supabase
+        .from('picks')
+        .select(`
+          id,
+          qty_picked,
+          picked_by,
+          picked_at,
+          notes,
+          line_items!inner (
+            part_number,
+            orders!inner (
+              so_number
+            )
+          ),
+          tools!inner (
+            tool_number
+          )
+        `)
+        .gte('picked_at', startISO)
+        .lte('picked_at', endISO)
+        .order('picked_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching picks for export:', error);
+        return;
+      }
+
+      // Apply search filter if active
+      let filteredData = allPicksData || [];
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filteredData = filteredData.filter((pick: any) =>
+          (pick.picked_by && pick.picked_by.toLowerCase().includes(query)) ||
+          pick.line_items.part_number.toLowerCase().includes(query) ||
+          pick.line_items.orders.so_number.toLowerCase().includes(query) ||
+          pick.tools.tool_number.toLowerCase().includes(query)
+        );
+      }
+
+      const exportData: PickHistoryItem[] = filteredData.map((pick: any) => ({
+        picked_at: pick.picked_at,
+        picked_by: pick.picked_by,
+        qty_picked: pick.qty_picked,
+        notes: pick.notes,
+        part_number: pick.line_items.part_number,
+        tool_number: pick.tools.tool_number,
+        so_number: pick.line_items.orders.so_number,
+      }));
+
+      const dateRange = `${format(new Date(startDate), 'MMM d')} - ${format(new Date(endDate), 'MMM d, yyyy')}`;
+      exportPickHistoryToExcel(exportData, `Activity History: ${dateRange}`);
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const getActivityIcon = (type: ActivityRecord['type']) => {
@@ -631,9 +682,9 @@ export function PickHistory() {
               {loading ? 'Searching...' : 'Search'}
             </Button>
             {hasSearched && filteredActivities.length > 0 && (
-              <Button onClick={handleExport} variant="outline" className="flex-1 sm:flex-none">
-                <Download className="h-4 w-4 mr-2" />
-                Export Picks to Excel
+              <Button onClick={handleExport} variant="outline" className="flex-1 sm:flex-none" disabled={exporting}>
+                <Download className={`h-4 w-4 mr-2 ${exporting ? 'animate-pulse' : ''}`} />
+                {exporting ? 'Exporting...' : 'Export Picks to Excel'}
               </Button>
             )}
           </div>

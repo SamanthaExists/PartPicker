@@ -47,15 +47,15 @@ export class ConsolidatedPartsService implements OnDestroy {
 
       // Fetch active orders
       const { data: ordersData, error: ordersError } = await this.supabase.from('orders')
-        .select('id, so_number')
+        .select('id, so_number, order_date')
         .eq('status', 'active');
 
       if (ordersError) throw ordersError;
 
       const activeOrderIds = (ordersData || []).map(o => o.id);
-      const orderMap = new Map<string, string>();
+      const orderMap = new Map<string, { so_number: string; order_date: string | null }>();
       for (const order of ordersData || []) {
-        orderMap.set(order.id, order.so_number);
+        orderMap.set(order.id, { so_number: order.so_number, order_date: order.order_date });
       }
 
       if (activeOrderIds.length === 0) {
@@ -129,13 +129,15 @@ export class ConsolidatedPartsService implements OnDestroy {
         const pickedQty = picksByLineItem.get(item.id) || 0;
         const existing = partMap.get(item.part_number);
 
+        const orderInfo = orderMap.get(item.order_id);
         if (existing) {
           existing.total_needed += item.total_qty_needed;
           existing.total_picked += pickedQty;
           existing.remaining = existing.total_needed - existing.total_picked;
           existing.orders.push({
             order_id: item.order_id,
-            so_number: orderMap.get(item.order_id) || 'Unknown',
+            so_number: orderInfo?.so_number || 'Unknown',
+            order_date: orderInfo?.order_date || null,
             needed: item.total_qty_needed,
             picked: pickedQty,
             line_item_id: item.id,
@@ -150,13 +152,31 @@ export class ConsolidatedPartsService implements OnDestroy {
             remaining: item.total_qty_needed - pickedQty,
             orders: [{
               order_id: item.order_id,
-              so_number: orderMap.get(item.order_id) || 'Unknown',
+              so_number: orderInfo?.so_number || 'Unknown',
+              order_date: orderInfo?.order_date || null,
               needed: item.total_qty_needed,
               picked: pickedQty,
               line_item_id: item.id,
             }],
           });
         }
+      }
+
+      // Sort orders within each part by order_date (oldest first), fallback to SO number
+      for (const part of partMap.values()) {
+        part.orders.sort((a, b) => {
+          // First, sort by order_date (oldest first, nulls at end)
+          if (a.order_date !== null && b.order_date !== null) {
+            const dateCompare = new Date(a.order_date).getTime() - new Date(b.order_date).getTime();
+            if (dateCompare !== 0) return dateCompare;
+          } else if (a.order_date !== null && b.order_date === null) {
+            return -1; // a has date, b doesn't - a comes first
+          } else if (a.order_date === null && b.order_date !== null) {
+            return 1; // b has date, a doesn't - b comes first
+          }
+          // Fallback: sort by SO number (lower/older SO numbers first)
+          return a.so_number.localeCompare(b.so_number, undefined, { numeric: true });
+        });
       }
 
       // Sort by part number

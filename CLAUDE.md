@@ -214,7 +214,17 @@ Updates `qty_available` on line items from external Excel inventory files:
 - `/issues` - Issue tracking
 - `/import` - Excel/CSV import wizard
 - `/activity` - Activity log
+- `/pick-history` - Pick history with date/time filtering
 - `/settings` - User settings
+
+### Pick History Page (`/pick-history`)
+
+Filter and view all picks within a specific date/time range. Features:
+- **Quick Presets**: Today, Yesterday, This Week, Last 7 Days, This Month, Last 30 Days
+- **Custom Range**: Datetime pickers for precise start/end filtering
+- **Search Within Results**: Filter by picker name, part number, SO number, location
+- **Summary Stats**: Total picks, total quantity, unique parts, unique pickers
+- **Export to Excel**: Download filtered results as an Excel file
 
 ## SO Spreadsheet Format
 

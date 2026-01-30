@@ -321,6 +321,58 @@ export class ExcelService {
     XLSX.writeFile(workbook, `Items-To-Order-${new Date().toISOString().split('T')[0]}.xlsx`);
   }
 
+  /**
+   * Export pick history to Excel with date range
+   */
+  exportPickHistoryToExcel(picks: any[], startDate: string, endDate: string): void {
+    const workbook = XLSX.utils.book_new();
+
+    // Pick History Sheet
+    const header = ['Picked At', 'Picked By', 'SO Number', 'Part Number', 'Tool Number', 'Qty Picked', 'Location', 'Notes'];
+    const data = picks.map(pick => [
+      new Date(pick.picked_at).toLocaleString(),
+      pick.picked_by || 'Unknown',
+      `SO-${pick.so_number}`,
+      pick.part_number,
+      pick.tool_number,
+      pick.qty_picked,
+      pick.location || '',
+      pick.notes || '',
+    ]);
+
+    const picksSheet = XLSX.utils.aoa_to_sheet([header, ...data]);
+    XLSX.utils.book_append_sheet(workbook, picksSheet, 'Pick History');
+
+    // Summary Sheet
+    const totalPicks = picks.length;
+    const totalQty = picks.reduce((sum: number, p: any) => sum + p.qty_picked, 0);
+    const uniqueUsers = new Set(picks.map((p: any) => p.picked_by || 'Unknown')).size;
+    const uniqueParts = new Set(picks.map((p: any) => p.part_number)).size;
+
+    const startFormatted = new Date(startDate).toLocaleDateString();
+    const endFormatted = new Date(endDate).toLocaleDateString();
+
+    const summaryData = [
+      ['Pick History Report'],
+      [],
+      ['Date Range', `${startFormatted} - ${endFormatted}`],
+      [],
+      ['Total Pick Records', totalPicks],
+      ['Total Qty Picked', totalQty],
+      ['Unique Users', uniqueUsers],
+      ['Unique Parts', uniqueParts],
+      [],
+      ['Export Date', new Date().toLocaleString()],
+    ];
+
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+
+    // Download
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `Pick-History-${dateStr}.xlsx`);
+  }
+
   downloadImportTemplate(type: 'single' | 'multi' = 'single'): void {
     const workbook = XLSX.utils.book_new();
 

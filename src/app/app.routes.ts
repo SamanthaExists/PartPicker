@@ -34,6 +34,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/activity-log/activity-log.component').then(m => m.ActivityLogComponent)
   },
   {
+    path: 'pick-history',
+    loadComponent: () => import('./pages/pick-history/pick-history.component').then(m => m.PickHistoryComponent)
+  },
+  {
     path: 'settings',
     loadComponent: () => import('./pages/settings/settings.component').then(m => m.SettingsComponent)
   },

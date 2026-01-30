@@ -8,7 +8,6 @@ import { ItemsToOrder } from '@/pages/ItemsToOrder';
 import { Import } from '@/pages/Import';
 import { Settings } from '@/pages/Settings';
 import { Issues } from '@/pages/Issues';
-import { ActivityLog } from '@/pages/ActivityLog';
 import { PickHistory } from '@/pages/PickHistory';
 import { OfflineIndicator, InstallPrompt, UpdatePrompt } from '@/components/pwa';
 import { NamePrompt } from '@/components/NamePrompt';
@@ -24,8 +23,7 @@ function App() {
           <Route path="/parts" element={<ConsolidatedParts />} />
           <Route path="/items-to-order" element={<ItemsToOrder />} />
           <Route path="/issues" element={<Issues />} />
-          <Route path="/activity" element={<ActivityLog />} />
-          <Route path="/pick-history" element={<PickHistory />} />
+          <Route path="/activity" element={<PickHistory />} />
           <Route path="/import" element={<Import />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

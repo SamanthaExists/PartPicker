@@ -12,7 +12,6 @@ import {
   WifiOff,
   AlertTriangle,
   History,
-  Clock,
   User,
   Check,
 } from 'lucide-react';
@@ -37,8 +36,7 @@ const navItems = [
   { path: '/parts', label: 'Parts', icon: Package },
   { path: '/items-to-order', label: 'Items to Order', icon: ShoppingCart },
   { path: '/issues', label: 'Issues', icon: AlertTriangle },
-  { path: '/activity', label: 'Activity Log', icon: History },
-  { path: '/pick-history', label: 'Pick History', icon: Clock },
+  { path: '/activity', label: 'Activity History', icon: History },
   { path: '/import', label: 'Import', icon: Upload },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];

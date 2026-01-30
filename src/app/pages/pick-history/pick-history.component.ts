@@ -707,35 +707,47 @@ export class PickHistoryComponent implements OnInit {
       const startISO = new Date(this.startDate).toISOString();
       const endISO = new Date(this.endDate).toISOString();
 
-      // Fetch ALL picks in date range (no pagination limit)
-      const { data: allPicksData, error } = await this.supabase.from('picks')
-        .select(`
-          id,
-          qty_picked,
-          picked_by,
-          picked_at,
-          notes,
-          line_items!inner (
-            part_number,
-            orders!inner (
-              so_number
-            )
-          ),
-          tools!inner (
-            tool_number
-          )
-        `)
-        .gte('picked_at', startISO)
-        .lte('picked_at', endISO)
-        .order('picked_at', { ascending: false });
+      // Fetch ALL picks in date range using pagination (Supabase limits to 1000 per query)
+      const EXPORT_PAGE_SIZE = 1000;
+      let allPicksData: any[] = [];
+      let offset = 0;
+      let hasMore = true;
 
-      if (error) {
-        console.error('Error fetching picks for export:', error);
-        return;
+      while (hasMore) {
+        const { data, error } = await this.supabase.from('picks')
+          .select(`
+            id,
+            qty_picked,
+            picked_by,
+            picked_at,
+            notes,
+            line_items!inner (
+              part_number,
+              orders!inner (
+                so_number
+              )
+            ),
+            tools!inner (
+              tool_number
+            )
+          `)
+          .gte('picked_at', startISO)
+          .lte('picked_at', endISO)
+          .order('picked_at', { ascending: false })
+          .range(offset, offset + EXPORT_PAGE_SIZE - 1);
+
+        if (error) {
+          console.error('Error fetching picks for export:', error);
+          return;
+        }
+
+        allPicksData = [...allPicksData, ...(data || [])];
+        hasMore = (data?.length || 0) === EXPORT_PAGE_SIZE;
+        offset += EXPORT_PAGE_SIZE;
       }
 
       // Apply search filter if active
-      let filteredData = allPicksData || [];
+      let filteredData = allPicksData;
       if (this.searchQuery) {
         const query = this.searchQuery.toLowerCase();
         filteredData = filteredData.filter((pick: any) =>

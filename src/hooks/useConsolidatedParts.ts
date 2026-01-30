@@ -36,6 +36,7 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
             orders!inner (
               id,
               so_number,
+              order_date,
               status
             )
           `)
@@ -126,6 +127,7 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
           existing.orders.push({
             order_id: item.order_id,
             so_number: orderInfo.so_number,
+            order_date: orderInfo.order_date,
             needed: item.total_qty_needed,
             picked: picked,
             line_item_id: item.id,
@@ -143,12 +145,30 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
             orders: [{
               order_id: item.order_id,
               so_number: orderInfo.so_number,
+              order_date: orderInfo.order_date,
               needed: item.total_qty_needed,
               picked: picked,
               line_item_id: item.id,
             }],
           });
         }
+      }
+
+      // Sort orders within each part by order_date (oldest first), fallback to SO number
+      for (const part of partsMap.values()) {
+        part.orders.sort((a, b) => {
+          // First, sort by order_date (oldest first, nulls at end)
+          if (a.order_date !== null && b.order_date !== null) {
+            const dateCompare = new Date(a.order_date).getTime() - new Date(b.order_date).getTime();
+            if (dateCompare !== 0) return dateCompare;
+          } else if (a.order_date !== null && b.order_date === null) {
+            return -1; // a has date, b doesn't - a comes first
+          } else if (a.order_date === null && b.order_date !== null) {
+            return 1; // b has date, a doesn't - b comes first
+          }
+          // Fallback: sort by SO number (lower/older SO numbers first)
+          return a.so_number.localeCompare(b.so_number, undefined, { numeric: true });
+        });
       }
 
       // Convert to array and sort by part number

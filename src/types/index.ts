@@ -107,6 +107,7 @@ export interface ConsolidatedPart {
   orders: {
     order_id: string;
     so_number: string;
+    order_date: string | null;
     needed: number;
     picked: number;
     line_item_id: string;

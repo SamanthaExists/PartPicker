@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -10,7 +10,11 @@ import { IssuesService } from '../../services/issues.service';
 import { SettingsService } from '../../services/settings.service';
 import { ExcelService } from '../../services/excel.service';
 import { UtilsService } from '../../services/utils.service';
+import { BomTemplatesService } from '../../services/bom-templates.service';
 import { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '../../models';
+import { SaveAsTemplateDialogComponent } from '../../components/dialogs/save-as-template-dialog.component';
+import { PrintPickListComponent } from '../../components/picking/print-pick-list.component';
+import { DistributeInventoryDialogComponent } from '../../components/dialogs/distribute-inventory-dialog.component';
 
 type SortMode = 'part_number' | 'location';
 
@@ -22,7 +26,7 @@ interface PickHistoryItem {
 @Component({
   selector: 'app-order-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, SaveAsTemplateDialogComponent, PrintPickListComponent, DistributeInventoryDialogComponent],
   template: `
     <div *ngIf="loading" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
@@ -91,6 +95,12 @@ interface PickHistoryItem {
           </select>
           <button class="btn btn-outline-secondary btn-sm" (click)="handleExport()">
             <i class="bi bi-download me-1"></i> Export
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" (click)="showPrintModal = true" title="Print Pick List">
+            <i class="bi bi-printer me-1"></i> Print
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" (click)="showSaveTemplateModal = true" title="Save as BOM Template">
+            <i class="bi bi-save me-1"></i> Template
           </button>
 
           <!-- Progress -->
@@ -291,6 +301,17 @@ interface PickHistoryItem {
                           <i class="bi bi-geo-alt-fill text-primary"></i>
                           <strong>{{ getLocationGroup(item) }}</strong>
                           <span class="badge bg-secondary">{{ getLocationGroupCount(item) }} items</span>
+                          <span class="badge bg-info">{{ getLocationGroupRemaining(item) }} remaining</span>
+                          <button
+                            *ngIf="getLocationGroupRemaining(item) > 0"
+                            class="btn btn-sm btn-success ms-auto"
+                            (click)="handlePickAllInLocation(getLocationGroup(item))"
+                            [disabled]="isSubmitting !== null"
+                            title="Pick all remaining items in this location"
+                          >
+                            <i class="bi bi-check-all me-1"></i>
+                            Pick All in {{ getLocationGroup(item) }}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -298,7 +319,9 @@ interface PickHistoryItem {
                     <!-- Main Row -->
                     <tr [class.table-success]="isItemComplete(item)"
                         [class.table-warning]="isItemPartial(item)"
-                        [class.table-danger]="hasOpenIssue(item.id)">
+                        [class.table-danger]="hasOpenIssue(item.id)"
+                        [class.keyboard-selected]="keyboardSelectedIndex === idx"
+                        [id]="'line-item-' + idx">
                       <!-- Expand Toggle -->
                       <td class="text-center">
                         <button class="btn btn-sm btn-link p-0" (click)="toggleExpanded(item.id)"
@@ -702,6 +725,32 @@ interface PickHistoryItem {
         </div>
       </div>
       <div class="modal-backdrop fade show" *ngIf="showReportIssueModal"></div>
+
+      <!-- Save as Template Dialog -->
+      <app-save-as-template-dialog
+        [(show)]="showSaveTemplateModal"
+        [lineItemsCount]="lineItems.length"
+        [defaultToolModel]="order?.tool_model || null"
+        (saveTemplate)="handleSaveAsTemplate($event)"
+      ></app-save-as-template-dialog>
+
+      <!-- Print Pick List Dialog -->
+      <app-print-pick-list
+        [show]="showPrintModal"
+        [order]="order"
+        [tools]="tools"
+        [lineItems]="lineItemsWithPicks"
+      ></app-print-pick-list>
+      <div class="modal-backdrop fade show" *ngIf="showPrintModal" (click)="showPrintModal = false"></div>
+
+      <!-- Distribute Inventory Dialog -->
+      <app-distribute-inventory-dialog
+        [(show)]="showDistributeModal"
+        [lineItem]="distributeItem"
+        [tools]="tools"
+        [getToolPicked]="getToolPickedBound"
+        (distribute)="handleDistribute($event)"
+      ></app-distribute-inventory-dialog>
     </div>
   `,
   styles: [`
@@ -760,6 +809,15 @@ interface PickHistoryItem {
     .table-warning { background-color: rgba(255, 193, 7, 0.1) !important; }
     .table-danger { background-color: rgba(220, 53, 69, 0.1) !important; }
     .table-info { background-color: rgba(13, 202, 240, 0.15) !important; }
+
+    .keyboard-selected {
+      outline: 2px solid #0d6efd !important;
+      outline-offset: -2px;
+    }
+
+    .keyboard-selected td {
+      background-color: rgba(13, 110, 253, 0.08) !important;
+    }
   `]
 })
 export class OrderDetailComponent implements OnInit, OnDestroy {
@@ -782,10 +840,15 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   showPartialPickModal = false;
   showUndoToolModal = false;
   showReportIssueModal = false;
+  showSaveTemplateModal = false;
+  showPrintModal = false;
+  showDistributeModal = false;
 
   sortMode: SortMode = 'part_number';
   expandedItems: Set<string> = new Set();
   isSubmitting: string | null = null;
+  keyboardSelectedIndex = -1;
+  distributeItem: LineItemWithPicks | null = null;
 
   editForm = {
     so_number: '',
@@ -834,8 +897,102 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     private issuesService: IssuesService,
     private settingsService: SettingsService,
     private excelService: ExcelService,
+    private bomTemplatesService: BomTemplatesService,
     public utils: UtilsService
-  ) {}
+  ) {
+    // Bind getToolPicked for child component
+    this.getToolPickedBound = this.getToolPicked.bind(this);
+  }
+
+  // Bound function for child component
+  getToolPickedBound: (item: LineItemWithPicks, tool: Tool) => number;
+
+  // Keyboard navigation
+  @HostListener('document:keydown', ['$event'])
+  handleKeydown(event: KeyboardEvent): void {
+    // Ignore if user is typing in an input field
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+      return;
+    }
+
+    // Ignore if any modal is open
+    if (this.showPartialPickModal || this.showUndoToolModal || this.showReportIssueModal ||
+        this.showSaveTemplateModal || this.showPrintModal || this.showDistributeModal ||
+        this.showAddToolModal || this.showManageToolsModal || this.showAddLineItemModal) {
+      return;
+    }
+
+    const items = this.sortedLineItems;
+    if (items.length === 0) return;
+
+    switch (event.key) {
+      case 'ArrowDown':
+      case 'j':
+        event.preventDefault();
+        if (this.keyboardSelectedIndex < items.length - 1) {
+          this.keyboardSelectedIndex++;
+          this.scrollToSelectedItem();
+        }
+        break;
+
+      case 'ArrowUp':
+      case 'k':
+        event.preventDefault();
+        if (this.keyboardSelectedIndex > 0) {
+          this.keyboardSelectedIndex--;
+          this.scrollToSelectedItem();
+        } else if (this.keyboardSelectedIndex === -1 && items.length > 0) {
+          this.keyboardSelectedIndex = 0;
+          this.scrollToSelectedItem();
+        }
+        break;
+
+      case 'Enter':
+      case ' ':
+        if (this.keyboardSelectedIndex >= 0 && this.keyboardSelectedIndex < items.length) {
+          event.preventDefault();
+          const item = items[this.keyboardSelectedIndex];
+          if (!this.isItemComplete(item)) {
+            if (this.tools.length === 1) {
+              this.handleQuickPick(item, this.tools[0]);
+            } else {
+              this.handlePickAllTools(item);
+            }
+          }
+        }
+        break;
+
+      case 'Escape':
+        this.keyboardSelectedIndex = -1;
+        break;
+
+      case 'Home':
+        event.preventDefault();
+        if (items.length > 0) {
+          this.keyboardSelectedIndex = 0;
+          this.scrollToSelectedItem();
+        }
+        break;
+
+      case 'End':
+        event.preventDefault();
+        if (items.length > 0) {
+          this.keyboardSelectedIndex = items.length - 1;
+          this.scrollToSelectedItem();
+        }
+        break;
+    }
+  }
+
+  private scrollToSelectedItem(): void {
+    setTimeout(() => {
+      const element = document.getElementById(`line-item-${this.keyboardSelectedIndex}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    });
+  }
 
   ngOnInit(): void {
     // Load sort preference from localStorage
@@ -948,6 +1105,35 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   getLocationGroupCount(item: LineItemWithPicks): number {
     const prefix = this.getLocationPrefix(item.location);
     return this.sortedLineItems.filter(i => this.getLocationPrefix(i.location) === prefix).length;
+  }
+
+  getLocationGroupRemaining(item: LineItemWithPicks): number {
+    const prefix = this.getLocationPrefix(item.location);
+    return this.sortedLineItems
+      .filter(i => this.getLocationPrefix(i.location) === prefix)
+      .reduce((sum, i) => sum + i.remaining, 0);
+  }
+
+  async handlePickAllInLocation(locationGroup: string): Promise<void> {
+    const itemsInLocation = this.sortedLineItems.filter(
+      i => this.getLocationPrefix(i.location) === locationGroup && i.remaining > 0
+    );
+
+    if (itemsInLocation.length === 0) return;
+
+    this.isSubmitting = 'batch';
+    const userName = this.settingsService.getUserName();
+
+    for (const item of itemsInLocation) {
+      for (const tool of this.tools) {
+        const remaining = this.getRemainingForTool(item, tool);
+        if (remaining > 0) {
+          await this.picksService.recordPick(item.id, tool.id, remaining, userName);
+        }
+      }
+    }
+
+    this.isSubmitting = null;
   }
 
   get totalNeeded(): number {
@@ -1311,5 +1497,43 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     if (this.orderId) {
       this.picksService.loadPicksForOrder(this.orderId);
     }
+  }
+
+  // Save as Template
+  async handleSaveAsTemplate(data: { name: string; toolModel: string | null }): Promise<void> {
+    if (this.lineItems.length === 0) return;
+
+    await this.bomTemplatesService.createTemplateFromOrder(
+      data.name,
+      data.toolModel,
+      this.lineItems
+    );
+  }
+
+  // Distribute Inventory
+  openDistributeDialog(item: LineItemWithPicks): void {
+    this.distributeItem = item;
+    this.showDistributeModal = true;
+  }
+
+  async handleDistribute(allocations: { toolId: string; qty: number }[]): Promise<void> {
+    if (!this.distributeItem) return;
+
+    this.isSubmitting = this.distributeItem.id;
+    const userName = this.settingsService.getUserName();
+
+    for (const alloc of allocations) {
+      if (alloc.qty > 0) {
+        await this.picksService.recordPick(
+          this.distributeItem.id,
+          alloc.toolId,
+          alloc.qty,
+          userName
+        );
+      }
+    }
+
+    this.isSubmitting = null;
+    this.distributeItem = null;
   }
 }

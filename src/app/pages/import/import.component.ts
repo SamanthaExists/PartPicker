@@ -1,15 +1,20 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { OrdersService } from '../../services/orders.service';
 import { ExcelService } from '../../services/excel.service';
-import { ImportedOrder } from '../../models';
+import { PartsCatalogService } from '../../services/parts-catalog.service';
+import { BomTemplatesService } from '../../services/bom-templates.service';
+import { ImportedOrder, ImportedLineItem, PartConflict, BOMTemplateWithItems } from '../../models';
+import { TemplateSelectDialogComponent } from '../../components/dialogs/template-select-dialog.component';
+import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicate-parts-dialog.component';
 
 @Component({
   selector: 'app-import',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, TemplateSelectDialogComponent, DuplicatePartsDialogComponent],
   template: `
     <div>
       <div class="mb-4">
@@ -28,12 +33,16 @@ import { ImportedOrder } from '../../models';
             <i class="bi bi-upload display-4 text-muted mb-3"></i>
             <p class="h5 mb-2">Drag and drop your file here</p>
             <p class="text-muted mb-4">Supports Excel (.xlsx) and CSV files</p>
-            <div class="d-flex justify-content-center gap-2">
+            <div class="d-flex justify-content-center gap-2 flex-wrap">
               <label class="btn btn-primary">
                 <i class="bi bi-file-earmark-spreadsheet me-1"></i>
                 Browse Files
                 <input type="file" class="d-none" accept=".xlsx,.xls,.csv" (change)="onFileSelect($event)">
               </label>
+              <button class="btn btn-outline-secondary" (click)="showTemplateDialog = true">
+                <i class="bi bi-file-earmark-text me-1"></i>
+                Load from Template
+              </button>
             </div>
           </div>
 
@@ -56,6 +65,7 @@ import { ImportedOrder } from '../../models';
           <div class="d-flex align-items-center">
             <i class="bi bi-check-circle-fill text-success me-2"></i>
             <span class="fw-semibold">Preview: SO-{{ parseResult.order.so_number }}</span>
+            <span *ngIf="loadedFromTemplate" class="badge bg-info ms-2">From Template</span>
           </div>
           <button class="btn btn-sm btn-outline-secondary" (click)="clearResult()">
             <i class="bi bi-x-lg"></i>
@@ -70,33 +80,60 @@ import { ImportedOrder } from '../../models';
             </ul>
           </div>
 
+          <!-- Conflicts detected -->
+          <div class="alert alert-warning d-flex align-items-center justify-content-between" *ngIf="partConflicts.length > 0">
+            <div>
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              <strong>{{ partConflicts.length }} part(s)</strong> have different values than the Parts Catalog.
+            </div>
+            <button class="btn btn-sm btn-warning" (click)="showDuplicatesDialog = true">
+              Review Conflicts
+            </button>
+          </div>
+
           <!-- Order Info -->
           <div class="mb-4">
             <h6 class="fw-semibold mb-2">Order Details</h6>
             <div class="row g-3 small">
               <div class="col-6 col-md-3">
-                <span class="text-muted">SO Number:</span>
-                <span class="fw-medium ms-2">{{ parseResult.order.so_number }}</span>
+                <label class="form-label text-muted small mb-1">SO Number *</label>
+                <input type="text" class="form-control form-control-sm" [(ngModel)]="parseResult.order.so_number">
               </div>
-              <div class="col-6 col-md-3" *ngIf="parseResult.order.po_number">
-                <span class="text-muted">PO Number:</span>
-                <span class="fw-medium ms-2">{{ parseResult.order.po_number }}</span>
+              <div class="col-6 col-md-3">
+                <label class="form-label text-muted small mb-1">PO Number</label>
+                <input type="text" class="form-control form-control-sm" [(ngModel)]="parseResult.order.po_number">
               </div>
-              <div class="col-6 col-md-3" *ngIf="parseResult.order.customer_name">
-                <span class="text-muted">Customer:</span>
-                <span class="fw-medium ms-2">{{ parseResult.order.customer_name }}</span>
+              <div class="col-6 col-md-3">
+                <label class="form-label text-muted small mb-1">Customer</label>
+                <input type="text" class="form-control form-control-sm" [(ngModel)]="parseResult.order.customer_name">
+              </div>
+              <div class="col-6 col-md-3">
+                <label class="form-label text-muted small mb-1">Due Date</label>
+                <input type="date" class="form-control form-control-sm" [(ngModel)]="parseResult.order.due_date">
               </div>
             </div>
           </div>
 
           <!-- Tools -->
           <div class="mb-4">
-            <h6 class="fw-semibold mb-2">Tools ({{ parseResult.order.tools.length }})</h6>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="fw-semibold mb-0">Tools ({{ parseResult.order.tools.length }})</h6>
+              <div class="d-flex align-items-center gap-2">
+                <label class="form-label mb-0 small text-muted">Tool Count:</label>
+                <input
+                  type="number"
+                  class="form-control form-control-sm"
+                  style="width: 70px;"
+                  [(ngModel)]="toolCount"
+                  [min]="1"
+                  (change)="regenerateTools()"
+                >
+              </div>
+            </div>
             <div class="d-flex flex-wrap gap-2">
               <span *ngFor="let tool of parseResult.order.tools" class="badge bg-secondary">
                 {{ tool.tool_number }}
                 <span *ngIf="tool.tool_model"> [{{ tool.tool_model }}]</span>
-                <span *ngIf="tool.serial_number"> (SN: {{ tool.serial_number }})</span>
               </span>
             </div>
           </div>
@@ -131,10 +168,31 @@ import { ImportedOrder } from '../../models';
             </p>
           </div>
 
+          <!-- Import Options -->
+          <div class="mb-4 p-3 bg-light rounded">
+            <h6 class="fw-semibold mb-2">Import Options</h6>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="saveToCatalog" [(ngModel)]="saveToCatalog">
+              <label class="form-check-label" for="saveToCatalog">
+                Save new parts to Parts Catalog
+                <span class="text-muted small d-block">Parts not already in the catalog will be added automatically</span>
+              </label>
+            </div>
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" id="useLegacyFormat" [(ngModel)]="useLegacyFormat"
+                     (change)="reparse()">
+              <label class="form-check-label" for="useLegacyFormat">
+                Legacy format (tool columns)
+                <span class="text-muted small d-block">Enable if your file has columns like "3137-1", "3137-2" for per-tool quantities</span>
+              </label>
+            </div>
+          </div>
+
           <!-- Actions -->
           <div class="d-flex justify-content-end gap-2">
             <button class="btn btn-outline-secondary" (click)="clearResult()">Cancel</button>
-            <button class="btn btn-primary" (click)="handleImport()" [disabled]="isImporting">
+            <button class="btn btn-primary" (click)="handleImport()" [disabled]="isImporting || !parseResult.order.so_number">
+              <i class="bi me-1" [class]="isImporting ? 'bi-arrow-clockwise spin' : 'bi-check-circle'"></i>
               {{ isImporting ? 'Importing...' : 'Import Order' }}
             </button>
           </div>
@@ -177,6 +235,13 @@ import { ImportedOrder } from '../../models';
             </p>
           </div>
           <div class="mb-3">
+            <h6 class="fw-semibold">Legacy Format (Tool Columns)</h6>
+            <p class="small text-muted mb-0">
+              Excel file with columns named like "3137-1", "3137-2" for per-tool quantities.
+              Enable "Legacy format" option to use this format.
+            </p>
+          </div>
+          <div class="mb-3">
             <h6 class="fw-semibold">Expected Columns</h6>
             <ul class="small text-muted mb-0">
               <li>Part Number (required)</li>
@@ -187,10 +252,60 @@ import { ImportedOrder } from '../../models';
           </div>
         </div>
       </div>
+
+      <!-- Template Select Dialog -->
+      <app-template-select-dialog
+        [(show)]="showTemplateDialog"
+        (templateSelected)="handleTemplateSelected($event)"
+      ></app-template-select-dialog>
+
+      <!-- Duplicate Parts Dialog -->
+      <app-duplicate-parts-dialog
+        [(show)]="showDuplicatesDialog"
+        [conflicts]="partConflicts"
+        (resolved)="handleConflictsResolved($event)"
+      ></app-duplicate-parts-dialog>
     </div>
-  `
+  `,
+  styles: [`
+    .dropzone {
+      border: 2px dashed #dee2e6;
+      border-radius: 0.5rem;
+      padding: 3rem;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .dropzone.dragover {
+      border-color: #0d6efd;
+      background-color: rgba(13, 110, 253, 0.05);
+    }
+
+    .dropzone:hover {
+      border-color: #adb5bd;
+    }
+
+    .font-mono {
+      font-family: monospace;
+    }
+
+    .spin {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .sticky-top {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+  `]
 })
-export class ImportComponent {
+export class ImportComponent implements OnInit, OnDestroy {
   isDragging = false;
   parseResult: {
     order: ImportedOrder;
@@ -199,12 +314,41 @@ export class ImportComponent {
   } | null = null;
   parseErrors: string[] = [];
   isImporting = false;
+  loadedFromTemplate = false;
+
+  // Dialogs
+  showTemplateDialog = false;
+  showDuplicatesDialog = false;
+
+  // Conflicts
+  partConflicts: PartConflict[] = [];
+
+  // Import options
+  saveToCatalog = true;
+  useLegacyFormat = false;
+  toolCount = 1;
+
+  // File reference for re-parsing
+  private currentFile: File | null = null;
+
+  private subscriptions: Subscription[] = [];
 
   constructor(
     private router: Router,
     private ordersService: OrdersService,
-    private excelService: ExcelService
+    private excelService: ExcelService,
+    private partsCatalogService: PartsCatalogService,
+    private bomTemplatesService: BomTemplatesService
   ) {}
+
+  ngOnInit(): void {
+    // Preload parts catalog for conflict detection
+    this.partsCatalogService.fetchParts();
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.forEach(sub => sub.unsubscribe());
+  }
 
   onDragOver(event: DragEvent): void {
     event.preventDefault();
@@ -236,6 +380,9 @@ export class ImportComponent {
   async handleFile(file: File): Promise<void> {
     this.parseResult = null;
     this.parseErrors = [];
+    this.partConflicts = [];
+    this.loadedFromTemplate = false;
+    this.currentFile = file;
 
     const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.type.includes('spreadsheet');
     const isCsv = file.name.endsWith('.csv') || file.type === 'text/csv';
@@ -245,9 +392,14 @@ export class ImportComponent {
       return;
     }
 
-    const result = isExcel
-      ? await this.excelService.parseEnhancedExcelFile(file)
-      : await this.excelService.parseCsvFile(file);
+    let result;
+    if (isExcel) {
+      result = this.useLegacyFormat
+        ? await this.excelService.parseEnhancedExcelFileWithLegacySupport(file)
+        : await this.excelService.parseEnhancedExcelFile(file);
+    } else {
+      result = await this.excelService.parseCsvFile(file);
+    }
 
     if (result.success && result.order) {
       this.parseResult = {
@@ -255,15 +407,98 @@ export class ImportComponent {
         errors: result.errors,
         warnings: result.warnings,
       };
+      this.toolCount = result.order.tools.length;
+
+      // Check for conflicts with parts catalog
+      this.checkForConflicts(result.order.line_items);
     } else {
       this.parseErrors = result.errors;
     }
+  }
+
+  async reparse(): Promise<void> {
+    if (this.currentFile) {
+      await this.handleFile(this.currentFile);
+    }
+  }
+
+  checkForConflicts(lineItems: ImportedLineItem[]): void {
+    this.partConflicts = this.partsCatalogService.checkForConflicts(lineItems);
+  }
+
+  regenerateTools(): void {
+    if (!this.parseResult) return;
+
+    const soNumber = this.parseResult.order.so_number;
+    const toolModel = this.parseResult.order.tools[0]?.tool_model;
+    const count = Math.max(1, this.toolCount);
+
+    this.parseResult.order.tools = [];
+    for (let i = 1; i <= count; i++) {
+      this.parseResult.order.tools.push({
+        tool_number: `${soNumber}-${i}`,
+        tool_model: toolModel,
+      });
+    }
+
+    // Recalculate total_qty_needed for all line items
+    for (const item of this.parseResult.order.line_items) {
+      item.total_qty_needed = item.qty_per_unit * count;
+    }
+  }
+
+  handleTemplateSelected(template: BOMTemplateWithItems): void {
+    // Create a new order from the template
+    const order: ImportedOrder = {
+      so_number: '',
+      tools: [{
+        tool_number: '-1',
+        tool_model: template.tool_model || undefined,
+      }],
+      line_items: template.items.map(item => ({
+        part_number: item.part_number,
+        description: item.description || undefined,
+        location: item.location || undefined,
+        qty_per_unit: item.qty_per_unit,
+        total_qty_needed: item.qty_per_unit,
+      })),
+    };
+
+    this.parseResult = {
+      order,
+      errors: [],
+      warnings: [`Loaded from template: ${template.name}`],
+    };
+    this.loadedFromTemplate = true;
+    this.toolCount = 1;
+    this.currentFile = null;
+
+    // Check for conflicts
+    this.checkForConflicts(order.line_items);
+  }
+
+  async handleConflictsResolved(conflicts: PartConflict[]): Promise<void> {
+    // Apply resolutions to the parts catalog
+    await this.partsCatalogService.applyConflictResolutions(conflicts);
+
+    // Clear conflicts
+    this.partConflicts = [];
   }
 
   async handleImport(): Promise<void> {
     if (!this.parseResult?.order) return;
 
     this.isImporting = true;
+
+    // Save new parts to catalog if enabled
+    if (this.saveToCatalog) {
+      await this.partsCatalogService.savePartsFromImport(
+        this.parseResult.order.line_items,
+        true // Skip existing parts
+      );
+    }
+
+    // Import the order
     const result = await this.ordersService.importOrder(this.parseResult.order);
     this.isImporting = false;
 
@@ -275,6 +510,9 @@ export class ImportComponent {
   clearResult(): void {
     this.parseResult = null;
     this.parseErrors = [];
+    this.partConflicts = [];
+    this.loadedFromTemplate = false;
+    this.currentFile = null;
   }
 
   downloadTemplate(type: 'single' | 'multi'): void {

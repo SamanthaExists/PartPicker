@@ -204,6 +204,45 @@ export class PicksService implements OnDestroy {
     return result;
   }
 
+  // Record pick for a line item (finds first tool for the order)
+  async recordPickForLineItem(
+    lineItemId: string,
+    qtyPicked: number,
+    pickedBy?: string,
+    notes?: string
+  ): Promise<Pick | null> {
+    try {
+      // First get the line item to find its order_id
+      const { data: lineItem, error: lineItemError } = await this.supabase.from('line_items')
+        .select('order_id')
+        .eq('id', lineItemId)
+        .single();
+
+      if (lineItemError || !lineItem) {
+        throw new Error('Line item not found');
+      }
+
+      // Get the first tool for this order
+      const { data: tools, error: toolsError } = await this.supabase.from('tools')
+        .select('id')
+        .eq('order_id', lineItem.order_id)
+        .order('tool_number')
+        .limit(1);
+
+      if (toolsError || !tools || tools.length === 0) {
+        throw new Error('No tools found for order');
+      }
+
+      const toolId = tools[0].id;
+
+      // Record the pick
+      return this.recordPick(lineItemId, toolId, qtyPicked, pickedBy, notes);
+    } catch (err) {
+      this.errorSubject.next(err instanceof Error ? err.message : 'Failed to record pick');
+      return null;
+    }
+  }
+
   // Batch update allocations
   async batchUpdateAllocations(
     lineItemId: string,

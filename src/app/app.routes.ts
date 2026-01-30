@@ -30,6 +30,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/import/import.component').then(m => m.ImportComponent)
   },
   {
+    path: 'activity',
+    loadComponent: () => import('./pages/activity-log/activity-log.component').then(m => m.ActivityLogComponent)
+  },
+  {
     path: 'settings',
     loadComponent: () => import('./pages/settings/settings.component').then(m => m.SettingsComponent)
   },

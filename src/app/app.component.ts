@@ -2,11 +2,23 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, RouterOutlet } from '@angular/router';
 import { SettingsService } from './services/settings.service';
+import { GlobalSearchComponent } from './components/layout/global-search.component';
+import { InstallPromptComponent } from './components/pwa/install-prompt.component';
+import { UpdatePromptComponent } from './components/pwa/update-prompt.component';
+import { OfflineIndicatorComponent } from './components/pwa/offline-indicator.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterModule, RouterOutlet],
+  imports: [
+    CommonModule,
+    RouterModule,
+    RouterOutlet,
+    GlobalSearchComponent,
+    InstallPromptComponent,
+    UpdatePromptComponent,
+    OfflineIndicatorComponent
+  ],
   template: `
     <div class="d-flex min-vh-100">
       <!-- Sidebar -->
@@ -45,8 +57,9 @@ import { SettingsService } from './services/settings.service';
             <i class="bi bi-list fs-4"></i>
           </button>
           <span class="fw-bold">Tool Pick List</span>
-          <div class="ms-auto d-flex align-items-center">
-            <span class="online-indicator me-2" [class.online]="isOnline" [class.offline]="!isOnline"></span>
+          <div class="ms-auto d-flex align-items-center gap-2">
+            <app-global-search></app-global-search>
+            <span class="online-indicator" [class.online]="isOnline" [class.offline]="!isOnline"></span>
           </div>
         </div>
       </div>
@@ -89,7 +102,8 @@ import { SettingsService } from './services/settings.service';
       <!-- Main Content -->
       <main class="flex-grow-1 d-flex flex-column overflow-hidden">
         <!-- Desktop Header -->
-        <header class="d-none d-lg-flex align-items-center justify-content-end p-3 border-bottom bg-white" style="height: 56px;">
+        <header class="d-none d-lg-flex align-items-center justify-content-between p-3 border-bottom bg-white" style="height: 56px;">
+          <app-global-search></app-global-search>
           <div class="d-flex align-items-center">
             <span class="online-indicator me-2" [class.online]="isOnline" [class.offline]="!isOnline"></span>
             <span class="text-muted small">{{ isOnline ? 'Online' : 'Offline' }}</span>
@@ -104,6 +118,11 @@ import { SettingsService } from './services/settings.service';
         </div>
       </main>
     </div>
+
+    <!-- PWA Components -->
+    <app-offline-indicator></app-offline-indicator>
+    <app-install-prompt></app-install-prompt>
+    <app-update-prompt></app-update-prompt>
   `,
   styles: [`
     :host {
@@ -131,6 +150,7 @@ export class AppComponent implements OnInit {
     { path: '/parts', label: 'Parts', icon: 'bi-box-seam' },
     { path: '/items-to-order', label: 'Items to Order', icon: 'bi-cart' },
     { path: '/issues', label: 'Issues', icon: 'bi-exclamation-triangle' },
+    { path: '/activity', label: 'Activity Log', icon: 'bi-clock-history' },
     { path: '/import', label: 'Import', icon: 'bi-upload' },
     { path: '/settings', label: 'Settings', icon: 'bi-gear' },
   ];

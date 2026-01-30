@@ -28,6 +28,10 @@ export class ConsolidatedPartsService implements OnDestroy {
     }
   }
 
+  refresh(): void {
+    this.fetchParts();
+  }
+
   private setupRealtimeSubscription(): void {
     this.subscription = this.supabase.channel('consolidated-parts')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'line_items' }, () => this.fetchParts())
@@ -59,24 +63,56 @@ export class ConsolidatedPartsService implements OnDestroy {
         return;
       }
 
-      // Fetch line items for active orders
-      const { data: lineItemsData, error: lineItemsError } = await this.supabase.from('line_items')
-        .select('*')
-        .in('order_id', activeOrderIds);
+      // Fetch line items for active orders with pagination
+      let lineItemsData: any[] = [];
+      {
+        const pageSize = 1000;
+        let offset = 0;
+        let hasMore = true;
 
-      if (lineItemsError) throw lineItemsError;
+        while (hasMore) {
+          const { data, error: lineItemsError } = await this.supabase.from('line_items')
+            .select('*')
+            .in('order_id', activeOrderIds)
+            .range(offset, offset + pageSize - 1);
 
-      // Fetch picks for these line items
+          if (lineItemsError) throw lineItemsError;
+
+          if (data && data.length > 0) {
+            lineItemsData.push(...data);
+            offset += pageSize;
+            hasMore = data.length === pageSize;
+          } else {
+            hasMore = false;
+          }
+        }
+      }
+
+      // Fetch picks for these line items with pagination
       const lineItemIds = (lineItemsData || []).map(item => item.id);
       let picksData: any[] = [];
 
       if (lineItemIds.length > 0) {
-        const { data, error: picksError } = await this.supabase.from('picks')
-          .select('line_item_id, qty_picked')
-          .in('line_item_id', lineItemIds);
+        const pageSize = 1000;
+        let offset = 0;
+        let hasMore = true;
 
-        if (picksError) throw picksError;
-        picksData = data || [];
+        while (hasMore) {
+          const { data, error: picksError } = await this.supabase.from('picks')
+            .select('line_item_id, qty_picked')
+            .in('line_item_id', lineItemIds)
+            .range(offset, offset + pageSize - 1);
+
+          if (picksError) throw picksError;
+
+          if (data && data.length > 0) {
+            picksData.push(...data);
+            offset += pageSize;
+            hasMore = data.length === pageSize;
+          } else {
+            hasMore = false;
+          }
+        }
       }
 
       // Calculate picks by line item
@@ -191,25 +227,57 @@ export class ItemsToOrderService implements OnDestroy {
         return;
       }
 
-      // Fetch line items with qty_available = 0 for active orders
-      const { data: lineItemsData, error: lineItemsError } = await this.supabase.from('line_items')
-        .select('*')
-        .in('order_id', activeOrderIds)
-        .eq('qty_available', 0);
+      // Fetch line items with qty_available = 0 for active orders with pagination
+      let lineItemsData: any[] = [];
+      {
+        const pageSize = 1000;
+        let offset = 0;
+        let hasMore = true;
 
-      if (lineItemsError) throw lineItemsError;
+        while (hasMore) {
+          const { data, error: lineItemsError } = await this.supabase.from('line_items')
+            .select('*')
+            .in('order_id', activeOrderIds)
+            .eq('qty_available', 0)
+            .range(offset, offset + pageSize - 1);
 
-      // Fetch picks for these line items
+          if (lineItemsError) throw lineItemsError;
+
+          if (data && data.length > 0) {
+            lineItemsData.push(...data);
+            offset += pageSize;
+            hasMore = data.length === pageSize;
+          } else {
+            hasMore = false;
+          }
+        }
+      }
+
+      // Fetch picks for these line items with pagination
       const lineItemIds = (lineItemsData || []).map(item => item.id);
       let picksData: any[] = [];
 
       if (lineItemIds.length > 0) {
-        const { data, error: picksError } = await this.supabase.from('picks')
-          .select('line_item_id, qty_picked')
-          .in('line_item_id', lineItemIds);
+        const pageSize = 1000;
+        let offset = 0;
+        let hasMore = true;
 
-        if (picksError) throw picksError;
-        picksData = data || [];
+        while (hasMore) {
+          const { data, error: picksError } = await this.supabase.from('picks')
+            .select('line_item_id, qty_picked')
+            .in('line_item_id', lineItemIds)
+            .range(offset, offset + pageSize - 1);
+
+          if (picksError) throw picksError;
+
+          if (data && data.length > 0) {
+            picksData.push(...data);
+            offset += pageSize;
+            hasMore = data.length === pageSize;
+          } else {
+            hasMore = false;
+          }
+        }
       }
 
       // Calculate picks by line item

@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { ItemsToOrderService } from '../../services/consolidated-parts.service';
 import { UtilsService } from '../../services/utils.service';
+import { ExcelService } from '../../services/excel.service';
 import { ItemToOrder } from '../../models';
 
 @Component({
@@ -18,6 +19,9 @@ import { ItemToOrder } from '../../models';
           <h1 class="h3 fw-bold mb-1">Items to Order</h1>
           <p class="text-muted mb-0">Parts with no stock available that still need to be picked</p>
         </div>
+        <button class="btn btn-outline-primary" (click)="handleExport()" [disabled]="filteredItems.length === 0">
+          <i class="bi bi-download me-2"></i>Export
+        </button>
       </div>
 
       <!-- Info Alert -->
@@ -109,6 +113,7 @@ export class ItemsToOrderComponent implements OnInit, OnDestroy {
 
   constructor(
     private itemsToOrderService: ItemsToOrderService,
+    private excelService: ExcelService,
     public utils: UtilsService
   ) {}
 
@@ -134,5 +139,9 @@ export class ItemsToOrderComponent implements OnInit, OnDestroy {
       item.part_number.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
       item.description?.toLowerCase().includes(this.searchQuery.toLowerCase())
     );
+  }
+
+  handleExport(): void {
+    this.excelService.exportItemsToOrderToExcel(this.filteredItems);
   }
 }

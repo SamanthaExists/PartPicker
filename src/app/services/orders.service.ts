@@ -47,16 +47,51 @@ export class OrdersService implements OnDestroy {
 
       if (ordersError) throw ordersError;
 
-      // Fetch line items and picks for progress calculation
-      const { data: lineItemsData, error: lineItemsError } = await this.supabase.from('line_items')
-        .select('id, order_id, total_qty_needed');
+      // Fetch all line items with pagination (Supabase default limit is 1000)
+      let lineItemsData: { id: string; order_id: string; total_qty_needed: number }[] = [];
+      {
+        const pageSize = 1000;
+        let offset = 0;
+        let hasMore = true;
 
-      if (lineItemsError) throw lineItemsError;
+        while (hasMore) {
+          const { data, error: lineItemsError } = await this.supabase.from('line_items')
+            .select('id, order_id, total_qty_needed')
+            .range(offset, offset + pageSize - 1);
 
-      const { data: picksData, error: picksError } = await this.supabase.from('picks')
-        .select('line_item_id, qty_picked');
+          if (lineItemsError) throw lineItemsError;
 
-      if (picksError) throw picksError;
+          if (data && data.length > 0) {
+            lineItemsData.push(...data);
+            offset += pageSize;
+            hasMore = data.length === pageSize;
+          } else {
+            hasMore = false;
+          }
+        }
+      }
+
+      // Fetch all picks with pagination (Supabase default limit is 1000)
+      let picksData: { line_item_id: string; qty_picked: number }[] = [];
+      const pageSize = 1000;
+      let offset = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error: picksError } = await this.supabase.from('picks')
+          .select('line_item_id, qty_picked')
+          .range(offset, offset + pageSize - 1);
+
+        if (picksError) throw picksError;
+
+        if (data && data.length > 0) {
+          picksData.push(...data);
+          offset += pageSize;
+          hasMore = data.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
 
       // Calculate progress for each order
       const picksByLineItem = new Map<string, number>();

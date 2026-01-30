@@ -225,3 +225,228 @@ body {
 .online-indicator.offline {
   background-color: #ffc107;
 }
+
+/* =====================================================
+   MOBILE/TOUCH ENHANCEMENTS
+   ===================================================== */
+
+/* Minimum touch target size (48px as per accessibility guidelines) */
+@media (pointer: coarse) {
+  .btn,
+  .nav-link,
+  .list-group-item-action,
+  .form-control,
+  .form-select,
+  .form-check-input {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  .btn-sm {
+    min-height: 40px;
+    min-width: 40px;
+    padding: 0.5rem 0.75rem;
+  }
+
+  /* Larger checkboxes for touch */
+  .form-check-input {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .form-check-label {
+    padding-left: 0.5rem;
+    line-height: 1.5rem;
+  }
+
+  /* Increase spacing between interactive elements */
+  .table td,
+  .table th {
+    padding: 0.75rem;
+  }
+
+  /* Better tap targets in tables */
+  .table .btn {
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+/* Safe area padding for notched devices (iPhone X+) */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .sidebar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mobile-search-overlay {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Fixed bottom elements need safe area */
+  .install-prompt,
+  .position-fixed[style*="bottom"] {
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    bottom: 0 !important;
+  }
+}
+
+/* Swipe gesture visual feedback */
+.swipe-item {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease-out;
+}
+
+.swipe-item.swiping-right {
+  background: linear-gradient(to right, rgba(25, 135, 84, 0.1), transparent 50%);
+}
+
+.swipe-item.swiping-left {
+  background: linear-gradient(to left, rgba(220, 53, 69, 0.1), transparent 50%);
+}
+
+/* Swipe action indicators */
+.swipe-action-indicator {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.5rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.swipe-action-indicator.left {
+  right: 1rem;
+  color: #dc3545;
+}
+
+.swipe-action-indicator.right {
+  left: 1rem;
+  color: #198754;
+}
+
+.swipe-item.swiping-right .swipe-action-indicator.right,
+.swipe-item.swiping-left .swipe-action-indicator.left {
+  opacity: 1;
+}
+
+/* Touch-friendly scrolling */
+.touch-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Prevent text selection on interactive elements */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Active state for touch feedback */
+@media (hover: none) {
+  .btn:active,
+  .list-group-item-action:active,
+  .nav-link:active {
+    opacity: 0.8;
+    transform: scale(0.98);
+    transition: transform 0.1s ease, opacity 0.1s ease;
+  }
+}
+
+/* Larger inputs on mobile */
+@media (max-width: 576px) {
+  .form-control,
+  .form-select {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+    padding: 0.75rem 1rem;
+  }
+
+  .input-group-text {
+    padding: 0.75rem 1rem;
+  }
+
+  /* Larger modal on mobile */
+  .modal-dialog {
+    margin: 0.5rem;
+  }
+
+  .modal-content {
+    border-radius: 0.75rem;
+  }
+
+  /* Bottom-positioned modals on mobile */
+  .modal-bottom .modal-dialog {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: 0;
+  }
+
+  .modal-bottom .modal-content {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+}
+
+/* Pull-to-refresh indicator placeholder */
+.pull-to-refresh {
+  position: fixed;
+  top: 56px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+  z-index: 1035;
+}
+
+.pull-to-refresh.visible {
+  transform: translateY(0);
+}
+
+/* Haptic-like visual feedback for picks */
+@keyframes pick-success {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); background-color: rgba(25, 135, 84, 0.2); }
+  100% { transform: scale(1); }
+}
+
+.pick-success-animation {
+  animation: pick-success 0.3s ease-out;
+}
+
+/* Ripple effect for buttons */
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+
+.ripple:active::after {
+  width: 200px;
+  height: 200px;
+  opacity: 1;
+  transition: width 0.3s ease, height 0.3s ease, opacity 0.3s ease;
+}
+
+/* Keyboard navigation visual indicator */
+.keyboard-selected {
+  outline: 2px solid #0d6efd;
+  outline-offset: -2px;
+}

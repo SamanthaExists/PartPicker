@@ -148,7 +148,7 @@ const PAGE_SIZE = 50;
           <div class="col-6 col-sm">
             <div class="card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ summaryStats.pickCount | number }}</div>
+                <div class="fs-4 fw-bold">{{ totalPickCount | number }}</div>
                 <p class="text-muted small mb-0">Picks</p>
               </div>
             </div>
@@ -156,7 +156,7 @@ const PAGE_SIZE = 50;
           <div class="col-6 col-sm">
             <div class="card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ summaryStats.totalQty | number }}</div>
+                <div class="fs-4 fw-bold">{{ totalQtyPicked | number }}</div>
                 <p class="text-muted small mb-0">Qty Picked</p>
               </div>
             </div>
@@ -164,7 +164,7 @@ const PAGE_SIZE = 50;
           <div class="col-6 col-sm">
             <div class="card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ summaryStats.uniqueParts }}</div>
+                <div class="fs-4 fw-bold">{{ allUniqueParts }}</div>
                 <p class="text-muted small mb-0">Unique Parts</p>
               </div>
             </div>
@@ -172,7 +172,7 @@ const PAGE_SIZE = 50;
           <div class="col-6 col-sm">
             <div class="card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ summaryStats.uniqueUsers }}</div>
+                <div class="fs-4 fw-bold">{{ allUniqueUsers }}</div>
                 <p class="text-muted small mb-0">Users</p>
               </div>
             </div>
@@ -180,7 +180,7 @@ const PAGE_SIZE = 50;
           <div class="col-6 col-sm">
             <div class="card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ summaryStats.issueCount }}</div>
+                <div class="fs-4 fw-bold">{{ totalIssueCount }}</div>
                 <p class="text-muted small mb-0">Issues</p>
               </div>
             </div>
@@ -358,6 +358,10 @@ export class PickHistoryComponent implements OnInit {
   page = 0;
   hasMore = true;
   totalPickCount = 0;
+  totalQtyPicked = 0;
+  allUniqueParts = 0;
+  allUniqueUsers = 0;
+  totalIssueCount = 0;
   hasSearched = false;
 
   // Activity type filters
@@ -587,6 +591,24 @@ export class PickHistoryComponent implements OnInit {
       this.totalPickCount = picksCount || 0;
       this.hasMore = (picksData?.length || 0) === PAGE_SIZE;
 
+      // Fetch ALL picks for accurate stats (separate lightweight query)
+      const { data: allPicksData } = await this.supabase.from('picks')
+        .select(`
+          qty_picked,
+          picked_by,
+          line_items!inner (
+            part_number
+          )
+        `)
+        .gte('picked_at', startISO)
+        .lte('picked_at', endISO);
+
+      if (allPicksData) {
+        this.totalQtyPicked = allPicksData.reduce((sum: number, p: any) => sum + (p.qty_picked || 0), 0);
+        this.allUniqueParts = new Set(allPicksData.map((p: any) => p.line_items?.part_number).filter(Boolean)).size;
+        this.allUniqueUsers = new Set(allPicksData.map((p: any) => p.picked_by).filter(Boolean)).size;
+      }
+
       // Fetch issues (only on first page)
       if (this.page === 0) {
         const { data: issuesData, error: issuesError } = await this.supabase.from('issues')
@@ -651,6 +673,7 @@ export class PickHistoryComponent implements OnInit {
         }
 
         this.issues = transformedIssues;
+        this.totalIssueCount = transformedIssues.length;
       }
     } catch (err) {
       console.error('Error fetching data:', err);

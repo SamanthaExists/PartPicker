@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, AlertCircle, CheckCircle2, Truck } from 'lucide-react';
+import { ShoppingCart, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, AlertCircle, CheckCircle2, Truck, Filter } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/select';
 import { SearchInput } from '@/components/common/SearchInput';
 import { OrderFilterPopover } from '@/components/common/OrderFilterPopover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { useItemsToOrder } from '@/hooks/useItemsToOrder';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { exportItemsToOrderToExcel } from '@/lib/excelExport';
@@ -22,6 +24,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 type SortMode = 'part_number' | 'remaining' | 'location';
 
 const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
+const HIDE_ALREADY_ORDERED_KEY = 'items-to-order-hide-already-ordered';
 
 export function ItemsToOrder() {
   const { items, loading } = useItemsToOrder();
@@ -33,11 +36,20 @@ export function ItemsToOrder() {
     return (saved as SortMode) || 'remaining';
   });
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+  const [hideAlreadyOrdered, setHideAlreadyOrdered] = useState<boolean>(() => {
+    const saved = localStorage.getItem(HIDE_ALREADY_ORDERED_KEY);
+    return saved === 'true';
+  });
 
   // Persist sort preference
   useEffect(() => {
     localStorage.setItem(ITEMS_TO_ORDER_SORT_KEY, sortMode);
   }, [sortMode]);
+
+  // Persist hide already ordered preference
+  useEffect(() => {
+    localStorage.setItem(HIDE_ALREADY_ORDERED_KEY, String(hideAlreadyOrdered));
+  }, [hideAlreadyOrdered]);
 
   // Compute unique orders for filter dropdown
   const uniqueOrders = useMemo(() => {
@@ -50,10 +62,11 @@ export function ItemsToOrder() {
       .sort((a, b) => a.so_number.localeCompare(b.so_number, undefined, { numeric: true }));
   }, [items]);
 
-  const hasActiveFilters = selectedOrders.size > 0;
+  const hasActiveFilters = selectedOrders.size > 0 || hideAlreadyOrdered;
 
   const clearFilters = () => {
     setSelectedOrders(new Set());
+    setHideAlreadyOrdered(false);
   };
 
   const toggleOrder = (orderId: string) => {
@@ -83,7 +96,12 @@ export function ItemsToOrder() {
     const matchesOrder = selectedOrders.size === 0
       || item.orders.some(o => selectedOrders.has(o.order_id));
 
-    return matchesSearch && matchesOrder;
+    // Hide items that have already been ordered (qty_on_order > 0)
+    const matchesAlreadyOrdered = !hideAlreadyOrdered
+      || !item.qty_on_order
+      || item.qty_on_order <= 0;
+
+    return matchesSearch && matchesOrder && matchesAlreadyOrdered;
   });
 
   // Sort filtered items
@@ -224,6 +242,20 @@ export function ItemsToOrder() {
                   onSelectAll={selectAllOrders}
                   onDeselectAll={deselectAllOrders}
                 />
+
+                <div className="flex items-center gap-2 px-2">
+                  <Checkbox
+                    id="hide-already-ordered"
+                    checked={hideAlreadyOrdered}
+                    onCheckedChange={(checked) => setHideAlreadyOrdered(checked === true)}
+                  />
+                  <Label
+                    htmlFor="hide-already-ordered"
+                    className="text-sm cursor-pointer whitespace-nowrap"
+                  >
+                    Hide already ordered
+                  </Label>
+                </div>
 
                 {hasActiveFilters && (
                   <Button

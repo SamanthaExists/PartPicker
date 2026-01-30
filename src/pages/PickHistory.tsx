@@ -304,12 +304,148 @@ export function PickHistory() {
     return { totalQty, uniqueParts, uniqueUsers, pickCount: picksOnly.length, issueCount };
   }, [filteredActivities]);
 
-  // Handle preset selection
-  const handlePreset = (preset: typeof datePresets[0]) => {
+  // Handle preset selection - also triggers search
+  const handlePreset = useCallback((preset: typeof datePresets[0]) => {
     const { start, end } = preset.getValue();
-    setStartDate(format(start, "yyyy-MM-dd'T'HH:mm"));
-    setEndDate(format(end, "yyyy-MM-dd'T'HH:mm"));
-  };
+    const newStartDate = format(start, "yyyy-MM-dd'T'HH:mm");
+    const newEndDate = format(end, "yyyy-MM-dd'T'HH:mm");
+    setStartDate(newStartDate);
+    setEndDate(newEndDate);
+
+    // Trigger fetch with new dates directly (since setState is async)
+    (async () => {
+      try {
+        setLoading(true);
+        setHasSearched(true);
+        setPage(0);
+
+        const startISO = new Date(newStartDate).toISOString();
+        const endISO = new Date(newEndDate).toISOString();
+
+        // Fetch picks
+        const { data: picksData, error: picksError, count: picksCount } = await supabase
+          .from('picks')
+          .select(`
+            id,
+            qty_picked,
+            picked_by,
+            picked_at,
+            notes,
+            line_items!inner (
+              part_number,
+              description,
+              location,
+              order_id,
+              orders!inner (
+                so_number
+              )
+            ),
+            tools!inner (
+              tool_number
+            )
+          `, { count: 'exact' })
+          .gte('picked_at', startISO)
+          .lte('picked_at', endISO)
+          .order('picked_at', { ascending: false })
+          .range(0, PAGE_SIZE - 1);
+
+        if (picksError) {
+          console.error('Error fetching picks:', picksError);
+        }
+
+        // Transform picks
+        const transformedPicks: PickRecord[] = (picksData || []).map((pick: any) => ({
+          id: pick.id,
+          type: 'pick' as const,
+          qty_picked: pick.qty_picked,
+          picked_by: pick.picked_by,
+          picked_at: pick.picked_at,
+          notes: pick.notes,
+          part_number: pick.line_items.part_number,
+          description: pick.line_items.description,
+          location: pick.line_items.location,
+          tool_number: pick.tools.tool_number,
+          so_number: pick.line_items.orders.so_number,
+          order_id: pick.line_items.order_id,
+        }));
+
+        setPicks(transformedPicks);
+        setTotalPickCount(picksCount || 0);
+        setHasMore((picksData?.length || 0) === PAGE_SIZE);
+
+        // Fetch issues
+        const { data: issuesData, error: issuesError } = await supabase
+          .from('issues')
+          .select(`
+            id,
+            issue_type,
+            description,
+            reported_by,
+            status,
+            created_at,
+            resolved_at,
+            resolved_by,
+            line_items!inner (
+              part_number,
+              order_id,
+              orders!inner (
+                so_number
+              )
+            )
+          `)
+          .or(`created_at.gte.${startISO},resolved_at.gte.${startISO}`)
+          .or(`created_at.lte.${endISO},resolved_at.lte.${endISO}`);
+
+        if (issuesError) {
+          console.error('Error fetching issues:', issuesError);
+        }
+
+        const transformedIssues: IssueRecord[] = [];
+
+        for (const issue of (issuesData || []) as any[]) {
+          const createdAt = new Date(issue.created_at);
+          if (createdAt >= new Date(newStartDate) && createdAt <= new Date(newEndDate)) {
+            transformedIssues.push({
+              id: `issue-created-${issue.id}`,
+              type: 'issue_created',
+              issue_type: issue.issue_type,
+              description: issue.description,
+              user: issue.reported_by,
+              timestamp: issue.created_at,
+              part_number: issue.line_items.part_number,
+              so_number: issue.line_items.orders.so_number,
+              order_id: issue.line_items.order_id,
+            });
+          }
+
+          if (issue.status === 'resolved' && issue.resolved_at) {
+            const resolvedAt = new Date(issue.resolved_at);
+            if (resolvedAt >= new Date(newStartDate) && resolvedAt <= new Date(newEndDate)) {
+              transformedIssues.push({
+                id: `issue-resolved-${issue.id}`,
+                type: 'issue_resolved',
+                issue_type: issue.issue_type,
+                description: issue.description,
+                user: issue.resolved_by,
+                timestamp: issue.resolved_at,
+                part_number: issue.line_items.part_number,
+                so_number: issue.line_items.orders.so_number,
+                order_id: issue.line_items.order_id,
+              });
+            }
+          }
+        }
+
+        setIssues(transformedIssues);
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setPicks([]);
+        setIssues([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   // Export to Excel
   const handleExport = () => {

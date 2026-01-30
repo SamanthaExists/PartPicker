@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Plus, Minus, Check, MapPin, MessageSquare, ArrowUpDown, AlertTriangle, CheckCircle2, ChevronRight, ChevronDown, Undo2, Trash2, Clock, User, Package, Eye, EyeOff } from 'lucide-react';
+import { Plus, Minus, Check, MapPin, MessageSquare, ArrowUpDown, AlertTriangle, CheckCircle2, ChevronRight, ChevronDown, Undo2, Trash2, Clock, User, Package, Eye, EyeOff, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +28,7 @@ import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { cn, formatDateTime, getLocationPrefix, alphanumericCompare } from '@/lib/utils';
 import { ReportIssueDialog } from './ReportIssueDialog';
 import { DistributeInventoryDialog } from './DistributeInventoryDialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type SortMode = 'part_number' | 'location';
 
@@ -49,7 +50,7 @@ interface PickingInterfaceProps {
     qtyPicked: number,
     pickedBy?: string,
     notes?: string
-  ) => Promise<Pick | null>;
+  ) => Promise<(Pick & { overPickWarning?: string }) | null>;
   onUndoPick: (pickId: string) => Promise<boolean>;
   getPicksForTool: (toolId: string) => Map<string, number>;
   getPicksForAllTools: () => Map<string, Map<string, number>>;
@@ -218,6 +219,7 @@ export function PickingInterface({
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [deleteConfirmPick, setDeleteConfirmPick] = useState<Pick | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [overPickWarning, setOverPickWarning] = useState<string | null>(null);
   const [undoToolConfirm, setUndoToolConfirm] = useState<{
     lineItem: LineItem;
     toolId: string;
@@ -329,7 +331,14 @@ export function PickingInterface({
     const note = pending?.note;
 
     setIsSubmitting(item.id);
-    await onRecordPick(item.id, tool.id, qtyToPick, getUserName(), note || undefined);
+    const result = await onRecordPick(item.id, tool.id, qtyToPick, getUserName(), note || undefined);
+
+    // Check for over-pick warning (concurrent pick detection)
+    if (result && 'overPickWarning' in result && result.overPickWarning) {
+      setOverPickWarning(result.overPickWarning);
+      // Auto-dismiss after 8 seconds
+      setTimeout(() => setOverPickWarning(null), 8000);
+    }
 
     // Clear the pending pick after recording
     if (pending) {
@@ -367,7 +376,14 @@ export function PickingInterface({
     if (remaining <= 0) return;
 
     setIsSubmitting(item.id);
-    await onRecordPick(item.id, targetToolId, remaining, getUserName());
+    const result = await onRecordPick(item.id, targetToolId, remaining, getUserName());
+
+    // Check for over-pick warning
+    if (result && 'overPickWarning' in result && result.overPickWarning) {
+      setOverPickWarning(result.overPickWarning);
+      setTimeout(() => setOverPickWarning(null), 8000);
+    }
+
     setIsSubmitting(null);
   }, [allToolsPicksMap, onRecordPick, getUserName]);
 
@@ -396,12 +412,20 @@ export function PickingInterface({
 
     try {
       // Pick all items sequentially to avoid race conditions
+      let hasWarnings = false;
       for (const item of itemsToPick) {
         const pickedForTool = toolPicks.get(item.id) || 0;
         const remaining = item.qty_per_unit - pickedForTool;
         if (remaining > 0) {
-          await onRecordPick(item.id, tool.id, remaining, getUserName());
+          const result = await onRecordPick(item.id, tool.id, remaining, getUserName());
+          if (result && 'overPickWarning' in result && result.overPickWarning) {
+            hasWarnings = true;
+          }
         }
+      }
+      if (hasWarnings) {
+        setOverPickWarning('Some items may have been over-picked. Another user may have picked items at the same time. Please review the quantities.');
+        setTimeout(() => setOverPickWarning(null), 8000);
       }
     } finally {
       setIsPickingLocation(null);
@@ -474,12 +498,18 @@ export function PickingInterface({
     if (!partialToolAction) return;
 
     setIsSubmitting(partialToolAction.lineItem.id);
-    await onRecordPick(
+    const result = await onRecordPick(
       partialToolAction.lineItem.id,
       partialToolAction.toolId,
       partialToolAction.remainingQty,
       getUserName()
     );
+
+    if (result && 'overPickWarning' in result && result.overPickWarning) {
+      setOverPickWarning(result.overPickWarning);
+      setTimeout(() => setOverPickWarning(null), 8000);
+    }
+
     setIsSubmitting(null);
     setPartialToolAction(null);
   };
@@ -492,12 +522,18 @@ export function PickingInterface({
     if (isNaN(qty) || qty <= 0 || qty > partialToolAction.remainingQty) return;
 
     setIsSubmitting(partialToolAction.lineItem.id);
-    await onRecordPick(
+    const result = await onRecordPick(
       partialToolAction.lineItem.id,
       partialToolAction.toolId,
       qty,
       getUserName()
     );
+
+    if (result && 'overPickWarning' in result && result.overPickWarning) {
+      setOverPickWarning(result.overPickWarning);
+      setTimeout(() => setOverPickWarning(null), 8000);
+    }
+
     setIsSubmitting(null);
     setPartialToolAction(null);
   };
@@ -1337,6 +1373,22 @@ export function PickingInterface({
           </Select>
         </div>
       </div>
+
+      {/* Over-Pick Warning Alert */}
+      {overPickWarning && (
+        <Alert variant="destructive" className="mb-4 relative">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Concurrent Pick Detected</AlertTitle>
+          <AlertDescription>{overPickWarning}</AlertDescription>
+          <button
+            onClick={() => setOverPickWarning(null)}
+            className="absolute top-2 right-2 p-1 hover:bg-destructive/20 rounded"
+            aria-label="Dismiss"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </Alert>
+      )}
 
       {/* Desktop Table Header */}
       <div className={cn(

@@ -3,13 +3,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useSettings } from '@/hooks/useSettings';
-import { SCHEMA_SQL, MIGRATION_QTY_AVAILABLE_SQL } from '@/lib/supabase';
+import { SCHEMA_SQL, MIGRATION_QTY_AVAILABLE_SQL, MIGRATION_QTY_ON_ORDER_SQL } from '@/lib/supabase';
 import { useState, useRef } from 'react';
 import { usePWA, useServiceWorker } from '@/hooks/usePWA';
 import { useOnlineStatus, useOfflineQueue } from '@/hooks/useOffline';
 import { useInventorySync } from '@/hooks/useInventorySync';
+import { usePartListSync } from '@/hooks/usePartListSync';
 import { useBackupExport } from '@/hooks/useBackupExport';
-import { Download, RefreshCw, Wifi, WifiOff, Trash2, CloudOff, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Database, HardDrive } from 'lucide-react';
+import { Download, RefreshCw, Wifi, WifiOff, Trash2, CloudOff, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Database, HardDrive, ListChecks } from 'lucide-react';
 
 export function Settings() {
   const { settings, updateSettings } = useSettings();
@@ -27,6 +28,12 @@ export function Settings() {
   // Inventory sync
   const { syncInventory, syncing, lastSyncResult } = useInventorySync();
   const inventoryFileRef = useRef<HTMLInputElement>(null);
+
+  // Part List sync
+  const { syncPartList, syncing: syncingPartList, lastSyncResult: lastPartListSyncResult } = usePartListSync();
+  const partListFileRef = useRef<HTMLInputElement>(null);
+  const [showPartListMigration, setShowPartListMigration] = useState(false);
+  const [copiedPartListMigration, setCopiedPartListMigration] = useState(false);
 
   // Backup export
   const { exportBackup, exporting: exportingBackup, error: backupError } = useBackupExport();
@@ -62,6 +69,23 @@ export function Settings() {
         inventoryFileRef.current.value = '';
       }
     }
+  };
+
+  const handlePartListFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await syncPartList(file);
+      // Reset file input
+      if (partListFileRef.current) {
+        partListFileRef.current.value = '';
+      }
+    }
+  };
+
+  const handleCopyPartListMigration = async () => {
+    await navigator.clipboard.writeText(MIGRATION_QTY_ON_ORDER_SQL);
+    setCopiedPartListMigration(true);
+    setTimeout(() => setCopiedPartListMigration(false), 2000);
   };
 
   const handleClearQueue = () => {
@@ -203,6 +227,141 @@ export function Settings() {
                 </div>
                 <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto">
                   {MIGRATION_QTY_AVAILABLE_SQL}
+                </pre>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Part List Sync */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ListChecks className="h-5 w-5" />
+            Part List Sync
+          </CardTitle>
+          <CardDescription>
+            Update part metadata (locations, descriptions, quantities) from Part List report
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <input
+              ref={partListFileRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handlePartListFileSelect}
+              className="hidden"
+              id="partlist-file"
+            />
+            <Button
+              onClick={() => partListFileRef.current?.click()}
+              disabled={syncingPartList}
+              className="gap-2"
+            >
+              {syncingPartList ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" />
+                  Import Part List Report
+                </>
+              )}
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Supports .xlsx files (e.g., Part List.xlsx)
+            </span>
+          </div>
+
+          {lastPartListSyncResult && (
+            <div className={`p-4 rounded-lg border ${
+              lastPartListSyncResult.success
+                ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
+                : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
+            }`}>
+              <div className="flex items-start gap-3">
+                {lastPartListSyncResult.success ? (
+                  <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                )}
+                <div className="flex-1">
+                  <p className={`font-medium ${
+                    lastPartListSyncResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
+                  }`}>
+                    {lastPartListSyncResult.success ? 'Part List Sync Complete' : 'Sync Failed'}
+                  </p>
+                  <div className="mt-2 text-sm space-y-1">
+                    <p>Updated: <strong>{lastPartListSyncResult.updatedCount}</strong> line items</p>
+                    {lastPartListSyncResult.notFoundCount > 0 && (
+                      <p className="text-amber-600 dark:text-amber-400">
+                        Not found in Part List: <strong>{lastPartListSyncResult.notFoundCount}</strong> line items
+                        ({lastPartListSyncResult.notFoundParts.length} unique parts)
+                      </p>
+                    )}
+                    {lastPartListSyncResult.notFoundParts.length > 0 && lastPartListSyncResult.notFoundParts.length <= 10 && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-muted-foreground">
+                          Show missing part numbers
+                        </summary>
+                        <ul className="mt-1 ml-4 text-xs font-mono">
+                          {lastPartListSyncResult.notFoundParts.map(p => (
+                            <li key={p}>{p}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                    {lastPartListSyncResult.errors.length > 0 && (
+                      <div className="mt-2 text-red-600 dark:text-red-400">
+                        {lastPartListSyncResult.errors.map((err, i) => (
+                          <p key={i}>{err}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p className="font-medium text-foreground">Expected file format:</p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li><strong>Product Id</strong> - Part number to match</li>
+              <li><strong>Location(s)</strong> - Storage location to update</li>
+              <li><strong>Qty Available</strong> - Available quantity</li>
+              <li><strong>Qty On Order</strong> - Quantity on order (optional)</li>
+              <li><strong>Description</strong> - Part description</li>
+            </ul>
+            <p className="text-xs mt-2">
+              This sync updates metadata only - picked quantities are preserved.
+            </p>
+          </div>
+
+          {/* Migration SQL for qty_on_order column */}
+          <div className="pt-4 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPartListMigration(!showPartListMigration)}
+            >
+              {showPartListMigration ? 'Hide' : 'Show'} Migration SQL (for Qty On Order)
+            </Button>
+
+            {showPartListMigration && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm">Run this SQL if qty_on_order column is missing:</Label>
+                  <Button size="sm" variant="secondary" onClick={handleCopyPartListMigration}>
+                    {copiedPartListMigration ? 'Copied!' : 'Copy'}
+                  </Button>
+                </div>
+                <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto">
+                  {MIGRATION_QTY_ON_ORDER_SQL}
                 </pre>
               </div>
             )}

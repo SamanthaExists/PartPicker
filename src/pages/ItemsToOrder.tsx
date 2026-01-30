@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ShoppingCart, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, AlertCircle, CheckCircle2, Truck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -308,6 +308,12 @@ export function ItemsToOrder() {
                           <Badge variant="secondary" className="gap-1 bg-yellow-100 text-yellow-800 border-yellow-300">
                             <AlertCircle className="h-3 w-3" />
                             Low Stock ({item.qty_available} avail)
+                          </Badge>
+                        )}
+                        {item.qty_on_order !== null && item.qty_on_order > 0 && (
+                          <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-800 border-blue-300">
+                            <Truck className="h-3 w-3" />
+                            {item.qty_on_order} on order
                           </Badge>
                         )}
                       </div>

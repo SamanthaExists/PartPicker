@@ -34,6 +34,7 @@ export interface LineItem {
   qty_per_unit: number;
   total_qty_needed: number;
   qty_available: number | null;
+  qty_on_order: number | null;
   tool_ids: string[] | null; // Array of tool IDs this part applies to (null = all tools)
   created_at: string;
 }
@@ -99,6 +100,7 @@ export interface ConsolidatedPart {
   description: string | null;
   location: string | null;
   qty_available: number | null;
+  qty_on_order: number | null;
   total_needed: number;
   total_picked: number;
   remaining: number;
@@ -118,6 +120,7 @@ export interface ItemToOrder {
   description: string | null;
   location: string | null;
   qty_available: number;
+  qty_on_order: number | null;
   total_needed: number;
   total_picked: number;
   remaining: number;

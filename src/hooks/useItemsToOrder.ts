@@ -28,6 +28,7 @@ export function useItemsToOrder() {
             description,
             location,
             qty_available,
+            qty_on_order,
             total_qty_needed,
             order_id,
             orders!inner (
@@ -87,6 +88,10 @@ export function useItemsToOrder() {
           existing.total_picked += picked;
           existing.remaining = existing.total_needed - existing.total_picked;
           existing.qty_to_order = Math.max(0, existing.remaining - existing.qty_available);
+          // Use the first non-null qty_on_order found (should be same for same part)
+          if (existing.qty_on_order === null && item.qty_on_order !== null) {
+            existing.qty_on_order = item.qty_on_order;
+          }
           existing.orders.push({
             order_id: item.order_id,
             so_number: orderInfo.so_number,
@@ -101,6 +106,7 @@ export function useItemsToOrder() {
             description: item.description,
             location: item.location,
             qty_available: newQtyAvailable,
+            qty_on_order: item.qty_on_order ?? null,
             total_needed: item.total_qty_needed,
             total_picked: picked,
             remaining: newRemaining,

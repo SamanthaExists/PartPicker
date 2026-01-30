@@ -481,6 +481,26 @@ export function exportItemsToOrderToExcel(items: ItemToOrder[]) {
 }
 
 /**
+ * Export part numbers to a simple Excel file with single column
+ * Used for copying to admin website to generate reports
+ */
+export function exportPartNumbersToExcel(partNumbers: string[]) {
+  const workbook = XLSX.utils.book_new();
+
+  // Simple sheet with part numbers
+  const header = ['Part Number'];
+  const data = partNumbers.map(pn => [pn]);
+
+  const sheet = XLSX.utils.aoa_to_sheet([header, ...data]);
+  setColumnWidths(sheet, [25]);
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Part Numbers');
+
+  // Download the file
+  const filename = `part-numbers-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+  downloadWorkbook(workbook, filename);
+}
+
+/**
  * Full database backup export - exports all tables to a single Excel file
  */
 export interface BackupData {
@@ -585,7 +605,65 @@ export function exportFullBackupToExcel(data: BackupData) {
   setColumnWidths(templateItemsSheet, [36, 36, 20, 40, 20, 12]);
   XLSX.utils.book_append_sheet(workbook, templateItemsSheet, 'BOM Template Items');
 
-  // Sheet 9: Summary
+  // Sheet 9: Pick History Detail (Human & AI readable - all data joined)
+  // Create lookup maps for joining data
+  const orderMap = new Map<string, Order>();
+  for (const order of data.orders) {
+    orderMap.set(order.id, order);
+  }
+
+  const toolMap = new Map<string, Tool>();
+  for (const tool of data.tools) {
+    toolMap.set(tool.id, tool);
+  }
+
+  const lineItemMap = new Map<string, LineItem>();
+  for (const lineItem of data.lineItems) {
+    lineItemMap.set(lineItem.id, lineItem);
+  }
+
+  const pickDetailHeader = [
+    'Picked At',
+    'SO Number',
+    'Customer',
+    'Tool Number',
+    'Part Number',
+    'Description',
+    'Location',
+    'Qty Picked',
+    'Picked By',
+    'Notes'
+  ];
+
+  // Sort picks by picked_at (oldest first for chronological order)
+  const sortedPicks = [...data.picks].sort((a, b) =>
+    new Date(a.picked_at).getTime() - new Date(b.picked_at).getTime()
+  );
+
+  const pickDetailData = sortedPicks.map(pick => {
+    const lineItem = lineItemMap.get(pick.line_item_id);
+    const tool = toolMap.get(pick.tool_id);
+    const order = tool ? orderMap.get(tool.order_id) : null;
+
+    return [
+      formatTimestamp(pick.picked_at),
+      order ? `SO-${order.so_number}` : '',
+      order?.customer_name || '',
+      tool?.tool_number || '',
+      lineItem?.part_number || '',
+      lineItem?.description || '',
+      lineItem?.location || '',
+      pick.qty_picked,
+      pick.picked_by || '',
+      pick.notes || ''
+    ];
+  });
+
+  const pickDetailSheet = XLSX.utils.aoa_to_sheet([pickDetailHeader, ...pickDetailData]);
+  setColumnWidths(pickDetailSheet, [20, 15, 25, 15, 20, 40, 15, 12, 20, 40]);
+  XLSX.utils.book_append_sheet(workbook, pickDetailSheet, 'Pick History Detail');
+
+  // Sheet 10: Summary
   const summaryData = [
     ['Full Database Backup'],
     [],
@@ -600,9 +678,12 @@ export function exportFullBackupToExcel(data: BackupData) {
     ['BOM Template Items', data.bomTemplateItems.length],
     [],
     ['Backup Date', formatTimestamp(new Date().toISOString())],
+    [],
+    ['Note: The "Pick History Detail" sheet contains all pick records with'],
+    ['order, tool, and part information joined for easy reading by humans or AI.'],
   ];
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-  setColumnWidths(summarySheet, [20, 15]);
+  setColumnWidths(summarySheet, [55, 15]);
   XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
 
   // Download the file

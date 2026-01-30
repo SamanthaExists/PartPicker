@@ -30,6 +30,7 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
             description,
             location,
             qty_available,
+            qty_on_order,
             total_qty_needed,
             order_id,
             orders!inner (
@@ -118,6 +119,10 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
           if (existing.qty_available === null && item.qty_available !== null) {
             existing.qty_available = item.qty_available;
           }
+          // Use the first non-null qty_on_order found (should be same for same part)
+          if (existing.qty_on_order === null && item.qty_on_order !== null) {
+            existing.qty_on_order = item.qty_on_order;
+          }
           existing.orders.push({
             order_id: item.order_id,
             so_number: orderInfo.so_number,
@@ -131,6 +136,7 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
             description: item.description,
             location: item.location,
             qty_available: item.qty_available ?? null,
+            qty_on_order: item.qty_on_order ?? null,
             total_needed: item.total_qty_needed,
             total_picked: picked,
             remaining: item.total_qty_needed - picked,

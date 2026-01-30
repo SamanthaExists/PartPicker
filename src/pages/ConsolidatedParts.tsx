@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, ClipboardList, CheckCircle2, Clock, Layers, List } from 'lucide-react';
+import { Package, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, ClipboardList, CheckCircle2, Clock, Layers, List, Copy, FileSpreadsheet, Truck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { SearchInput } from '@/components/common/SearchInput';
 import { OrderFilterPopover } from '@/components/common/OrderFilterPopover';
@@ -18,7 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useConsolidatedParts, type OrderStatusFilter } from '@/hooks/useConsolidatedParts';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { cn, getLocationPrefix, alphanumericCompare } from '@/lib/utils';
-import { exportConsolidatedPartsToExcel } from '@/lib/excelExport';
+import { exportConsolidatedPartsToExcel, exportPartNumbersToExcel } from '@/lib/excelExport';
 import { MultiOrderPickDialog } from '@/components/picking/MultiOrderPickDialog';
 import type { ConsolidatedPart } from '@/types';
 
@@ -79,18 +79,27 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick }: PartCardPro
             </Badge>
           )}
 
-          {/* Row 3: Qty Available */}
-          {part.qty_available !== null && (
-            <div className="text-sm">
-              <span className="text-muted-foreground">Available: </span>
-              <span className={cn(
-                "font-semibold",
-                part.qty_available >= part.remaining ? "text-green-600" : "text-amber-600"
-              )}>
-                {part.qty_available}
-              </span>
-            </div>
-          )}
+          {/* Row 3: Qty Available and On Order */}
+          <div className="flex gap-4 text-sm">
+            {part.qty_available !== null && (
+              <div>
+                <span className="text-muted-foreground">Available: </span>
+                <span className={cn(
+                  "font-semibold",
+                  part.qty_available >= part.remaining ? "text-green-600" : "text-amber-600"
+                )}>
+                  {part.qty_available}
+                </span>
+              </div>
+            )}
+            {part.qty_on_order !== null && part.qty_on_order > 0 && (
+              <div className="flex items-center gap-1">
+                <Truck className="h-3 w-3 text-blue-500" />
+                <span className="text-muted-foreground">On Order: </span>
+                <span className="font-semibold text-blue-600">{part.qty_on_order}</span>
+              </div>
+            )}
+          </div>
 
           {/* Row 4: Progress and quantities */}
           <div className="flex items-center gap-3">
@@ -161,6 +170,17 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick }: PartCardPro
                 {part.qty_available}
               </div>
               <p className="text-xs text-muted-foreground">available</p>
+            </div>
+          )}
+
+          {/* Qty On Order */}
+          {part.qty_on_order !== null && part.qty_on_order > 0 && (
+            <div className="text-center shrink-0 min-w-[70px]">
+              <div className="text-lg font-bold text-blue-600 flex items-center justify-center gap-1">
+                <Truck className="h-4 w-4" />
+                {part.qty_on_order}
+              </div>
+              <p className="text-xs text-muted-foreground">on order</p>
             </div>
           )}
 
@@ -394,6 +414,26 @@ export function ConsolidatedParts() {
     exportConsolidatedPartsToExcel(parts);
   };
 
+  // Copy part numbers feedback
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+
+  const handleCopyPartNumbers = async () => {
+    const partNumbers = parts.map(p => p.part_number).join('\n');
+    try {
+      await navigator.clipboard.writeText(partNumbers);
+      setCopyFeedback(`${parts.length} part numbers copied`);
+      setTimeout(() => setCopyFeedback(null), 2000);
+    } catch {
+      setCopyFeedback('Failed to copy');
+      setTimeout(() => setCopyFeedback(null), 2000);
+    }
+  };
+
+  const handleExportPartNumbers = () => {
+    const partNumbers = parts.map(p => p.part_number);
+    exportPartNumbersToExcel(partNumbers);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -403,10 +443,20 @@ export function ConsolidatedParts() {
             View all parts across active orders, grouped by part number
           </p>
         </div>
-        <Button variant="outline" onClick={handleExport}>
-          <Download className="mr-2 h-4 w-4" />
-          Export
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleCopyPartNumbers} disabled={parts.length === 0}>
+            <Copy className="mr-2 h-4 w-4" />
+            {copyFeedback || 'Copy Part #s'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPartNumbers} disabled={parts.length === 0}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Export Part #s
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={parts.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Export Full
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}

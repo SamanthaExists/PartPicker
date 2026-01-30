@@ -145,6 +145,12 @@ export const MIGRATION_QTY_AVAILABLE_SQL = `
 ALTER TABLE line_items ADD COLUMN IF NOT EXISTS qty_available INTEGER;
 `;
 
+// Migration SQL to add qty_on_order column to existing databases
+export const MIGRATION_QTY_ON_ORDER_SQL = `
+-- Add qty_on_order column to line_items table
+ALTER TABLE line_items ADD COLUMN IF NOT EXISTS qty_on_order INTEGER DEFAULT 0;
+`;
+
 // Migration SQL to add new columns and tables for enhanced import
 export const MIGRATION_ENHANCED_IMPORT_SQL = `
 -- Add tool_model column to tools table

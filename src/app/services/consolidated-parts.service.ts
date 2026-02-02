@@ -323,6 +323,10 @@ export class ItemsToOrderService implements OnDestroy {
           existing.total_needed += item.total_qty_needed;
           existing.total_picked += pickedQty;
           existing.remaining = existing.total_needed - existing.total_picked;
+          // Use the first non-null qty_on_order found (should be same for same part)
+          if (existing.qty_on_order === null && item.qty_on_order !== null) {
+            existing.qty_on_order = item.qty_on_order;
+          }
           existing.orders.push({
             order_id: item.order_id,
             so_number: orderMap.get(item.order_id) || 'Unknown',
@@ -335,6 +339,7 @@ export class ItemsToOrderService implements OnDestroy {
             description: item.description,
             location: item.location,
             qty_available: item.qty_available || 0,
+            qty_on_order: item.qty_on_order ?? null,
             total_needed: item.total_qty_needed,
             total_picked: pickedQty,
             remaining: remaining,

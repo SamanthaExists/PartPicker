@@ -57,18 +57,37 @@ export class BomTemplatesService implements OnDestroy {
    */
   async getTemplateWithItems(templateId: string): Promise<BOMTemplateWithItems | null> {
     try {
-      const [templateRes, itemsRes] = await Promise.all([
-        this.supabase.from('bom_templates').select('*').eq('id', templateId).single(),
-        // Supabase defaults to 1000 rows - need higher limit for large templates
-        this.supabase.from('bom_template_items').select('*').eq('template_id', templateId).limit(10000),
-      ]);
-
+      // Fetch template first
+      const templateRes = await this.supabase.from('bom_templates').select('*').eq('id', templateId).single();
       if (templateRes.error) throw templateRes.error;
-      if (itemsRes.error) throw itemsRes.error;
+
+      // Fetch all items with pagination (Supabase has server-side 1000 row limit)
+      const PAGE_SIZE = 1000;
+      let allItems: any[] = [];
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data: itemsPage, error: itemsError } = await this.supabase
+          .from('bom_template_items')
+          .select('*')
+          .eq('template_id', templateId)
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (itemsError) throw itemsError;
+
+        if (itemsPage && itemsPage.length > 0) {
+          allItems = allItems.concat(itemsPage);
+          hasMore = itemsPage.length === PAGE_SIZE;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
 
       return {
         ...templateRes.data,
-        items: itemsRes.data || [],
+        items: allItems,
       };
     } catch (err) {
       this.errorSubject.next(err instanceof Error ? err.message : 'Failed to fetch template');

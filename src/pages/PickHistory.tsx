@@ -167,39 +167,57 @@ export function PickHistory() {
       setTotalPickCount(picksCount || 0);
       setHasMore((picksData?.length || 0) === PAGE_SIZE);
 
-      // Fetch ALL picks for accurate stats (separate lightweight query)
-      let statsQuery = supabase
-        .from('picks')
-        .select(`
-          qty_picked,
-          picked_by,
-          line_items!inner (
-            part_number,
-            orders!inner (
-              so_number
-            )
-          ),
-          tools!inner (
-            tool_number
-          )
-        `)
-        .gte('picked_at', startISO)
-        .lte('picked_at', endISO);
+      // Fetch ALL picks for accurate stats using pagination
+      // Supabase has a server-side limit of 1000 rows per request
+      const STATS_PAGE_SIZE = 1000;
+      let allPicksData: any[] = [];
+      let statsPage = 0;
+      let hasMoreStats = true;
 
-      // Add search filter if there's a search term
-      if (activeSearch) {
-        statsQuery = statsQuery.or(
-          `picked_by.ilike.%${activeSearch}%,` +
-          `line_items.part_number.ilike.%${activeSearch}%,` +
-          `line_items.orders.so_number.ilike.%${activeSearch}%,` +
-          `tools.tool_number.ilike.%${activeSearch}%`
+      while (hasMoreStats) {
+        let statsQuery = supabase
+          .from('picks')
+          .select(`
+            qty_picked,
+            picked_by,
+            line_items!inner (
+              part_number,
+              orders!inner (
+                so_number
+              )
+            ),
+            tools!inner (
+              tool_number
+            )
+          `)
+          .gte('picked_at', startISO)
+          .lte('picked_at', endISO);
+
+        // Add search filter if there's a search term
+        if (activeSearch) {
+          statsQuery = statsQuery.or(
+            `picked_by.ilike.%${activeSearch}%,` +
+            `line_items.part_number.ilike.%${activeSearch}%,` +
+            `line_items.orders.so_number.ilike.%${activeSearch}%,` +
+            `tools.tool_number.ilike.%${activeSearch}%`
+          );
+        }
+
+        const { data: statsPageData } = await statsQuery.range(
+          statsPage * STATS_PAGE_SIZE,
+          (statsPage + 1) * STATS_PAGE_SIZE - 1
         );
+
+        if (statsPageData && statsPageData.length > 0) {
+          allPicksData = allPicksData.concat(statsPageData);
+          hasMoreStats = statsPageData.length === STATS_PAGE_SIZE;
+          statsPage++;
+        } else {
+          hasMoreStats = false;
+        }
       }
 
-      // Supabase defaults to 1000 rows - we need all picks for accurate stats
-      const { data: allPicksData } = await statsQuery.limit(50000);
-
-      if (allPicksData) {
+      if (allPicksData.length > 0) {
         const totalQty = allPicksData.reduce((sum: number, p: any) => sum + (p.qty_picked || 0), 0);
         const uniqueParts = new Set(allPicksData.map((p: any) => p.line_items?.part_number).filter(Boolean)).size;
         const uniqueUsers = new Set(allPicksData.map((p: any) => p.picked_by).filter(Boolean)).size;
@@ -451,22 +469,37 @@ export function PickHistory() {
         setTotalPickCount(picksCount || 0);
         setHasMore((picksData?.length || 0) === PAGE_SIZE);
 
-        // Fetch ALL picks for accurate stats (separate lightweight query)
-        // Supabase defaults to 1000 rows - we need all picks for accurate stats
-        const { data: allPicksData } = await supabase
-          .from('picks')
-          .select(`
-            qty_picked,
-            picked_by,
-            line_items!inner (
-              part_number
-            )
-          `)
-          .gte('picked_at', startISO)
-          .lte('picked_at', endISO)
-          .limit(50000);
+        // Fetch ALL picks for accurate stats using pagination
+        // Supabase has a server-side limit of 1000 rows per request
+        const STATS_PAGE_SIZE = 1000;
+        let allPicksData: any[] = [];
+        let statsPage = 0;
+        let hasMoreStats = true;
 
-        if (allPicksData) {
+        while (hasMoreStats) {
+          const { data: statsPageData } = await supabase
+            .from('picks')
+            .select(`
+              qty_picked,
+              picked_by,
+              line_items!inner (
+                part_number
+              )
+            `)
+            .gte('picked_at', startISO)
+            .lte('picked_at', endISO)
+            .range(statsPage * STATS_PAGE_SIZE, (statsPage + 1) * STATS_PAGE_SIZE - 1);
+
+          if (statsPageData && statsPageData.length > 0) {
+            allPicksData = allPicksData.concat(statsPageData);
+            hasMoreStats = statsPageData.length === STATS_PAGE_SIZE;
+            statsPage++;
+          } else {
+            hasMoreStats = false;
+          }
+        }
+
+        if (allPicksData.length > 0) {
           const totalQty = allPicksData.reduce((sum: number, p: any) => sum + (p.qty_picked || 0), 0);
           const uniqueParts = new Set(allPicksData.map((p: any) => p.line_items?.part_number).filter(Boolean)).size;
           const uniqueUsers = new Set(allPicksData.map((p: any) => p.picked_by).filter(Boolean)).size;

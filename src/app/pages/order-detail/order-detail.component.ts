@@ -860,6 +860,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   keyboardSelectedIndex = -1;
   distributeItem: LineItemWithPicks | null = null;
   overPickWarning: string | null = null;
+  scrollToItemId: string | null = null;
 
   editForm = {
     so_number: '',
@@ -1005,6 +1006,28 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  private scrollToLineItemById(): void {
+    if (!this.scrollToItemId) return;
+
+    // Find the index of the item in sortedLineItems
+    const items = this.sortedLineItems;
+    const index = items.findIndex(item => item.id === this.scrollToItemId);
+
+    if (index >= 0) {
+      setTimeout(() => {
+        const element = document.getElementById(`line-item-${index}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        // Clear the scroll target after scrolling
+        this.scrollToItemId = null;
+      }, 100); // Small delay to allow DOM to update
+    } else {
+      // Item not found (may be hidden by filter), clear the target gracefully
+      this.scrollToItemId = null;
+    }
+  }
+
   ngOnInit(): void {
     // Load sort preference from localStorage
     const savedSort = localStorage.getItem('picking-sort-preference');
@@ -1025,6 +1048,10 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
       this.picksService.lineItemsWithPicks$.subscribe(items => {
         this.lineItemsWithPicks = items;
         this.updateAllToolsPicksMap();
+        // Scroll to tracked item after data refresh
+        if (this.scrollToItemId) {
+          this.scrollToLineItemById();
+        }
       }),
       this.picksService.picks$.subscribe(picks => {
         this.picks = picks;
@@ -1295,6 +1322,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     if (remaining <= 0) return;
 
     this.isSubmitting = item.id;
+    this.scrollToItemId = item.id;  // Track for scroll after refresh
     const userName = this.settingsService.getUserName();
     const result = await this.picksService.recordPick(item.id, tool.id, remaining, userName);
 
@@ -1314,6 +1342,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
 
   async handlePickAllTools(item: LineItemWithPicks): Promise<void> {
     this.isSubmitting = item.id;
+    this.scrollToItemId = item.id;  // Track for scroll after refresh
     const userName = this.settingsService.getUserName();
     let hasWarnings = false;
 
@@ -1388,6 +1417,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     if (qtyToPick <= 0) return;
 
     this.isSubmitting = this.partialPickItem.id;
+    this.scrollToItemId = this.partialPickItem.id;  // Track for scroll after refresh
     const userName = this.settingsService.getUserName();
     const result = await this.picksService.recordPick(
       this.partialPickItem.id,
@@ -1562,6 +1592,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     if (!this.distributeItem) return;
 
     this.isSubmitting = this.distributeItem.id;
+    this.scrollToItemId = this.distributeItem.id;  // Track for scroll after refresh
     const userName = this.settingsService.getUserName();
     let hasWarnings = false;
 

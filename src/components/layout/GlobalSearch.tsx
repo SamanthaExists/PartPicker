@@ -93,12 +93,25 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
     }
   };
 
-  const handleResultClick = (result: SearchResult) => {
+  const handleGoToOrder = (result: SearchResult) => {
     navigate(`/orders/${result.order_id}`);
     setQuery('');
     setIsOpen(false);
     setIsExpanded(false); // Close mobile search
     clearResults();
+  };
+
+  const handleViewInParts = (result: SearchResult) => {
+    navigate(`/parts?search=${encodeURIComponent(result.part_number)}`);
+    setQuery('');
+    setIsOpen(false);
+    setIsExpanded(false); // Close mobile search
+    clearResults();
+  };
+
+  // Keep legacy handler for keyboard navigation (defaults to order view)
+  const handleResultClick = (result: SearchResult) => {
+    handleGoToOrder(result);
   };
 
   const handleClear = () => {
@@ -219,14 +232,13 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
                 const remaining = result.total_qty_needed - result.total_picked;
 
                 return (
-                  <button
+                  <div
                     key={`${result.id}-${result.order_id}`}
                     className={cn(
-                      'w-full px-3 py-2 text-left hover:bg-accent transition-colors',
+                      'w-full px-3 py-2 hover:bg-accent transition-colors',
                       selectedIndex === index && 'bg-accent',
                       isComplete && 'bg-green-50/50'
                     )}
-                    onClick={() => handleResultClick(result)}
                     onMouseEnter={() => setSelectedIndex(index)}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -267,7 +279,26 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
                         )}
                       </div>
                     </div>
-                  </button>
+                    {/* Navigation buttons */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs flex-1 sm:flex-none"
+                        onClick={() => handleGoToOrder(result)}
+                      >
+                        Order
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs flex-1 sm:flex-none"
+                        onClick={() => handleViewInParts(result)}
+                      >
+                        Parts
+                      </Button>
+                    </div>
+                  </div>
                 );
               })}
             </div>

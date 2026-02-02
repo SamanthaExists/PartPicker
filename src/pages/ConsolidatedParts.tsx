@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Package, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, ClipboardList, CheckCircle2, Clock, Layers, List, Copy, FileSpreadsheet, Truck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { SearchInput } from '@/components/common/SearchInput';
@@ -270,6 +270,7 @@ const CONSOLIDATED_SORT_PREFERENCE_KEY = 'consolidated-parts-sort-preference';
 const CONSOLIDATED_STATUS_FILTER_KEY = 'consolidated-parts-status-filter';
 
 export function ConsolidatedParts() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>(() => {
     const saved = localStorage.getItem(CONSOLIDATED_STATUS_FILTER_KEY);
     return (saved as OrderStatusFilter) || 'all';
@@ -285,6 +286,16 @@ export function ConsolidatedParts() {
     return (saved as SortMode) || 'part_number';
   });
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+
+  // Read URL search parameter on mount
+  useEffect(() => {
+    const urlSearch = searchParams.get('search');
+    if (urlSearch) {
+      setSearchQuery(urlSearch);
+      // Clear URL param to keep URL clean
+      setSearchParams({}, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist status filter preference
   useEffect(() => {

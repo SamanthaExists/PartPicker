@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { CheckCircle2, Package, Plus, Settings, Filter } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchInput } from '@/components/common/SearchInput';
 import { PickingInterface } from '@/components/picking/PickingInterface';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import type { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -56,6 +59,30 @@ export function PickingSection({
   hasOpenIssue,
   onBatchUpdateAllocations,
 }: PickingSectionProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 300);
+
+  // Filter items based on search query
+  const filteredLineItems = lineItems.filter(item => {
+    if (!debouncedSearch) return true;
+    const query = debouncedSearch.toLowerCase();
+    return (
+      item.part_number.toLowerCase().includes(query) ||
+      item.description?.toLowerCase().includes(query) ||
+      item.location?.toLowerCase().includes(query)
+    );
+  });
+
+  const filteredLineItemsWithPicks = lineItemsWithPicks.filter(item => {
+    if (!debouncedSearch) return true;
+    const query = debouncedSearch.toLowerCase();
+    return (
+      item.part_number.toLowerCase().includes(query) ||
+      item.description?.toLowerCase().includes(query) ||
+      item.location?.toLowerCase().includes(query)
+    );
+  });
+
   if (tools.length === 0) {
     return (
       <Card>
@@ -127,6 +154,14 @@ export function PickingSection({
 
       {/* Action buttons row */}
       <div className="flex items-center gap-2 flex-wrap">
+        {/* Part Search Input */}
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search parts..."
+          className="w-40 sm:w-52"
+        />
+
         {/* Filter by Tool Dropdown */}
         {tools.length > 1 && (
           <div className="flex items-center gap-1">
@@ -159,6 +194,13 @@ export function PickingSection({
         </Button>
       </div>
 
+      {/* Search results indicator */}
+      {debouncedSearch && (
+        <div className="text-sm text-muted-foreground">
+          {filteredLineItems.length} of {lineItems.length} parts match "{debouncedSearch}"
+        </div>
+      )}
+
       {/* Unified Picking Interface */}
       <Card>
         <CardContent className="pt-4">
@@ -166,8 +208,8 @@ export function PickingSection({
             tool={tools.find(t => t.id === currentToolId) || tools[0]}
             allTools={tools}
             orderId={order.id}
-            lineItems={lineItems}
-            lineItemsWithPicks={lineItemsWithPicks}
+            lineItems={filteredLineItems}
+            lineItemsWithPicks={filteredLineItemsWithPicks}
             picks={picks}
             onRecordPick={onRecordPick}
             onUndoPick={onUndoPick}

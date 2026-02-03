@@ -313,7 +313,7 @@ export function Orders() {
                         <div className="flex justify-between text-sm mb-1">
                           <span className="font-medium">{order.progress_percent}%</span>
                           <span className="text-muted-foreground">
-                            {order.picked_items}/{order.total_items}
+                            {order.picked_items}/{order.total_items} parts
                           </span>
                         </div>
                         <Progress value={order.progress_percent} className="h-2" />

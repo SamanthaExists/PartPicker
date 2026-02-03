@@ -47,8 +47,11 @@ export function useOrders() {
       const lineItemsByOrder = new Map<string, { total: number; picked: number }>();
       for (const item of lineItemsData || []) {
         const current = lineItemsByOrder.get(item.order_id) || { total: 0, picked: 0 };
-        current.total += item.total_qty_needed;
-        current.picked += picksByLineItem.get(item.id) || 0;
+        current.total += 1;
+        const qtyPicked = picksByLineItem.get(item.id) || 0;
+        if (qtyPicked >= item.total_qty_needed) {
+          current.picked += 1;
+        }
         lineItemsByOrder.set(item.order_id, current);
       }
 

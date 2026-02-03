@@ -116,16 +116,13 @@ export function PickingSection({
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide pb-1 -mb-1">
           {tools.map((tool) => {
             const toolPicks = getPicksForTool(tool.id);
-            const toolTotal = lineItems.reduce(
-              (sum, item) => sum + item.qty_per_unit,
-              0
-            );
-            const toolPicked = Array.from(toolPicks.values()).reduce(
-              (sum, qty) => sum + qty,
-              0
-            );
+            const toolTotalItems = lineItems.length;
+            const toolCompletedItems = lineItems.filter(item => {
+              const picked = toolPicks.get(item.id) || 0;
+              return picked >= item.qty_per_unit;
+            }).length;
             const toolProgress =
-              toolTotal > 0 ? Math.round((toolPicked / toolTotal) * 100) : 0;
+              toolTotalItems > 0 ? Math.round((toolCompletedItems / toolTotalItems) * 100) : 0;
 
             return (
               <div

@@ -52,11 +52,13 @@ export function OrderDetail() {
   const [lineItemToDelete, setLineItemToDelete] = useState<LineItem | null>(null);
   const [isSaveTemplateOpen, setIsSaveTemplateOpen] = useState(false);
 
-  // Calculate overall progress
-  const totalNeeded = lineItemsWithPicks.reduce((sum, item) => sum + item.total_qty_needed, 0);
-  const totalPicked = lineItemsWithPicks.reduce((sum, item) => sum + item.total_picked, 0);
-  const progressPercent = totalNeeded > 0 ? Math.round((totalPicked / totalNeeded) * 100) : 0;
-  const isFullyPicked = progressPercent === 100 && totalNeeded > 0;
+  // Calculate overall progress by line items (parts), not quantities
+  const totalLineItems = lineItemsWithPicks.length;
+  const completedLineItems = lineItemsWithPicks.filter(
+    item => item.total_picked >= item.total_qty_needed
+  ).length;
+  const progressPercent = totalLineItems > 0 ? Math.round((completedLineItems / totalLineItems) * 100) : 0;
+  const isFullyPicked = progressPercent === 100 && totalLineItems > 0;
 
   // Set initial current tool ID when tools load
   useEffect(() => {
@@ -268,7 +270,7 @@ export function OrderDetail() {
           <span className="text-sm text-muted-foreground hidden sm:inline">Progress:</span>
           <Progress value={progressPercent} className="h-2 flex-1 min-w-0" />
           <span className="text-sm font-semibold whitespace-nowrap">{progressPercent}%</span>
-          <span className="text-xs text-muted-foreground whitespace-nowrap">({totalPicked}/{totalNeeded})</span>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">({completedLineItems}/{totalLineItems} parts)</span>
         </div>
 
         {/* Action Buttons */}

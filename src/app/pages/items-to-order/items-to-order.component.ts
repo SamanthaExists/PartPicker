@@ -25,9 +25,9 @@ import { ItemToOrder } from '../../models';
       </div>
 
       <!-- Info Alert -->
-      <div class="alert alert-info d-flex align-items-center mb-4" *ngIf="!loading && items.length > 0">
+      <div class="alert alert-info d-flex align-items-center mb-4" *ngIf="!loading && filteredItems.length > 0">
         <i class="bi bi-info-circle me-2"></i>
-        <span>Showing {{ items.length }} part(s) that have qty_available = 0 and still have remaining quantity to pick.</span>
+        <span>Showing {{ filteredItems.length }} part(s) that need to be ordered.</span>
       </div>
 
       <!-- Filters -->

@@ -14,6 +14,9 @@ import {
   History,
   User,
   Check,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -24,6 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { GlobalSearch } from '@/components/layout/GlobalSearch';
 import { useOnlineStatus } from '@/hooks/useOffline';
 import { useSettings } from '@/hooks/useSettings';
+import { useTheme } from '@/hooks/useTheme';
 import { InstallButton } from '@/components/pwa/InstallPrompt';
 
 interface MainLayoutProps {
@@ -139,6 +143,32 @@ function UserBadge({ className }: { className?: string }) {
   );
 }
 
+function ThemeToggle({ className }: { className?: string }) {
+  const { theme, setTheme } = useTheme();
+
+  const cycleTheme = () => {
+    if (theme === 'light') setTheme('dark');
+    else if (theme === 'dark') setTheme('system');
+    else setTheme('light');
+  };
+
+  return (
+    <button
+      onClick={cycleTheme}
+      className={cn(
+        'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors cursor-pointer',
+        className
+      )}
+      title={`Theme: ${theme} (click to cycle)`}
+    >
+      {theme === 'light' && <Sun className="h-3 w-3" />}
+      {theme === 'dark' && <Moon className="h-3 w-3" />}
+      {theme === 'system' && <Monitor className="h-3 w-3" />}
+      <span className="hidden sm:inline capitalize">{theme}</span>
+    </button>
+  );
+}
+
 export function MainLayout({ children }: MainLayoutProps) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -155,6 +185,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
         <h1 className="ml-3 text-lg font-semibold flex-1 truncate">Tool Pick List</h1>
+        <ThemeToggle className="mr-2" />
         <UserBadge className="mr-2" />
         <OnlineStatusBadge className="mr-2" />
         <GlobalSearch />
@@ -217,6 +248,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Desktop header with global search */}
           <header className="sticky top-0 z-30 hidden lg:flex h-14 items-center justify-end gap-4 border-b bg-background px-6 shrink-0">
+            <ThemeToggle />
             <UserBadge />
             <OnlineStatusBadge />
             <GlobalSearch />

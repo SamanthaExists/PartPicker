@@ -883,7 +883,7 @@ export function PickingInterface({
                 <span
                   className={cn(
                     'font-semibold',
-                    isComplete ? 'text-green-600' : ''
+                    isComplete ? 'text-green-600 dark:text-green-400' : ''
                   )}
                 >
                   {pickedForTool}
@@ -1033,7 +1033,7 @@ export function PickingInterface({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                    className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950"
                     onClick={() => setDeleteConfirmPick(pick)}
                     title="Delete this pick record"
                   >
@@ -1131,7 +1131,7 @@ export function PickingInterface({
               )}
             </div>
             {allToolsComplete && (
-              <CheckCircle2 className="h-7 w-7 text-green-600 flex-shrink-0 ml-2" />
+              <CheckCircle2 className="h-7 w-7 text-green-600 dark:text-green-400 flex-shrink-0 ml-2" />
             )}
           </div>
 
@@ -1167,7 +1167,7 @@ export function PickingInterface({
                 <span
                   className={cn(
                     'text-xl font-bold tabular-nums',
-                    allToolsComplete ? 'text-green-600' : 'text-primary'
+                    allToolsComplete ? 'text-green-600 dark:text-green-400' : 'text-primary'
                   )}
                 >
                   {totalPicked}
@@ -1457,7 +1457,7 @@ export function PickingInterface({
               <div key={prefix} className="space-y-3 md:space-y-1">
                 {/* Location Group Header */}
                 <div className="flex items-center gap-2 px-4 py-3 md:px-3 md:py-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl md:rounded-lg mt-4 md:mt-3 first:mt-0">
-                  <MapPin className="h-5 w-5 md:h-4 md:w-4 text-blue-600" />
+                  <MapPin className="h-5 w-5 md:h-4 md:w-4 text-blue-600 dark:text-blue-400" />
                   <span className="font-semibold text-lg md:text-base text-blue-800 dark:text-blue-200">{prefix}</span>
                   <Badge variant="secondary" className="text-sm">{items.length} {items.length === 1 ? 'item' : 'items'}</Badge>
                   <div className="ml-auto flex items-center gap-2">

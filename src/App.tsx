@@ -12,8 +12,12 @@ import { PickHistory } from '@/pages/PickHistory';
 import { OfflineIndicator, InstallPrompt, UpdatePrompt } from '@/components/pwa';
 import { NamePrompt } from '@/components/NamePrompt';
 import { PasswordGate } from '@/components/PasswordGate';
+import { useTheme } from '@/hooks/useTheme';
 
 function App() {
+  // Initialize theme on app mount
+  useTheme();
+
   return (
     <BrowserRouter>
       <MainLayout>

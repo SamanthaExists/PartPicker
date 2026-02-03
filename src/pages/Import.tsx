@@ -243,7 +243,7 @@ export function Import() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
               Preview: SO-{parseResult.order.so_number}
             </CardTitle>
             <Button variant="ghost" size="icon" onClick={clearResult}>
@@ -253,9 +253,9 @@ export function Import() {
           <CardContent className="space-y-6">
             {/* Warnings */}
             {parseResult.warnings.length > 0 && (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="font-medium text-yellow-800 mb-2">Warnings</p>
-                <ul className="list-disc list-inside text-sm text-yellow-700">
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg dark:bg-yellow-950/20 dark:border-yellow-800">
+                <p className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">Warnings</p>
+                <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-300">
                   {parseResult.warnings.map((warning, i) => (
                     <li key={i}>{warning}</li>
                   ))}
@@ -310,12 +310,12 @@ export function Import() {
 
             {/* Conflicts Warning */}
             {conflicts.length > 0 && (
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-center gap-2 text-amber-800 mb-2">
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-950/20 dark:border-amber-800">
+                <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 mb-2">
                   <AlertCircle className="h-5 w-5" />
                   <span className="font-medium">{conflicts.length} Part Conflict(s) Detected</span>
                 </div>
-                <p className="text-sm text-amber-700 mb-2">
+                <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
                   Some parts have different descriptions than what's in your catalog.
                 </p>
                 <Button size="sm" variant="outline" onClick={() => setShowConflictDialog(true)}>

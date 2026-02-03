@@ -2,14 +2,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { useSettings } from '@/hooks/useSettings';
 import { SCHEMA_SQL, MIGRATION_QTY_ON_ORDER_SQL } from '@/lib/supabase';
 import { useState, useRef } from 'react';
 import { usePWA, useServiceWorker } from '@/hooks/usePWA';
 import { useOnlineStatus, useOfflineQueue } from '@/hooks/useOffline';
 import { usePartListSync } from '@/hooks/usePartListSync';
+import { useApiSync } from '@/hooks/useApiSync';
 import { useBackupExport } from '@/hooks/useBackupExport';
-import { Download, RefreshCw, Wifi, WifiOff, Trash2, CloudOff, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Database, HardDrive, ListChecks } from 'lucide-react';
+import { Download, RefreshCw, Wifi, WifiOff, Trash2, CloudOff, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Database, HardDrive, ListChecks, Globe, Lock } from 'lucide-react';
 
 export function Settings() {
   const { settings, updateSettings } = useSettings();
@@ -26,6 +28,17 @@ export function Settings() {
   // Part List sync
   const { syncPartList, syncing, lastSyncResult } = usePartListSync();
   const partListFileRef = useRef<HTMLInputElement>(null);
+
+  // API sync
+  const { syncFromApi, syncing: apiSyncing, progress: apiProgress, lastSyncResult: apiSyncResult } = useApiSync();
+  const [apiPassword, setApiPassword] = useState('');
+  const API_SYNC_PASSWORD = '33214551';
+  const isApiPasswordCorrect = apiPassword === API_SYNC_PASSWORD;
+
+  const handleApiSync = async () => {
+    if (!isApiPasswordCorrect) return;
+    await syncFromApi();
+  };
 
   // Backup export
   const { exportBackup, exporting: exportingBackup, error: backupError } = useBackupExport();
@@ -208,6 +221,138 @@ export function Settings() {
                 </pre>
               </div>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* API Sync */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            API Sync
+          </CardTitle>
+          <CardDescription>
+            Sync qty available, qty on order, and descriptions directly from the Andrews Tool API
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="api-password" className="flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5" />
+                Password Required
+              </Label>
+              <div className="flex items-center gap-3 max-w-md">
+                <Input
+                  id="api-password"
+                  type="password"
+                  placeholder="Enter sync password"
+                  value={apiPassword}
+                  onChange={(e) => setApiPassword(e.target.value)}
+                />
+                <Button
+                  onClick={handleApiSync}
+                  disabled={!isApiPasswordCorrect || apiSyncing}
+                  className="gap-2 whitespace-nowrap"
+                >
+                  {apiSyncing ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="h-4 w-4" />
+                      Sync from API
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Progress */}
+          {apiSyncing && apiProgress && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{apiProgress.status}</span>
+                <span className="font-medium">
+                  {apiProgress.currentBatch} / {apiProgress.totalBatches}
+                </span>
+              </div>
+              <Progress
+                value={
+                  apiProgress.totalBatches > 0
+                    ? (apiProgress.currentBatch / apiProgress.totalBatches) * 100
+                    : 0
+                }
+              />
+            </div>
+          )}
+
+          {/* Results */}
+          {apiSyncResult && !apiSyncing && (
+            <div className={`p-4 rounded-lg border ${
+              apiSyncResult.success
+                ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
+                : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
+            }`}>
+              <div className="flex items-start gap-3">
+                {apiSyncResult.success ? (
+                  <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                )}
+                <div className="flex-1">
+                  <p className={`font-medium ${
+                    apiSyncResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
+                  }`}>
+                    {apiSyncResult.success ? 'API Sync Complete' : 'API Sync Failed'}
+                  </p>
+                  <div className="mt-2 text-sm space-y-1">
+                    <p>Updated: <strong>{apiSyncResult.updatedCount}</strong> line items</p>
+                    {apiSyncResult.notFoundCount > 0 && (
+                      <p className="text-amber-600 dark:text-amber-400">
+                        Not found in API: <strong>{apiSyncResult.notFoundCount}</strong> line items
+                        ({apiSyncResult.notFoundParts.length} unique parts)
+                      </p>
+                    )}
+                    {apiSyncResult.notFoundParts.length > 0 && apiSyncResult.notFoundParts.length <= 20 && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-muted-foreground">
+                          Show missing part numbers
+                        </summary>
+                        <ul className="mt-1 ml-4 text-xs font-mono">
+                          {apiSyncResult.notFoundParts.map(p => (
+                            <li key={p}>{p}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                    {apiSyncResult.errors.length > 0 && (
+                      <div className="mt-2 text-red-600 dark:text-red-400">
+                        {apiSyncResult.errors.map((err, i) => (
+                          <p key={i}>{err}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p className="font-medium text-foreground">What gets updated:</p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li><strong>Qty Available</strong> - Current stock on hand</li>
+              <li><strong>Qty On Order</strong> - Quantity on order</li>
+              <li><strong>Description</strong> - Part description</li>
+            </ul>
+            <p className="text-xs mt-2">
+              Pick counts, locations, and quantities needed are NOT affected. Parts are synced in batches of 30.
+            </p>
           </div>
         </CardContent>
       </Card>

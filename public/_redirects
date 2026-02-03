@@ -1,1 +1,2 @@
+/api/proxy/* https://api.andrewstool.com/api/:splat 200
 /* /index.html 200

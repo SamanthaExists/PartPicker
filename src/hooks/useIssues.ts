@@ -187,10 +187,10 @@ export function getIssueTypeLabel(type: IssueType): string {
 // Utility function to get issue type color
 export function getIssueTypeColor(type: IssueType): string {
   const colors: Record<IssueType, string> = {
-    out_of_stock: 'bg-orange-100 text-orange-800',
-    wrong_part: 'bg-purple-100 text-purple-800',
-    damaged: 'bg-red-100 text-red-800',
-    other: 'bg-gray-100 text-gray-800',
+    out_of_stock: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    wrong_part: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+    damaged: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    other: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
   };
-  return colors[type] || 'bg-gray-100 text-gray-800';
+  return colors[type] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
 }

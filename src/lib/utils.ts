@@ -66,32 +66,32 @@ export function getDueDateColors(status: DueDateStatus): { bg: string; text: str
   switch (status) {
     case 'overdue':
       return {
-        bg: 'bg-red-50',
-        text: 'text-red-700',
-        border: 'border-red-200',
-        badge: 'bg-red-100 text-red-800 border-red-300'
+        bg: 'bg-red-50 dark:bg-red-950/30',
+        text: 'text-red-700 dark:text-red-400',
+        border: 'border-red-200 dark:border-red-800',
+        badge: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700'
       };
     case 'due-soon':
       return {
-        bg: 'bg-amber-50',
-        text: 'text-amber-700',
-        border: 'border-amber-200',
-        badge: 'bg-amber-100 text-amber-800 border-amber-300'
+        bg: 'bg-amber-50 dark:bg-amber-950/30',
+        text: 'text-amber-700 dark:text-amber-400',
+        border: 'border-amber-200 dark:border-amber-800',
+        badge: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700'
       };
     case 'on-track':
       return {
-        bg: 'bg-green-50',
-        text: 'text-green-700',
-        border: 'border-green-200',
-        badge: 'bg-green-100 text-green-800 border-green-300'
+        bg: 'bg-green-50 dark:bg-green-950/30',
+        text: 'text-green-700 dark:text-green-400',
+        border: 'border-green-200 dark:border-green-800',
+        badge: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700'
       };
     case 'no-date':
     default:
       return {
-        bg: 'bg-gray-50',
-        text: 'text-gray-600',
-        border: 'border-gray-200',
-        badge: 'bg-gray-100 text-gray-700 border-gray-300'
+        bg: 'bg-gray-50 dark:bg-gray-900',
+        text: 'text-gray-600 dark:text-gray-400',
+        border: 'border-gray-200 dark:border-gray-700',
+        badge: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
       };
   }
 }
@@ -138,17 +138,17 @@ export function calculateProgress(picked: number, total: number): number {
 export function getStatusColor(status: string): string {
   switch (status) {
     case 'complete':
-      return 'bg-green-100 text-green-800';
+      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
     case 'in-progress':
-      return 'bg-blue-100 text-blue-800';
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
     case 'pending':
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     case 'active':
-      return 'bg-blue-100 text-blue-800';
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
     case 'cancelled':
-      return 'bg-red-100 text-red-800';
+      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
   }
 }
 

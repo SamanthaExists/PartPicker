@@ -166,7 +166,7 @@ export function DistributeInventoryDialog({
         {/* Shortage Warning */}
         {shortage > 0 && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-            <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
             <div className="text-sm">
               <span className="font-medium text-amber-800 dark:text-amber-200">
                 Shortage: {availableStock} available, {totalNeeded} needed ({shortage} short)
@@ -195,7 +195,7 @@ export function DistributeInventoryDialog({
           <div className="flex justify-between text-sm">
             <span className={cn(
               "font-medium",
-              isOverAllocated && "text-red-600"
+              isOverAllocated && "text-red-600 dark:text-red-400"
             )}>
               Allocated: {totalAllocated}
             </span>
@@ -208,7 +208,7 @@ export function DistributeInventoryDialog({
         {/* Over-allocation warning */}
         {isOverAllocated && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
-            <X className="h-5 w-5 text-red-600 flex-shrink-0" />
+            <X className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
             <span className="text-sm font-medium text-red-800 dark:text-red-200">
               Total exceeds available stock by {totalAllocated - availableStock}
             </span>
@@ -385,7 +385,7 @@ export function DistributeInventoryDialog({
             <div className="hidden sm:block sm:col-span-2 text-center font-medium">{totalNeeded}</div>
             <div className="sm:col-span-4 text-center font-semibold">
               <span className={cn(
-                isOverAllocated && "text-red-600"
+                isOverAllocated && "text-red-600 dark:text-red-400"
               )}>
                 {totalAllocated}
               </span>

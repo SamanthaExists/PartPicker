@@ -87,7 +87,7 @@ export function LineItemManagement({
               {lineItems.map((item) => (
                 <div
                   key={item.id}
-                  className="grid grid-cols-12 gap-2 px-3 py-3 rounded-lg border bg-white items-center"
+                  className="grid grid-cols-12 gap-2 px-3 py-3 rounded-lg border bg-white dark:bg-card items-center"
                 >
                   <div className="col-span-3">
                     <span className="font-mono font-medium">{item.part_number}</span>
@@ -121,7 +121,7 @@ export function LineItemManagement({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950"
                       onClick={() => setDeleteItem(item)}
                       disabled={isLoading}
                       title="Delete line item"

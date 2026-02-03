@@ -237,7 +237,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
                     className={cn(
                       'w-full px-3 py-2 hover:bg-accent transition-colors',
                       selectedIndex === index && 'bg-accent',
-                      isComplete && 'bg-green-50/50'
+                      isComplete && 'bg-green-50/50 dark:bg-green-950/20'
                     )}
                     onMouseEnter={() => setSelectedIndex(index)}
                   >
@@ -265,7 +265,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-sm font-medium">
-                          <span className={cn(isComplete && 'text-green-600')}>
+                          <span className={cn(isComplete && 'text-green-600 dark:text-green-400')}>
                             {result.total_picked}
                           </span>
                           <span className="text-muted-foreground"> / {result.total_qty_needed}</span>

@@ -178,8 +178,8 @@ export function ItemsToOrder() {
         <Card className="border-l-4 border-l-orange-500">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="rounded-full bg-orange-100 p-2">
-                <ShoppingCart className="h-5 w-5 text-orange-600" />
+              <div className="rounded-full bg-orange-100 dark:bg-orange-900/30 p-2">
+                <ShoppingCart className="h-5 w-5 text-orange-600 dark:text-orange-400" />
               </div>
               <div>
                 <div className="text-2xl font-bold">{totalItems}</div>
@@ -191,8 +191,8 @@ export function ItemsToOrder() {
         <Card className="border-l-4 border-l-red-500">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="rounded-full bg-red-100 p-2">
-                <AlertCircle className="h-5 w-5 text-red-600" />
+              <div className="rounded-full bg-red-100 dark:bg-red-900/30 p-2">
+                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
               <div>
                 <div className="text-2xl font-bold">{totalQtyToOrder}</div>
@@ -210,7 +210,7 @@ export function ItemsToOrder() {
       </div>
 
       {/* Search and Filters */}
-      <Card className="border-2 border-orange-200 bg-orange-50/50">
+      <Card className="border-2 border-orange-200 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-950/20">
         <CardContent className="pt-6">
           <div className="flex flex-col gap-4">
             {/* Search Bar */}
@@ -337,13 +337,13 @@ export function ItemsToOrder() {
                             Out of Stock
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="gap-1 bg-yellow-100 text-yellow-800 border-yellow-300">
+                          <Badge variant="secondary" className="gap-1 bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700">
                             <AlertCircle className="h-3 w-3" />
                             Low Stock ({item.qty_available} avail)
                           </Badge>
                         )}
                         {item.qty_on_order !== null && item.qty_on_order > 0 && (
-                          <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-800 border-blue-300">
+                          <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700">
                             <Truck className="h-3 w-3" />
                             {item.qty_on_order} on order
                           </Badge>
@@ -358,7 +358,7 @@ export function ItemsToOrder() {
 
                     <div className="text-right shrink-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-xl font-bold text-orange-600">
+                        <span className="text-xl font-bold text-orange-600 dark:text-orange-400">
                           {item.qty_to_order}
                         </span>
                         <span className="text-muted-foreground">to order</span>
@@ -394,7 +394,7 @@ export function ItemsToOrder() {
                                 <span className="font-mono">
                                   {orderInfo.picked} / {orderInfo.needed}
                                 </span>
-                                <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                <Badge variant="outline" className="text-orange-600 border-orange-300 dark:text-orange-400 dark:border-orange-700">
                                   {orderRemaining} needed
                                 </Badge>
                               </div>

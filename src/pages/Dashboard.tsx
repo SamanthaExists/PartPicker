@@ -53,29 +53,29 @@ export function Dashboard() {
       title: 'Active Orders',
       value: activeOrders.length,
       icon: ClipboardList,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      color: 'text-blue-600 dark:text-blue-400',
+      bgColor: 'bg-blue-100 dark:bg-blue-900/30',
     },
     {
       title: 'Parts Remaining',
       value: remainingParts,
       icon: Package,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100',
+      color: 'text-orange-600 dark:text-orange-400',
+      bgColor: 'bg-orange-100 dark:bg-orange-900/30',
     },
     {
       title: 'Parts Picked',
       value: pickedParts,
       icon: CheckCircle2,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      color: 'text-green-600 dark:text-green-400',
+      bgColor: 'bg-green-100 dark:bg-green-900/30',
     },
     {
       title: 'Completed Orders',
       value: completedOrders.length,
       icon: Clock,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
+      color: 'text-purple-600 dark:text-purple-400',
+      bgColor: 'bg-purple-100 dark:bg-purple-900/30',
     },
   ];
 
@@ -116,16 +116,16 @@ export function Dashboard() {
       {!ordersLoading && dueSoonOrders.length > 0 && (
         <Card className={cn(
           "border-l-4",
-          overdueCount > 0 ? "border-l-red-500 bg-red-50/50" : "border-l-amber-500 bg-amber-50/50"
+          overdueCount > 0 ? "border-l-red-500 bg-red-50/50 dark:bg-red-950/20" : "border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20"
         )}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div className="flex items-center gap-2">
               {overdueCount > 0 ? (
-                <AlertCircle className="h-5 w-5 text-red-600" />
+                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
               ) : (
-                <AlertTriangle className="h-5 w-5 text-amber-600" />
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               )}
-              <CardTitle className={overdueCount > 0 ? "text-red-800" : "text-amber-800"}>
+              <CardTitle className={overdueCount > 0 ? "text-red-800 dark:text-red-300" : "text-amber-800 dark:text-amber-300"}>
                 {overdueCount > 0
                   ? `${overdueCount} Overdue Order${overdueCount > 1 ? 's' : ''}`
                   : `${dueSoonOrders.length} Order${dueSoonOrders.length > 1 ? 's' : ''} Due Soon`
@@ -152,8 +152,8 @@ export function Dashboard() {
                   >
                     <div className={cn(
                       "flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50 transition-colors",
-                      dueDateInfo.status === 'overdue' && "border-red-200 bg-white",
-                      dueDateInfo.status === 'due-soon' && "border-amber-200 bg-white"
+                      dueDateInfo.status === 'overdue' && "border-red-200 bg-white dark:border-red-800 dark:bg-red-950/20",
+                      dueDateInfo.status === 'due-soon' && "border-amber-200 bg-white dark:border-amber-800 dark:bg-amber-950/20"
                     )}>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
@@ -189,11 +189,11 @@ export function Dashboard() {
 
       {/* Items to Order Section - Only show if there are items */}
       {!itemsToOrderLoading && itemsToOrder.length > 0 && (
-        <Card className="border-l-4 border-l-orange-500 bg-orange-50/50">
+        <Card className="border-l-4 border-l-orange-500 bg-orange-50/50 dark:bg-orange-950/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5 text-orange-600" />
-              <CardTitle className="text-orange-800">
+              <ShoppingCart className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              <CardTitle className="text-orange-800 dark:text-orange-300">
                 {itemsToOrder.length} Part{itemsToOrder.length > 1 ? 's' : ''} to Order
               </CardTitle>
             </div>
@@ -211,7 +211,7 @@ export function Dashboard() {
               {itemsToOrder.slice(0, 5).map((item) => (
                 <div
                   key={item.part_number}
-                  className="flex items-center justify-between rounded-lg border border-orange-200 bg-white p-3"
+                  className="flex items-center justify-between rounded-lg border border-orange-200 bg-white dark:border-orange-800 dark:bg-orange-950/20 p-3"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="font-mono font-medium truncate">{item.part_number}</p>
@@ -222,7 +222,7 @@ export function Dashboard() {
                     )}
                   </div>
                   <div className="text-right ml-4 shrink-0">
-                    <Badge variant="outline" className="text-orange-600 border-orange-300">
+                    <Badge variant="outline" className="text-orange-600 border-orange-300 dark:text-orange-400 dark:border-orange-700">
                       {item.remaining} needed
                     </Badge>
                   </div>
@@ -311,7 +311,7 @@ export function Dashboard() {
                     className="flex items-start gap-3 text-sm"
                   >
                     <div className="mt-1">
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                     </div>
                     <div className="flex-1">
                       <p>{activity.message}</p>

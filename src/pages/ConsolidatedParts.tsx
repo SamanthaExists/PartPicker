@@ -41,7 +41,7 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback }
       : 0;
 
   return (
-    <Card ref={refCallback} className={cn(isComplete && 'bg-green-50 border-green-200')}>
+    <Card ref={refCallback} className={cn(isComplete && 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800')}>
       <CardContent className="pt-4 pb-4">
         {/* Mobile Layout */}
         <div
@@ -87,7 +87,7 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback }
                 <span className="text-muted-foreground">Available: </span>
                 <span className={cn(
                   "font-semibold",
-                  part.qty_available >= part.remaining ? "text-green-600" : "text-amber-600"
+                  part.qty_available >= part.remaining ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"
                 )}>
                   {part.qty_available}
                 </span>
@@ -95,9 +95,9 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback }
             )}
             {part.qty_on_order !== null && part.qty_on_order > 0 && (
               <div className="flex items-center gap-1">
-                <Truck className="h-3 w-3 text-blue-500" />
+                <Truck className="h-3 w-3 text-blue-500 dark:text-blue-400" />
                 <span className="text-muted-foreground">On Order: </span>
-                <span className="font-semibold text-blue-600">{part.qty_on_order}</span>
+                <span className="font-semibold text-blue-600 dark:text-blue-400">{part.qty_on_order}</span>
               </div>
             )}
           </div>
@@ -177,7 +177,7 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback }
           {/* Qty On Order */}
           {part.qty_on_order !== null && part.qty_on_order > 0 && (
             <div className="text-center shrink-0 min-w-[70px]">
-              <div className="text-lg font-bold text-blue-600 flex items-center justify-center gap-1">
+              <div className="text-lg font-bold text-blue-600 dark:text-blue-400 flex items-center justify-center gap-1">
                 <Truck className="h-4 w-4" />
                 {part.qty_on_order}
               </div>
@@ -242,7 +242,7 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback }
                       <span
                         className={cn(
                           'font-mono',
-                          orderComplete && 'text-green-600'
+                          orderComplete && 'text-green-600 dark:text-green-400'
                         )}
                       >
                         {orderInfo.picked} / {orderInfo.needed}
@@ -515,7 +515,7 @@ export function ConsolidatedParts() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-600">{totalPicked}</div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalPicked}</div>
             <p className="text-sm text-muted-foreground">Total Qty Picked</p>
           </CardContent>
         </Card>
@@ -677,9 +677,9 @@ export function ConsolidatedParts() {
           {Array.from(locationGroups.entries()).map(([prefix, groupParts]) => (
             <div key={prefix} className="space-y-2">
               {/* Location Group Header */}
-              <div className="flex items-center gap-2 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <MapPin className="h-5 w-5 text-blue-600" />
-                <span className="font-semibold text-lg text-blue-800">{prefix}</span>
+              <div className="flex items-center gap-2 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-950/20 dark:border-blue-800">
+                <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <span className="font-semibold text-lg text-blue-800 dark:text-blue-200">{prefix}</span>
                 <Badge variant="secondary" className="ml-auto">
                   {groupParts.length} {groupParts.length === 1 ? 'part' : 'parts'}
                 </Badge>

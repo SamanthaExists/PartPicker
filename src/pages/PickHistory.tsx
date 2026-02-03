@@ -667,22 +667,22 @@ export function PickHistory() {
   const getActivityIcon = (type: ActivityRecord['type']) => {
     switch (type) {
       case 'pick':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />;
       case 'issue_created':
-        return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+        return <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400" />;
       case 'issue_resolved':
-        return <CheckCircle className="h-4 w-4 text-blue-500" />;
+        return <CheckCircle className="h-4 w-4 text-blue-500 dark:text-blue-400" />;
     }
   };
 
   const getActivityBadge = (type: ActivityRecord['type']) => {
     switch (type) {
       case 'pick':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">Pick</Badge>;
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800 text-xs">Pick</Badge>;
       case 'issue_created':
-        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">Issue</Badge>;
+        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800 text-xs">Issue</Badge>;
       case 'issue_resolved':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">Resolved</Badge>;
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800 text-xs">Resolved</Badge>;
     }
   };
 
@@ -888,7 +888,7 @@ export function PickHistory() {
                                 </span>
                                 {getActivityBadge(activity.type)}
                                 {activity.type === 'pick' && (
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800 text-xs">
                                     {activity.qty_picked}x
                                   </Badge>
                                 )}

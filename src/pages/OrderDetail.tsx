@@ -91,11 +91,11 @@ export function OrderDetail() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Orders
         </Link>
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20">
           <CardContent className="py-8 text-center">
-            <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
-            <p className="text-red-600 font-medium">Error loading order</p>
-            <p className="text-red-500 text-sm mt-2">{orderError}</p>
+            <AlertCircle className="mx-auto h-12 w-12 text-red-500 dark:text-red-400 mb-4" />
+            <p className="text-red-600 dark:text-red-400 font-medium">Error loading order</p>
+            <p className="text-red-500 dark:text-red-400 text-sm mt-2">{orderError}</p>
           </CardContent>
         </Card>
       </div>

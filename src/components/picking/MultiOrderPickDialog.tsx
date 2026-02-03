@@ -278,7 +278,7 @@ export function MultiOrderPickDialog({
                         <div className="flex items-center gap-2">
                           <span className={cn(
                             "font-mono text-sm",
-                            orderComplete && "text-green-600"
+                            orderComplete && "text-green-600 dark:text-green-400"
                           )}>
                             {orderAllocated} / {order.needed}
                           </span>

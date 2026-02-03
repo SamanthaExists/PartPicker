@@ -138,6 +138,15 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    proxy: {
+      '/api/proxy': {
+        target: 'https://api.andrewstool.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/proxy/, '/api'),
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

@@ -34,7 +34,7 @@ export function DeleteConfirmDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-600">
+          <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
             <AlertTriangle className="h-5 w-5" />
             Delete Line Item
           </DialogTitle>
@@ -57,7 +57,7 @@ export function DeleteConfirmDialog({
                 Qty: {lineItem.qty_per_unit} per unit / {lineItem.total_qty_needed} total
               </p>
             </div>
-            <p className="text-sm text-red-600 mt-3">
+            <p className="text-sm text-red-600 dark:text-red-400 mt-3">
               All pick records associated with this line item will also be deleted.
             </p>
           </div>

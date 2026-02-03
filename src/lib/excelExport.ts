@@ -379,6 +379,46 @@ export function exportPickHistoryToExcel(picks: PickHistoryItem[], title?: strin
   setColumnWidths(picksSheet, [20, 20, 15, 20, 15, 12, 40]);
   XLSX.utils.book_append_sheet(workbook, picksSheet, 'Pick History');
 
+  // Part Totals Sheet - group by part number with total qty picked
+  const partTotalsMap = new Map<string, { qty: number; pickCount: number; soNumbers: Set<string> }>();
+  for (const pick of picks) {
+    const existing = partTotalsMap.get(pick.part_number);
+    if (existing) {
+      existing.qty += pick.qty_picked;
+      existing.pickCount += 1;
+      existing.soNumbers.add(`SO-${pick.so_number}`);
+    } else {
+      partTotalsMap.set(pick.part_number, {
+        qty: pick.qty_picked,
+        pickCount: 1,
+        soNumbers: new Set([`SO-${pick.so_number}`]),
+      });
+    }
+  }
+
+  const partTotalsHeader = [
+    'Part Number',
+    'Total Qty Picked',
+    'Pick Count',
+    'SO Numbers',
+  ];
+
+  // Sort by part number
+  const sortedPartEntries = Array.from(partTotalsMap.entries()).sort((a, b) =>
+    a[0].localeCompare(b[0])
+  );
+
+  const partTotalsData = sortedPartEntries.map(([partNumber, data]) => [
+    partNumber,
+    data.qty,
+    data.pickCount,
+    Array.from(data.soNumbers).sort().join(', '),
+  ]);
+
+  const partTotalsSheet = XLSX.utils.aoa_to_sheet([partTotalsHeader, ...partTotalsData]);
+  setColumnWidths(partTotalsSheet, [20, 15, 12, 40]);
+  XLSX.utils.book_append_sheet(workbook, partTotalsSheet, 'Part Totals');
+
   // Undo History Sheet (if undos provided)
   if (undos && undos.length > 0) {
     const undoHeader = [

@@ -60,7 +60,7 @@ import { Order, Tool, LineItemWithPicks } from '../../models';
             </div>
 
             <!-- Print Preview -->
-            <div class="border rounded p-3 bg-white" id="printPreview">
+            <div class="border rounded p-3 bg-body" id="printPreview">
               <div class="text-center mb-3">
                 <h4 class="mb-1">Pick List - SO-{{ order?.so_number }}</h4>
                 <p class="text-muted small mb-0">
@@ -74,7 +74,7 @@ import { Order, Tool, LineItemWithPicks } from '../../models';
               </div>
 
               <table class="table table-sm table-bordered">
-                <thead class="table-light">
+                <thead class="table-secondary">
                   <tr>
                     <th style="width: 30px;"></th>
                     <th>Part Number</th>

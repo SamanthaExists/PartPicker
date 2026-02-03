@@ -76,7 +76,7 @@ import { BOMTemplate, BOMTemplateWithItems } from '../../models';
             </div>
 
             <!-- Selected Template Preview -->
-            <div *ngIf="selectedTemplate" class="mt-3 p-3 border rounded bg-light">
+            <div *ngIf="selectedTemplate" class="mt-3 p-3 border rounded bg-body-secondary">
               <div class="d-flex justify-content-between align-items-center mb-2">
                 <strong>{{ selectedTemplate.name }}</strong>
                 <span class="badge bg-primary">{{ selectedTemplate.items.length }} parts</span>

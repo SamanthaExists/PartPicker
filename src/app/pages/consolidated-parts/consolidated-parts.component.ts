@@ -134,8 +134,8 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
       <div *ngIf="!loading && filteredParts.length > 0" class="card">
         <div class="table-responsive">
           <table class="table table-hover mb-0">
-            <thead class="table-light">
-              <tr>
+            <thead>
+              <tr class="table-secondary">
                 <th>Part Number</th>
                 <th>Description</th>
                 <th>Location</th>
@@ -173,7 +173,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                   <div class="d-flex flex-wrap gap-1">
                     <a *ngFor="let order of part.orders"
                        [routerLink]="['/orders', order.order_id]"
-                       class="badge bg-light text-dark border text-decoration-none">
+                       class="badge bg-body-secondary text-body border text-decoration-none">
                       SO-{{ order.so_number }}
                       <span class="text-muted">({{ order.picked }}/{{ order.needed }})</span>
                     </a>

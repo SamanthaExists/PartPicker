@@ -79,7 +79,7 @@ import { OrderWithProgress, RecentActivity, ConsolidatedPart, ItemToOrder } from
       </div>
 
       <!-- Items to Order Section -->
-      <div class="card mb-4 alert-left-border" style="border-left-color: #fd7e14 !important;" *ngIf="!itemsToOrderLoading && itemsToOrder.length > 0">
+      <div class="card mb-4 alert-left-border" style="border-left-color: var(--bs-warning) !important;" *ngIf="!itemsToOrderLoading && itemsToOrder.length > 0">
         <div class="card-header bg-warning bg-opacity-10 d-flex justify-content-between align-items-center">
           <div class="d-flex align-items-center">
             <i class="bi bi-cart text-warning me-2"></i>
@@ -98,7 +98,7 @@ import { OrderWithProgress, RecentActivity, ConsolidatedPart, ItemToOrder } from
                 <span class="font-mono fw-medium">{{ item.part_number }}</span>
                 <div class="small text-muted text-truncate" *ngIf="item.description">{{ item.description }}</div>
               </div>
-              <span class="badge bg-warning text-dark ms-2">{{ item.remaining }} needed</span>
+              <span class="badge bg-warning text-dark rounded-pill ms-2">{{ item.remaining }} needed</span>
             </div>
           </div>
           <p class="small text-muted text-center mt-2 mb-0" *ngIf="itemsToOrder.length > 5">

@@ -5,6 +5,7 @@ import { Subscription } from 'rxjs';
 import { SettingsService } from '../../services/settings.service';
 import { InventorySyncService, SyncResult as InventorySyncResult } from '../../services/inventory-sync.service';
 import { PartListSyncService, SyncResult as PartListSyncResult } from '../../services/part-list-sync.service';
+import { ApiSyncService, ApiSyncResult, ApiSyncProgress } from '../../services/api-sync.service';
 import { ExcelService } from '../../services/excel.service';
 import { OfflineService } from '../../services/offline.service';
 import { UserSettings } from '../../models';
@@ -191,7 +192,7 @@ import { UserSettings } from '../../models';
                   >
                     {{ showNotFoundParts ? 'Hide' : 'Show' }} {{ inventorySyncResult.notFoundParts.length }} not found parts
                   </button>
-                  <div *ngIf="showNotFoundParts" class="mt-2 p-2 bg-light rounded small" style="max-height: 150px; overflow-y: auto;">
+                  <div *ngIf="showNotFoundParts" class="mt-2 p-2 bg-body-secondary rounded small" style="max-height: 150px; overflow-y: auto;">
                     <code *ngFor="let part of inventorySyncResult.notFoundParts; let last = last">
                       {{ part }}{{ last ? '' : ', ' }}
                     </code>
@@ -248,6 +249,105 @@ import { UserSettings } from '../../models';
                   <ul class="mb-0 ps-3">
                     <li *ngFor="let error of partListSyncResult.errors">{{ error }}</li>
                   </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- API Sync -->
+          <div class="card mb-4">
+            <div class="card-header">
+              <span class="fw-semibold">
+                <i class="bi bi-globe me-2"></i>API Sync
+              </span>
+            </div>
+            <div class="card-body">
+              <p class="small text-muted mb-3">
+                Sync qty available, qty on order, and descriptions directly from the Andrews Tool API.
+              </p>
+
+              <div class="mb-3">
+                <label class="form-label small">
+                  <i class="bi bi-lock me-1"></i>Password Required
+                </label>
+                <div class="d-flex gap-2">
+                  <input
+                    type="password"
+                    class="form-control"
+                    placeholder="Enter sync password"
+                    [(ngModel)]="apiPassword"
+                  >
+                  <button
+                    class="btn btn-primary flex-shrink-0"
+                    [disabled]="!isApiPasswordCorrect || apiSyncing"
+                    (click)="syncFromApi()"
+                  >
+                    <i class="bi me-1" [class]="apiSyncing ? 'bi-arrow-clockwise spin' : 'bi-globe'"></i>
+                    {{ apiSyncing ? 'Syncing...' : 'Sync from API' }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Progress -->
+              <div *ngIf="apiSyncing && apiProgress" class="mb-3">
+                <div class="d-flex justify-content-between small mb-1">
+                  <span class="text-muted">{{ apiProgress.status }}</span>
+                  <span class="fw-medium">{{ apiProgress.currentBatch }} / {{ apiProgress.totalBatches }}</span>
+                </div>
+                <div class="progress">
+                  <div
+                    class="progress-bar"
+                    role="progressbar"
+                    [style.width.%]="apiProgress.totalBatches > 0 ? (apiProgress.currentBatch / apiProgress.totalBatches) * 100 : 0"
+                  ></div>
+                </div>
+              </div>
+
+              <!-- Results -->
+              <div *ngIf="apiSyncResult && !apiSyncing" class="mt-3">
+                <div [class]="apiSyncResult.success ? 'alert alert-success' : 'alert alert-warning'" class="small mb-2">
+                  <div class="fw-semibold mb-1">
+                    {{ apiSyncResult.success ? 'API Sync Complete' : 'API Sync Failed' }}
+                  </div>
+                  <div>Updated: {{ apiSyncResult.updatedCount }} line items</div>
+                  <div *ngIf="apiSyncResult.notFoundCount > 0" class="text-warning">
+                    Not found in API: {{ apiSyncResult.notFoundCount }} line items
+                    ({{ apiSyncResult.notFoundParts.length }} unique parts)
+                  </div>
+                </div>
+
+                <div *ngIf="apiSyncResult.errors.length > 0" class="alert alert-danger small mb-2">
+                  <div class="fw-semibold mb-1">Errors:</div>
+                  <ul class="mb-0 ps-3">
+                    <li *ngFor="let error of apiSyncResult.errors">{{ error }}</li>
+                  </ul>
+                </div>
+
+                <div *ngIf="apiSyncResult.notFoundParts.length > 0 && apiSyncResult.notFoundParts.length <= 20">
+                  <button
+                    class="btn btn-sm btn-outline-secondary"
+                    type="button"
+                    (click)="showApiNotFoundParts = !showApiNotFoundParts"
+                  >
+                    {{ showApiNotFoundParts ? 'Hide' : 'Show' }} {{ apiSyncResult.notFoundParts.length }} not found parts
+                  </button>
+                  <div *ngIf="showApiNotFoundParts" class="mt-2 p-2 bg-body-secondary rounded small" style="max-height: 150px; overflow-y: auto;">
+                    <code *ngFor="let part of apiSyncResult.notFoundParts; let last = last">
+                      {{ part }}{{ last ? '' : ', ' }}
+                    </code>
+                  </div>
+                </div>
+              </div>
+
+              <div class="small text-muted mt-3">
+                <div class="fw-medium text-body mb-1">What gets updated:</div>
+                <ul class="mb-1 ps-3">
+                  <li><strong>Qty Available</strong> - Current stock on hand</li>
+                  <li><strong>Qty On Order</strong> - Quantity on order</li>
+                  <li><strong>Description</strong> - Part description</li>
+                </ul>
+                <div class="small">
+                  Pick counts, locations, and quantities needed are NOT affected. Parts are synced in batches of 30.
                 </div>
               </div>
             </div>
@@ -337,6 +437,18 @@ export class SettingsComponent implements OnInit, OnDestroy {
   partListSyncing = false;
   partListSyncResult: PartListSyncResult | null = null;
 
+  // API sync
+  apiPassword = '';
+  apiSyncing = false;
+  apiProgress: ApiSyncProgress | null = null;
+  apiSyncResult: ApiSyncResult | null = null;
+  showApiNotFoundParts = false;
+  private readonly API_SYNC_PASSWORD = '33214551';
+
+  get isApiPasswordCorrect(): boolean {
+    return this.apiPassword === this.API_SYNC_PASSWORD;
+  }
+
   // Backup
   exportingBackup = false;
   backupExported = false;
@@ -347,6 +459,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
     private settingsService: SettingsService,
     private inventorySyncService: InventorySyncService,
     private partListSyncService: PartListSyncService,
+    private apiSyncService: ApiSyncService,
     private excelService: ExcelService,
     private offlineService: OfflineService
   ) {}
@@ -377,6 +490,15 @@ export class SettingsComponent implements OnInit, OnDestroy {
       }),
       this.partListSyncService.lastSyncResult$.subscribe(result => {
         this.partListSyncResult = result;
+      }),
+      this.apiSyncService.syncing$.subscribe(syncing => {
+        this.apiSyncing = syncing;
+      }),
+      this.apiSyncService.progress$.subscribe(progress => {
+        this.apiProgress = progress;
+      }),
+      this.apiSyncService.lastSyncResult$.subscribe(result => {
+        this.apiSyncResult = result;
       })
     );
 
@@ -430,6 +552,12 @@ export class SettingsComponent implements OnInit, OnDestroy {
   async syncPartList(): Promise<void> {
     if (!this.partListFile) return;
     await this.partListSyncService.syncPartList(this.partListFile);
+  }
+
+  // API Sync
+  async syncFromApi(): Promise<void> {
+    if (!this.isApiPasswordCorrect) return;
+    await this.apiSyncService.syncFromApi();
   }
 
   // Backup Export

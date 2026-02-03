@@ -65,7 +65,7 @@ export class UtilsService {
       case 'cancelled':
         return 'badge bg-secondary';
       case 'pending':
-        return 'badge bg-warning text-dark';
+        return 'badge bg-warning text-dark';  // text-dark needed for contrast on yellow bg
       case 'in-progress':
         return 'badge bg-info';
       default:

@@ -450,3 +450,67 @@ body {
   outline: 2px solid #0d6efd;
   outline-offset: -2px;
 }
+
+/* =====================================================
+   DARK MODE OVERRIDES
+   ===================================================== */
+[data-bs-theme="dark"] body {
+  background-color: #212529;
+}
+
+[data-bs-theme="dark"] .sidebar {
+  background-color: #1a1d20;
+  border-right-color: #343a40;
+}
+
+[data-bs-theme="dark"] .sidebar .nav-link {
+  color: #adb5bd;
+}
+
+[data-bs-theme="dark"] .sidebar .nav-link:hover {
+  background-color: #2b3035;
+  color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .sidebar .nav-link.active {
+  background-color: #0d6efd;
+  color: #fff;
+}
+
+[data-bs-theme="dark"] .card {
+  border-color: #343a40;
+}
+
+[data-bs-theme="dark"] .pick-row:hover {
+  background-color: #2b3035;
+}
+
+[data-bs-theme="dark"] .pick-complete {
+  background-color: rgba(25, 135, 84, 0.15) !important;
+}
+
+[data-bs-theme="dark"] .pick-partial {
+  background-color: rgba(255, 193, 7, 0.15) !important;
+}
+
+[data-bs-theme="dark"] .table-hover tbody tr:hover {
+  background-color: #2b3035;
+}
+
+[data-bs-theme="dark"] .dropzone {
+  border-color: #495057;
+}
+
+[data-bs-theme="dark"] .dropzone:hover,
+[data-bs-theme="dark"] .dropzone.dragover {
+  border-color: #0d6efd;
+  background-color: rgba(13, 110, 253, 0.1);
+}
+
+[data-bs-theme="dark"] .swipe-item.swiping-right {
+  background: linear-gradient(to right, rgba(25, 135, 84, 0.2), transparent 50%);
+}
+
+[data-bs-theme="dark"] .swipe-item.swiping-left {
+  background: linear-gradient(to left, rgba(220, 53, 69, 0.2), transparent 50%);
+}

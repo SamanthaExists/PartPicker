@@ -237,7 +237,7 @@ const PAGE_SIZE = 50;
             <div *ngIf="!loading && filteredActivities.length > 0">
               <div *ngFor="let dateGroup of groupedDates" class="mb-4">
                 <!-- Date Header -->
-                <h6 class="text-muted small fw-semibold mb-3 sticky-top bg-white py-1 d-flex justify-content-between align-items-center">
+                <h6 class="text-muted small fw-semibold mb-3 sticky-top bg-body py-1 d-flex justify-content-between align-items-center">
                   <span>{{ formatDateHeader(dateGroup) }}</span>
                   <span class="badge bg-secondary">{{ groupedActivities[dateGroup].length }} records</span>
                 </h6>

@@ -27,14 +27,14 @@ import { GlobalSearchService, SearchResult } from '../../services/global-search.
             (keydown)="onKeydown($event)"
           >
           <span class="input-group-text bg-transparent border-start-0 text-muted small" *ngIf="!searchQuery">
-            <kbd class="bg-light border rounded px-1">Ctrl+K</kbd>
+            <kbd class="bg-body-secondary border rounded px-1">Ctrl+K</kbd>
           </span>
         </div>
 
         <!-- Results Dropdown -->
         <div
           *ngIf="showResults && searchQuery.length >= 2"
-          class="position-absolute top-100 start-0 end-0 bg-white border rounded-bottom shadow-sm mt-1 z-3"
+          class="position-absolute top-100 start-0 end-0 bg-body border rounded-bottom shadow-sm mt-1 z-3"
           style="max-height: 400px; overflow-y: auto;"
         >
           <div *ngIf="loading" class="text-center py-3 text-muted">
@@ -58,7 +58,7 @@ import { GlobalSearchService, SearchResult } from '../../services/global-search.
                   <span class="font-monospace fw-medium">{{ result.part_number }}</span>
                   <small class="text-muted ms-2" *ngIf="result.description">{{ result.description }}</small>
                 </div>
-                <span class="badge bg-light text-dark">SO-{{ result.so_number }}</span>
+                <span class="badge bg-body-secondary text-body">SO-{{ result.so_number }}</span>
               </div>
               <div class="small text-muted mt-1">
                 <span *ngIf="result.location" class="me-3">
@@ -91,7 +91,7 @@ import { GlobalSearchService, SearchResult } from '../../services/global-search.
       <!-- Mobile Search Overlay -->
       <div
         *ngIf="showMobileSearch"
-        class="mobile-search-overlay position-fixed top-0 start-0 end-0 bottom-0 bg-white z-3 d-md-none"
+        class="mobile-search-overlay position-fixed top-0 start-0 end-0 bottom-0 bg-body z-3 d-md-none"
       >
         <div class="p-3">
           <div class="d-flex gap-2 mb-3">
@@ -127,7 +127,7 @@ import { GlobalSearchService, SearchResult } from '../../services/global-search.
                   <span class="font-monospace fw-medium">{{ result.part_number }}</span>
                   <small class="text-muted d-block" *ngIf="result.description">{{ result.description }}</small>
                 </div>
-                <span class="badge bg-light text-dark">SO-{{ result.so_number }}</span>
+                <span class="badge bg-body-secondary text-body">SO-{{ result.so_number }}</span>
               </div>
               <div class="small text-muted mt-1">
                 <span *ngIf="result.location" class="me-3">

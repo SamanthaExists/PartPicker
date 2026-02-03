@@ -67,8 +67,8 @@ import { ItemToOrder } from '../../models';
       <div *ngIf="!loading && filteredItems.length > 0" class="card">
         <div class="table-responsive">
           <table class="table table-hover mb-0">
-            <thead class="table-light">
-              <tr>
+            <thead>
+              <tr class="table-secondary">
                 <th>Part Number</th>
                 <th>Description</th>
                 <th>Location</th>
@@ -101,7 +101,7 @@ import { ItemToOrder } from '../../models';
                   <div class="d-flex flex-wrap gap-1">
                     <a *ngFor="let order of item.orders"
                        [routerLink]="['/orders', order.order_id]"
-                       class="badge bg-light text-dark border text-decoration-none">
+                       class="badge bg-body-secondary text-body border text-decoration-none">
                       SO-{{ order.so_number }}
                     </a>
                   </div>

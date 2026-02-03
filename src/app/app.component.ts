@@ -51,9 +51,9 @@ import { OfflineIndicatorComponent } from './components/pwa/offline-indicator.co
       </aside>
 
       <!-- Mobile Header -->
-      <div class="d-lg-none position-fixed top-0 start-0 end-0 bg-white border-bottom z-3" style="height: 56px;">
+      <div class="d-lg-none position-fixed top-0 start-0 end-0 bg-body border-bottom z-3" style="height: 56px;">
         <div class="d-flex align-items-center h-100 px-3">
-          <button class="btn btn-link text-dark p-0 me-3" (click)="toggleSidebar()">
+          <button class="btn btn-link text-body p-0 me-3" (click)="toggleSidebar()">
             <i class="bi bi-list fs-4"></i>
           </button>
           <span class="fw-bold">Tool Pick List</span>
@@ -78,7 +78,7 @@ import { OfflineIndicatorComponent } from './components/pwa/offline-indicator.co
             <i class="bi bi-clipboard-check text-primary fs-4 me-2"></i>
             <span class="fw-bold">Pick List Tracker</span>
           </div>
-          <button class="btn btn-link text-dark p-0" (click)="toggleSidebar()">
+          <button class="btn btn-link text-body p-0" (click)="toggleSidebar()">
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
@@ -102,7 +102,7 @@ import { OfflineIndicatorComponent } from './components/pwa/offline-indicator.co
       <!-- Main Content -->
       <main class="flex-grow-1 d-flex flex-column overflow-hidden">
         <!-- Desktop Header -->
-        <header class="d-none d-lg-flex align-items-center justify-content-between p-3 border-bottom bg-white" style="height: 56px;">
+        <header class="d-none d-lg-flex align-items-center justify-content-between p-3 border-bottom bg-body" style="height: 56px;">
           <app-global-search></app-global-search>
           <div class="d-flex align-items-center">
             <span class="online-indicator me-2" [class.online]="isOnline" [class.offline]="!isOnline"></span>

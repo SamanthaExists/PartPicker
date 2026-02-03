@@ -38,7 +38,7 @@ import { PartConflict } from '../../models';
             <!-- Conflicts Table -->
             <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
               <table class="table table-sm">
-                <thead class="table-light sticky-top">
+                <thead class="table-secondary sticky-top">
                   <tr>
                     <th>Part Number</th>
                     <th>Field</th>

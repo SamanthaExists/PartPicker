@@ -114,7 +114,7 @@ interface PickHistoryItem {
           </button>
 
           <!-- Progress -->
-          <div class="d-flex align-items-center gap-2 ms-auto bg-light rounded px-3 py-2">
+          <div class="d-flex align-items-center gap-2 ms-auto bg-body-secondary rounded px-3 py-2">
             <span class="small text-muted">Progress:</span>
             <div class="progress" style="width: 100px; height: 8px;">
               <div class="progress-bar" [style.width.%]="progressPercent"></div>
@@ -235,7 +235,7 @@ interface PickHistoryItem {
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
           <h2 class="h6 fw-semibold mb-0">Picking</h2>
           <span class="badge bg-secondary">{{ lineItems.length }} parts</span>
-          <span class="badge bg-light text-dark border">{{ tools.length }} tool(s)</span>
+          <span class="badge bg-body-secondary text-body border">{{ tools.length }} tool(s)</span>
 
           <!-- Part Search Input -->
           <div class="input-group" style="width: 180px;">
@@ -294,7 +294,7 @@ interface PickHistoryItem {
                       [ngClass]="{
                         'bg-success': getToolProgress(tool.id) === 100,
                         'bg-warning text-dark': getToolProgress(tool.id) > 0 && getToolProgress(tool.id) < 100,
-                        'bg-light text-dark border': getToolProgress(tool.id) === 0
+                        'bg-body-secondary text-body border': getToolProgress(tool.id) === 0
                       }">
                   {{ tool.tool_number }}
                   <small *ngIf="tool.serial_number" class="opacity-75">({{ tool.serial_number }})</small>
@@ -314,8 +314,8 @@ interface PickHistoryItem {
           <div class="card-body p-0">
             <div class="table-responsive">
               <table class="table table-hover mb-0 align-middle">
-                <thead class="table-light">
-                  <tr>
+                <thead>
+                  <tr class="table-secondary">
                     <th style="width: 30px;"></th>
                     <th>Part Number</th>
                     <th>Description</th>
@@ -374,7 +374,7 @@ interface PickHistoryItem {
                       <td class="text-muted small">{{ item.description || '-' }}</td>
                       <!-- Location -->
                       <td>
-                        <span class="badge bg-light text-dark border" *ngIf="item.location">
+                        <span class="badge bg-body-secondary text-body border" *ngIf="item.location">
                           <i class="bi bi-geo-alt me-1"></i>{{ item.location }}
                         </span>
                         <span class="text-muted" *ngIf="!item.location">-</span>
@@ -461,7 +461,7 @@ interface PickHistoryItem {
                     </tr>
 
                     <!-- Pick History Panel (expandable) -->
-                    <tr *ngIf="expandedItems.has(item.id)" class="table-light">
+                    <tr *ngIf="expandedItems.has(item.id)" class="table-secondary">
                       <td colspan="8" class="p-3">
                         <div class="small">
                           <div class="d-flex align-items-center gap-2 mb-2">
@@ -822,9 +822,9 @@ interface PickHistoryItem {
     }
 
     .tool-checkbox.btn-light {
-      background-color: #e9ecef;
-      border-color: #ced4da;
-      color: #495057;
+      background-color: var(--bs-secondary-bg);
+      border-color: var(--bs-border-color);
+      color: var(--bs-body-color);
     }
 
     .tool-checkbox.btn-light:hover {
@@ -844,6 +844,11 @@ interface PickHistoryItem {
     .table-danger { background-color: rgba(220, 53, 69, 0.1) !important; }
     .table-info { background-color: rgba(13, 202, 240, 0.15) !important; }
 
+    :host-context([data-bs-theme="dark"]) .table-success { background-color: rgba(25, 135, 84, 0.2) !important; }
+    :host-context([data-bs-theme="dark"]) .table-warning { background-color: rgba(255, 193, 7, 0.15) !important; }
+    :host-context([data-bs-theme="dark"]) .table-danger { background-color: rgba(220, 53, 69, 0.15) !important; }
+    :host-context([data-bs-theme="dark"]) .table-info { background-color: rgba(13, 202, 240, 0.1) !important; }
+
     .keyboard-selected {
       outline: 2px solid #0d6efd !important;
       outline-offset: -2px;
@@ -851,6 +856,10 @@ interface PickHistoryItem {
 
     .keyboard-selected td {
       background-color: rgba(13, 110, 253, 0.08) !important;
+    }
+
+    :host-context([data-bs-theme="dark"]) .keyboard-selected td {
+      background-color: rgba(13, 110, 253, 0.15) !important;
     }
   `]
 })

@@ -143,7 +143,7 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
             <h6 class="fw-semibold mb-2">Line Items ({{ parseResult.order.line_items.length }})</h6>
             <div class="table-responsive border rounded" style="max-height: 300px; overflow-y: auto;">
               <table class="table table-sm mb-0">
-                <thead class="table-light sticky-top">
+                <thead class="table-secondary sticky-top">
                   <tr>
                     <th>Part Number</th>
                     <th>Description</th>
@@ -169,7 +169,7 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
           </div>
 
           <!-- Import Options -->
-          <div class="mb-4 p-3 bg-light rounded">
+          <div class="mb-4 p-3 bg-body-secondary rounded">
             <h6 class="fw-semibold mb-2">Import Options</h6>
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="saveToCatalog" [(ngModel)]="saveToCatalog">
@@ -269,7 +269,7 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
   `,
   styles: [`
     .dropzone {
-      border: 2px dashed #dee2e6;
+      border: 2px dashed var(--bs-border-color);
       border-radius: 0.5rem;
       padding: 3rem;
       text-align: center;
@@ -282,7 +282,7 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
     }
 
     .dropzone:hover {
-      border-color: #adb5bd;
+      border-color: var(--bs-secondary-color);
     }
 
     .font-mono {

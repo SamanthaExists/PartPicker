@@ -38,7 +38,7 @@ export function ItemsToOrder() {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [hideAlreadyOrdered, setHideAlreadyOrdered] = useState<boolean>(() => {
     const saved = localStorage.getItem(HIDE_ALREADY_ORDERED_KEY);
-    return saved === 'true';
+    return saved === null ? true : saved === 'true';
   });
 
   // Persist sort preference

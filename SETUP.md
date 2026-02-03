@@ -95,11 +95,33 @@ CREATE POLICY "Allow all operations on tools" ON tools FOR ALL USING (true) WITH
 CREATE POLICY "Allow all operations on line_items" ON line_items FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all operations on picks" ON picks FOR ALL USING (true) WITH CHECK (true);
 
+-- Pick Undo Audit Trail (denormalized snapshots of undone picks)
+CREATE TABLE IF NOT EXISTS pick_undos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  original_pick_id UUID NOT NULL,
+  line_item_id UUID NOT NULL,
+  tool_id UUID NOT NULL,
+  qty_picked INTEGER NOT NULL,
+  picked_by TEXT,
+  notes TEXT,
+  picked_at TIMESTAMPTZ NOT NULL,
+  part_number TEXT NOT NULL,
+  tool_number TEXT NOT NULL,
+  so_number TEXT NOT NULL,
+  order_id UUID NOT NULL,
+  undone_by TEXT NOT NULL,
+  undone_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE pick_undos ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations on pick_undos" ON pick_undos FOR ALL USING (true) WITH CHECK (true);
+
 -- Enable realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE orders;
 ALTER PUBLICATION supabase_realtime ADD TABLE tools;
 ALTER PUBLICATION supabase_realtime ADD TABLE line_items;
 ALTER PUBLICATION supabase_realtime ADD TABLE picks;
+ALTER PUBLICATION supabase_realtime ADD TABLE pick_undos;
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_tools_order_id ON tools(order_id);
@@ -107,6 +129,8 @@ CREATE INDEX IF NOT EXISTS idx_line_items_order_id ON line_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_picks_line_item_id ON picks(line_item_id);
 CREATE INDEX IF NOT EXISTS idx_picks_tool_id ON picks(tool_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_pick_undos_undone_at ON pick_undos(undone_at);
+CREATE INDEX IF NOT EXISTS idx_pick_undos_line_item_id ON pick_undos(line_item_id);
 ```
 
 ## Features

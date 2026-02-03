@@ -87,11 +87,11 @@ export function useItemsToOrder() {
           existing.total_needed += item.total_qty_needed;
           existing.total_picked += picked;
           existing.remaining = existing.total_needed - existing.total_picked;
-          existing.qty_to_order = Math.max(0, existing.remaining - existing.qty_available - (existing.qty_on_order ?? 0));
           // Use the first non-null qty_on_order found (should be same for same part)
           if (existing.qty_on_order === null && item.qty_on_order !== null) {
             existing.qty_on_order = item.qty_on_order;
           }
+          existing.qty_to_order = Math.max(0, existing.remaining - existing.qty_available - (existing.qty_on_order ?? 0));
           existing.orders.push({
             order_id: item.order_id,
             so_number: orderInfo.so_number,

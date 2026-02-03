@@ -149,10 +149,10 @@ export function ItemsToOrder() {
     setExpandedItems(newExpanded);
   };
 
-  // Stats
-  const totalItems = items.length;
-  const totalQtyToOrder = items.reduce((sum, p) => sum + p.qty_to_order, 0);
-  const totalOrders = new Set(items.flatMap(item => item.orders.map(o => o.order_id))).size;
+  // Stats - based on filtered items so counts match what's shown
+  const totalItems = filteredItems.length;
+  const totalQtyToOrder = filteredItems.reduce((sum, p) => sum + p.qty_to_order, 0);
+  const totalOrders = new Set(filteredItems.flatMap(item => item.orders.map(o => o.order_id))).size;
 
   const handleExport = () => {
     exportItemsToOrderToExcel(items);

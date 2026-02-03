@@ -327,6 +327,7 @@ export class ItemsToOrderService implements OnDestroy {
           if (existing.qty_on_order === null && item.qty_on_order !== null) {
             existing.qty_on_order = item.qty_on_order;
           }
+          existing.qty_to_order = Math.max(0, existing.remaining - existing.qty_available - (existing.qty_on_order ?? 0));
           existing.orders.push({
             order_id: item.order_id,
             so_number: orderMap.get(item.order_id) || 'Unknown',
@@ -334,15 +335,18 @@ export class ItemsToOrderService implements OnDestroy {
             picked: pickedQty,
           });
         } else {
+          const qtyOnOrder = item.qty_on_order ?? 0;
+          const qtyAvailable = item.qty_available || 0;
           itemMap.set(item.part_number, {
             part_number: item.part_number,
             description: item.description,
             location: item.location,
-            qty_available: item.qty_available || 0,
+            qty_available: qtyAvailable,
             qty_on_order: item.qty_on_order ?? null,
             total_needed: item.total_qty_needed,
             total_picked: pickedQty,
             remaining: remaining,
+            qty_to_order: Math.max(0, remaining - qtyAvailable - qtyOnOrder),
             orders: [{
               order_id: item.order_id,
               so_number: orderMap.get(item.order_id) || 'Unknown',

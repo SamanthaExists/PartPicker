@@ -76,6 +76,7 @@ import { ItemToOrder } from '../../models';
                 <th class="text-center">On Order</th>
                 <th class="text-center">Total Needed</th>
                 <th class="text-center">Remaining</th>
+                <th class="text-center">Qty to Order</th>
                 <th>Orders</th>
               </tr>
             </thead>
@@ -96,6 +97,9 @@ import { ItemToOrder } from '../../models';
                 <td class="text-center">{{ item.total_needed }}</td>
                 <td class="text-center">
                   <span class="badge bg-warning text-dark">{{ item.remaining }}</span>
+                </td>
+                <td class="text-center">
+                  <span class="badge" [class]="item.qty_to_order > 0 ? 'bg-danger' : 'bg-success'">{{ item.qty_to_order }}</span>
                 </td>
                 <td>
                   <div class="d-flex flex-wrap gap-1">

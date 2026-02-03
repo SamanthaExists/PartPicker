@@ -116,8 +116,12 @@ export function PickingSection({
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide pb-1 -mb-1">
           {tools.map((tool) => {
             const toolPicks = getPicksForTool(tool.id);
-            const toolTotalItems = lineItems.length;
-            const toolCompletedItems = lineItems.filter(item => {
+            // Only count line items that apply to this tool
+            const applicableItems = lineItems.filter(item =>
+              !item.tool_ids || item.tool_ids.length === 0 || item.tool_ids.includes(tool.id)
+            );
+            const toolTotalItems = applicableItems.length;
+            const toolCompletedItems = applicableItems.filter(item => {
               const picked = toolPicks.get(item.id) || 0;
               return picked >= item.qty_per_unit;
             }).length;

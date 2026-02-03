@@ -37,6 +37,7 @@ export interface LineItem {
   qty_available: number | null;
   qty_on_order: number | null;
   tool_ids: string[] | null; // Array of tool IDs this part applies to (null = all tools)
+  assembly_group: string | null; // Top-level assembly name for multi-BOM grouping
   created_at: string;
 }
 
@@ -143,6 +144,7 @@ export interface ImportedOrder {
   customer_name?: string;
   order_date?: string;
   due_date?: string;
+  estimated_ship_date?: string;
   tools: ImportedTool[];
   line_items: ImportedLineItem[];
 }
@@ -160,6 +162,7 @@ export interface ImportedLineItem {
   qty_per_unit: number;
   total_qty_needed: number;
   tool_ids?: string[]; // Tool IDs this part applies to (undefined = all tools)
+  assembly_group?: string; // Top-level assembly name for multi-BOM grouping
 }
 
 // Pick Undo audit trail

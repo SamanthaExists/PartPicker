@@ -135,6 +135,7 @@ export function useOrders() {
           customer_name: imported.customer_name || null,
           order_date: imported.order_date || null,
           due_date: imported.due_date || null,
+          estimated_ship_date: imported.estimated_ship_date || null,
           status: 'active',
         })
         .select()
@@ -189,6 +190,7 @@ export function useOrders() {
             qty_per_unit: item.qty_per_unit,
             total_qty_needed: item.total_qty_needed,
             tool_ids: toolIds,
+            assembly_group: item.assembly_group || null,
           };
         });
 

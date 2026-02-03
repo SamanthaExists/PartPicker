@@ -30,7 +30,7 @@ import { ReportIssueDialog } from './ReportIssueDialog';
 import { DistributeInventoryDialog } from './DistributeInventoryDialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-type SortMode = 'part_number' | 'location';
+type SortMode = 'part_number' | 'location' | 'assembly';
 
 const SORT_PREFERENCE_KEY = 'picking-sort-preference';
 
@@ -95,9 +95,14 @@ function ToolStatusIndicators({
   onPartialToolClick,
   disabled
 }: ToolStatusIndicatorsProps) {
+  // Filter to only applicable tools based on line item's tool_ids
+  const applicableTools = lineItem.tool_ids && lineItem.tool_ids.length > 0
+    ? tools.filter(t => lineItem.tool_ids!.includes(t.id))
+    : tools;
+
   return (
     <div className="flex gap-1 flex-wrap">
-      {tools.map(tool => {
+      {applicableTools.map(tool => {
         const toolPicks = picksMap.get(tool.id);
         const picked = toolPicks?.get(lineItem.id) || 0;
         const needed = lineItem.qty_per_unit;
@@ -270,7 +275,7 @@ export function PickingInterface({
   }).length;
 
   // Sort and group items
-  const { sortedItems, locationGroups, hiddenCount } = useMemo(() => {
+  const { sortedItems, locationGroups, assemblyGroups, hiddenCount } = useMemo(() => {
     // Filter out completed items if hideCompleted is true
     let items = [...filteredLineItems];
     let hiddenItemsCount = 0;
@@ -313,11 +318,40 @@ export function PickingInterface({
         }
       });
 
-      return { sortedItems: items, locationGroups: groups, hiddenCount: hiddenItemsCount };
+      return { sortedItems: items, locationGroups: groups, assemblyGroups: null, hiddenCount: hiddenItemsCount };
+    } else if (sortMode === 'assembly') {
+      // Sort by assembly group, then by part number within each group
+      items.sort((a, b) => {
+        const agA = a.assembly_group || '';
+        const agB = b.assembly_group || '';
+
+        if (!agA && agB) return 1;
+        if (agA && !agB) return -1;
+        if (!agA && !agB) return alphanumericCompare(a.part_number, b.part_number);
+
+        const cmp = alphanumericCompare(agA, agB);
+        if (cmp !== 0) return cmp;
+        return alphanumericCompare(a.part_number, b.part_number);
+      });
+
+      // Group by assembly_group
+      const groups = new Map<string, LineItem[]>();
+      items.forEach(item => {
+        const group_key = item.assembly_group || 'No Assembly Group';
+        if (!groups.has(group_key)) {
+          groups.set(group_key, []);
+        }
+        const group = groups.get(group_key);
+        if (group) {
+          group.push(item);
+        }
+      });
+
+      return { sortedItems: items, locationGroups: null, assemblyGroups: groups, hiddenCount: hiddenItemsCount };
     } else {
       // Sort by part number (alphanumeric)
       items.sort((a, b) => alphanumericCompare(a.part_number, b.part_number));
-      return { sortedItems: items, locationGroups: null, hiddenCount: hiddenItemsCount };
+      return { sortedItems: items, locationGroups: null, assemblyGroups: null, hiddenCount: hiddenItemsCount };
     }
   }, [filteredLineItems, sortMode, hideCompleted, toolPicks]);
 
@@ -462,19 +496,25 @@ export function PickingInterface({
 
   // Count how many tools still need this part
   const getRemainingToolsCount = useCallback((item: LineItem) => {
-    return allTools.filter(t => {
+    const applicableTools = item.tool_ids && item.tool_ids.length > 0
+      ? allTools.filter(t => item.tool_ids!.includes(t.id))
+      : allTools;
+    return applicableTools.filter(t => {
       const toolPicks = allToolsPicksMap.get(t.id);
       const picked = toolPicks?.get(item.id) || 0;
       return picked < item.qty_per_unit;
     }).length;
   }, [allTools, allToolsPicksMap]);
 
-  // Get current allocations for a line item across all tools
-  const getCurrentAllocations = useCallback((lineItemId: string): Map<string, number> => {
+  // Get current allocations for a line item across applicable tools
+  const getCurrentAllocations = useCallback((lineItem: LineItem): Map<string, number> => {
+    const applicableTools = lineItem.tool_ids && lineItem.tool_ids.length > 0
+      ? allTools.filter(t => lineItem.tool_ids!.includes(t.id))
+      : allTools;
     const allocations = new Map<string, number>();
-    allTools.forEach(t => {
+    applicableTools.forEach(t => {
       const toolPicks = allToolsPicksMap.get(t.id);
-      const picked = toolPicks?.get(lineItemId) || 0;
+      const picked = toolPicks?.get(lineItem.id) || 0;
       allocations.set(t.id, picked);
     });
     return allocations;
@@ -820,8 +860,20 @@ export function PickingInterface({
           </div>
 
           {/* Description */}
-          <div className="col-span-2 text-sm text-muted-foreground truncate">
-            {item.description || '-'}
+          <div className="col-span-2 text-sm text-muted-foreground min-w-0">
+            <div className="truncate">{item.description || '-'}</div>
+            {item.assembly_group && (
+              <div className="text-xs text-muted-foreground/70 truncate font-mono">
+                Assy: {item.assembly_group}
+              </div>
+            )}
+            {item.tool_ids && item.tool_ids.length > 0 && (
+              <div className="mt-0.5">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-700">
+                  {item.tool_ids.length} of {allTools.length} tools
+                </Badge>
+              </div>
+            )}
           </div>
 
           {/* Location */}
@@ -1129,6 +1181,16 @@ export function PickingInterface({
                   {item.description}
                 </p>
               )}
+              {item.assembly_group && (
+                <p className="text-xs text-muted-foreground/70 mt-0.5 font-mono">
+                  Assy: {item.assembly_group}
+                </p>
+              )}
+              {item.tool_ids && item.tool_ids.length > 0 && (
+                <Badge variant="outline" className="mt-1 text-[10px] px-1.5 py-0 h-4 bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-700">
+                  {item.tool_ids.length} of {allTools.length} tools
+                </Badge>
+              )}
             </div>
             {allToolsComplete && (
               <CheckCircle2 className="h-7 w-7 text-green-600 dark:text-green-400 flex-shrink-0 ml-2" />
@@ -1360,6 +1422,7 @@ export function PickingInterface({
             <SelectContent>
               <SelectItem value="part_number">Sort by Part Number</SelectItem>
               <SelectItem value="location">Sort by Location</SelectItem>
+              <SelectItem value="assembly">Sort by Assembly</SelectItem>
             </SelectContent>
           </Select>
           <label className="flex items-center gap-2 cursor-pointer select-none flex-shrink-0 px-2">
@@ -1403,6 +1466,7 @@ export function PickingInterface({
             <SelectContent>
               <SelectItem value="part_number">Sort by Part Number</SelectItem>
               <SelectItem value="location">Sort by Location</SelectItem>
+              <SelectItem value="assembly">Sort by Assembly</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1479,6 +1543,30 @@ export function PickingInterface({
                         )}
                       </Button>
                     )}
+                    {unpickedCount === 0 && (
+                      <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Complete
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                {items.map(renderLineItem)}
+              </div>
+            );
+          })
+        ) : sortMode === 'assembly' && assemblyGroups ? (
+          Array.from(assemblyGroups.entries()).map(([assemblyName, items]) => {
+            const unpickedCount = getUnpickedCountInLocation(items);
+
+            return (
+              <div key={assemblyName} className="space-y-3 md:space-y-1">
+                {/* Assembly Group Header */}
+                <div className="flex items-center gap-2 px-4 py-3 md:px-3 md:py-2 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl md:rounded-lg mt-4 md:mt-3 first:mt-0">
+                  <Package className="h-5 w-5 md:h-4 md:w-4 text-purple-600 dark:text-purple-400" />
+                  <span className="font-semibold text-lg md:text-base text-purple-800 dark:text-purple-200 font-mono">{assemblyName}</span>
+                  <Badge variant="secondary" className="text-sm">{items.length} {items.length === 1 ? 'part' : 'parts'}</Badge>
+                  <div className="ml-auto flex items-center gap-2">
                     {unpickedCount === 0 && (
                       <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
                         <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -1842,8 +1930,10 @@ export function PickingInterface({
         open={distributeItem !== null}
         onOpenChange={(open) => !open && setDistributeItem(null)}
         lineItem={distributeItem}
-        tools={allTools}
-        currentAllocations={distributeItem ? getCurrentAllocations(distributeItem.id) : new Map()}
+        tools={distributeItem?.tool_ids && distributeItem.tool_ids.length > 0
+          ? allTools.filter(t => distributeItem.tool_ids!.includes(t.id))
+          : allTools}
+        currentAllocations={distributeItem ? getCurrentAllocations(distributeItem) : new Map()}
         availableStock={distributeItem?.qty_available ?? 0}
         onSave={handleDistributeSave}
       />

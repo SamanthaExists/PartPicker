@@ -172,8 +172,56 @@ export class PicksService implements OnDestroy {
     }
   }
 
-  async undoPick(pickId: string): Promise<boolean> {
+  async undoPick(pickId: string, undoneBy?: string): Promise<boolean> {
     try {
+      // Look up pick from local state
+      const picks = this.picksSubject.getValue();
+      const pick = picks.find(p => p.id === pickId);
+      if (!pick) {
+        throw new Error('Pick not found');
+      }
+
+      // Look up line item from local state for part_number and order_id
+      const lineItemsWithPicks = this.lineItemsWithPicksSubject.getValue();
+      const lineItem = lineItemsWithPicks.find(li => li.id === pick.line_item_id);
+
+      // Look up tool info and order SO number from Supabase
+      const { data: toolData } = await this.supabase.from('tools')
+        .select('tool_number, order_id')
+        .eq('id', pick.tool_id)
+        .single();
+
+      let soNumber = '';
+      let orderIdForUndo = lineItem?.order_id || '';
+      if (toolData) {
+        orderIdForUndo = orderIdForUndo || toolData.order_id;
+        const { data: orderData } = await this.supabase.from('orders')
+          .select('so_number')
+          .eq('id', toolData.order_id)
+          .single();
+        soNumber = orderData?.so_number || '';
+      }
+
+      // Insert audit snapshot into pick_undos BEFORE deleting
+      const { error: auditError } = await this.supabase.from('pick_undos')
+        .insert({
+          original_pick_id: pick.id,
+          line_item_id: pick.line_item_id,
+          tool_id: pick.tool_id,
+          qty_picked: pick.qty_picked,
+          picked_by: pick.picked_by,
+          notes: pick.notes,
+          picked_at: pick.picked_at,
+          part_number: lineItem?.part_number || '',
+          tool_number: toolData?.tool_number || '',
+          so_number: soNumber,
+          order_id: orderIdForUndo,
+          undone_by: undoneBy || 'Unknown',
+        });
+
+      if (auditError) throw auditError;
+
+      // Now delete the pick
       const { error } = await this.supabase.from('picks')
         .delete()
         .eq('id', pickId);
@@ -365,6 +413,7 @@ export class RecentActivityService implements OnDestroy {
   private setupRealtimeSubscription(): void {
     this.subscription = this.supabase.channel('activity-feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'picks' }, () => this.fetchActivity())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pick_undos' }, () => this.fetchActivity())
       .subscribe();
   }
 
@@ -391,11 +440,9 @@ export class RecentActivityService implements OnDestroy {
 
       if (picksError) {
         console.error('Error fetching activity:', picksError);
-        this.activitiesSubject.next([]);
-        return;
       }
 
-      const recentActivities: RecentActivity[] = (picksData || []).map((pick: any) => ({
+      const pickActivities: RecentActivity[] = (picksData || []).map((pick: any) => ({
         id: pick.id,
         type: 'pick' as const,
         message: `Picked ${pick.qty_picked}x ${pick.line_items.part_number}`,
@@ -405,7 +452,32 @@ export class RecentActivityService implements OnDestroy {
         so_number: pick.line_items.orders.so_number,
       }));
 
-      this.activitiesSubject.next(recentActivities);
+      // Fetch recent undo events
+      const { data: undoData, error: undoError } = await this.supabase.from('pick_undos')
+        .select('*')
+        .order('undone_at', { ascending: false })
+        .limit(20);
+
+      if (undoError) {
+        console.error('Error fetching undo activity:', undoError);
+      }
+
+      const undoActivities: RecentActivity[] = (undoData || []).map((undo: any) => ({
+        id: undo.id,
+        type: 'pick_undo' as const,
+        message: `Undid ${undo.qty_picked}x ${undo.part_number}`,
+        timestamp: undo.undone_at,
+        user: undo.undone_by || 'Unknown',
+        order_id: undo.order_id,
+        so_number: undo.so_number,
+      }));
+
+      // Merge and sort by timestamp descending
+      const allActivities = [...pickActivities, ...undoActivities]
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 20);
+
+      this.activitiesSubject.next(allActivities);
     } catch (err) {
       console.error('Error fetching activity:', err);
       this.activitiesSubject.next([]);

@@ -32,7 +32,21 @@ interface IssueRecord {
   order_id: string;
 }
 
-type ActivityRecord = PickRecord | IssueRecord;
+interface UndoRecord {
+  id: string;
+  type: 'undo';
+  qty_picked: number;
+  picked_by: string | null;
+  undone_by: string;
+  undone_at: string;
+  picked_at: string;
+  part_number: string;
+  tool_number: string;
+  so_number: string;
+  order_id: string;
+}
+
+type ActivityRecord = PickRecord | IssueRecord | UndoRecord;
 
 interface GroupedActivities {
   [date: string]: ActivityRecord[];
@@ -121,6 +135,10 @@ const PAGE_SIZE = 50;
               <input class="form-check-input" type="checkbox" id="showIssues" [(ngModel)]="showIssues">
               <label class="form-check-label" for="showIssues">Issues</label>
             </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="showUndos" [(ngModel)]="showUndos">
+              <label class="form-check-label" for="showUndos">Undos</label>
+            </div>
           </div>
 
           <!-- Search Button -->
@@ -183,6 +201,14 @@ const PAGE_SIZE = 50;
               <div class="card-body py-3">
                 <div class="fs-4 fw-bold">{{ totalIssueCount }}</div>
                 <p class="text-muted small mb-0">Issues</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-sm">
+            <div class="card">
+              <div class="card-body py-3">
+                <div class="fs-4 fw-bold text-danger">{{ totalUndoCount }}</div>
+                <p class="text-muted small mb-0">Undos</p>
               </div>
             </div>
           </div>
@@ -266,6 +292,9 @@ const PAGE_SIZE = 50;
                         <span *ngIf="activity.type === 'pick'" class="badge bg-success-subtle text-success border border-success-subtle">
                           {{ activity.qty_picked }}x
                         </span>
+                        <span *ngIf="activity.type === 'undo'" class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                          {{ activity.qty_picked }}x
+                        </span>
                         <a
                           [routerLink]="['/orders', activity.order_id]"
                           class="text-primary text-decoration-none small"
@@ -275,13 +304,19 @@ const PAGE_SIZE = 50;
                         <span *ngIf="activity.type === 'pick'" class="badge bg-secondary-subtle text-secondary">
                           {{ activity.tool_number }}
                         </span>
+                        <span *ngIf="activity.type === 'undo'" class="badge bg-secondary-subtle text-secondary">
+                          {{ activity.tool_number }}
+                        </span>
                       </div>
                       <p class="small mb-0 mt-1">
-                        <span class="font-monospace fw-medium">{{ activity.part_number }}</span>
+                        <span class="font-monospace fw-medium" [class.text-danger]="activity.type === 'undo'">{{ activity.part_number }}</span>
                         <ng-container *ngIf="activity.type === 'pick'">
                           <span *ngIf="activity.description" class="text-muted"> - {{ activity.description }}</span>
                         </ng-container>
-                        <ng-container *ngIf="activity.type !== 'pick'">
+                        <ng-container *ngIf="activity.type === 'undo'">
+                          <span class="text-muted"> - originally picked by {{ activity.picked_by || 'Unknown' }}</span>
+                        </ng-container>
+                        <ng-container *ngIf="activity.type !== 'pick' && activity.type !== 'undo'">
                           <span class="text-muted"> - {{ activity.issue_type.replace('_', ' ') }}</span>
                         </ng-container>
                       </p>
@@ -291,7 +326,7 @@ const PAGE_SIZE = 50;
                       <p *ngIf="activity.type === 'pick' && activity.notes" class="text-muted small mb-0 mt-1 fst-italic">
                         Note: {{ activity.notes }}
                       </p>
-                      <p *ngIf="activity.type !== 'pick' && activity.description" class="text-muted small mb-0 mt-1 fst-italic">
+                      <p *ngIf="activity.type !== 'pick' && activity.type !== 'undo' && activity.description" class="text-muted small mb-0 mt-1 fst-italic">
                         {{ activity.description }}
                       </p>
                     </div>
@@ -354,6 +389,7 @@ const PAGE_SIZE = 50;
 export class PickHistoryComponent implements OnInit {
   picks: PickRecord[] = [];
   issues: IssueRecord[] = [];
+  undos: UndoRecord[] = [];
   loading = false;
   searchQuery = '';
   page = 0;
@@ -363,12 +399,14 @@ export class PickHistoryComponent implements OnInit {
   allUniqueParts = 0;
   allUniqueUsers = 0;
   totalIssueCount = 0;
+  totalUndoCount = 0;
   hasSearched = false;
   exporting = false;
 
   // Activity type filters
   showPicks = true;
   showIssues = true;
+  showUndos = true;
 
   // Date filters - default to today
   startDate = '';
@@ -454,10 +492,14 @@ export class PickHistoryComponent implements OnInit {
       activities.push(...this.issues);
     }
 
+    if (this.showUndos && this.page === 0) {
+      activities.push(...this.undos);
+    }
+
     // Sort by timestamp descending
     activities.sort((a, b) => {
-      const timeA = a.type === 'pick' ? a.picked_at : a.timestamp;
-      const timeB = b.type === 'pick' ? b.picked_at : b.timestamp;
+      const timeA = this.getActivityTimestamp(a);
+      const timeB = this.getActivityTimestamp(b);
       return new Date(timeB).getTime() - new Date(timeA).getTime();
     });
 
@@ -478,6 +520,14 @@ export class PickHistoryComponent implements OnInit {
           (activity.description && activity.description.toLowerCase().includes(query)) ||
           (activity.location && activity.location.toLowerCase().includes(query))
         );
+      } else if (activity.type === 'undo') {
+        return (
+          activity.undone_by.toLowerCase().includes(query) ||
+          (activity.picked_by && activity.picked_by.toLowerCase().includes(query)) ||
+          activity.part_number.toLowerCase().includes(query) ||
+          activity.so_number.toLowerCase().includes(query) ||
+          activity.tool_number.toLowerCase().includes(query)
+        );
       } else {
         return (
           (activity.user && activity.user.toLowerCase().includes(query)) ||
@@ -494,7 +544,7 @@ export class PickHistoryComponent implements OnInit {
     const groups: GroupedActivities = {};
 
     for (const activity of this.filteredActivities) {
-      const timestamp = activity.type === 'pick' ? activity.picked_at : activity.timestamp;
+      const timestamp = this.getActivityTimestamp(activity);
       const date = new Date(timestamp).toISOString().split('T')[0];
       if (!groups[date]) {
         groups[date] = [];
@@ -694,10 +744,39 @@ export class PickHistoryComponent implements OnInit {
         this.issues = transformedIssues;
         this.totalIssueCount = transformedIssues.length;
       }
+
+      // Fetch undo records (only on first page)
+      if (this.page === 0) {
+        const { data: undoData, error: undoError } = await this.supabase.from('pick_undos')
+          .select('*')
+          .gte('undone_at', startISO)
+          .lte('undone_at', endISO)
+          .order('undone_at', { ascending: false });
+
+        if (undoError) {
+          console.error('Error fetching undos:', undoError);
+        }
+
+        this.undos = (undoData || []).map((undo: any) => ({
+          id: undo.id,
+          type: 'undo' as const,
+          qty_picked: undo.qty_picked,
+          picked_by: undo.picked_by,
+          undone_by: undo.undone_by,
+          undone_at: undo.undone_at,
+          picked_at: undo.picked_at,
+          part_number: undo.part_number,
+          tool_number: undo.tool_number,
+          so_number: undo.so_number,
+          order_id: undo.order_id,
+        }));
+        this.totalUndoCount = this.undos.length;
+      }
     } catch (err) {
       console.error('Error fetching data:', err);
       this.picks = [];
       this.issues = [];
+      this.undos = [];
     } finally {
       this.loading = false;
     }
@@ -786,10 +865,29 @@ export class PickHistoryComponent implements OnInit {
         so_number: pick.line_items.orders.so_number,
       }));
 
+      // Fetch undo records for export
+      const { data: undoExportData } = await this.supabase.from('pick_undos')
+        .select('*')
+        .gte('undone_at', startISO)
+        .lte('undone_at', endISO)
+        .order('undone_at', { ascending: false });
+
+      const undoExport = (undoExportData || []).map((undo: any) => ({
+        undone_at: undo.undone_at,
+        undone_by: undo.undone_by,
+        picked_at: undo.picked_at,
+        picked_by: undo.picked_by,
+        qty_picked: undo.qty_picked,
+        part_number: undo.part_number,
+        tool_number: undo.tool_number,
+        so_number: undo.so_number,
+      }));
+
       this.excelService.exportPickHistoryToExcel(
         exportData,
         this.startDate,
-        this.endDate
+        this.endDate,
+        undoExport
       );
     } catch (err) {
       console.error('Export failed:', err);
@@ -820,12 +918,18 @@ export class PickHistoryComponent implements OnInit {
     if (activity.type === 'pick') {
       return activity.picked_by || 'Unknown';
     }
+    if (activity.type === 'undo') {
+      return activity.undone_by || 'Unknown';
+    }
     return activity.user || 'Unknown';
   }
 
   getActivityTimestamp(activity: ActivityRecord): string {
     if (activity.type === 'pick') {
       return activity.picked_at;
+    }
+    if (activity.type === 'undo') {
+      return activity.undone_at;
     }
     return activity.timestamp;
   }
@@ -834,6 +938,8 @@ export class PickHistoryComponent implements OnInit {
     switch (type) {
       case 'pick':
         return 'bi bi-check-circle-fill text-success';
+      case 'undo':
+        return 'bi bi-arrow-counterclockwise text-danger';
       case 'issue_created':
         return 'bi bi-exclamation-triangle-fill text-warning';
       case 'issue_resolved':
@@ -847,6 +953,8 @@ export class PickHistoryComponent implements OnInit {
     switch (type) {
       case 'pick':
         return 'badge bg-success-subtle text-success border border-success-subtle';
+      case 'undo':
+        return 'badge bg-danger-subtle text-danger border border-danger-subtle';
       case 'issue_created':
         return 'badge bg-warning-subtle text-warning border border-warning-subtle';
       case 'issue_resolved':
@@ -860,6 +968,8 @@ export class PickHistoryComponent implements OnInit {
     switch (type) {
       case 'pick':
         return 'Pick';
+      case 'undo':
+        return 'Undo';
       case 'issue_created':
         return 'Issue';
       case 'issue_resolved':

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import * as XLSX from 'xlsx';
-import { ImportedOrder, ImportedTool, ImportedLineItem, Order, Tool, LineItemWithPicks, Pick, OrderWithProgress, ItemToOrder, Issue, PartsCatalogItem, BOMTemplate, BOMTemplateItem } from '../models';
+import { ImportedOrder, ImportedTool, ImportedLineItem, Order, Tool, LineItemWithPicks, Pick, OrderWithProgress, ItemToOrder, Issue, PartsCatalogItem, BOMTemplate, BOMTemplateItem, PickUndo } from '../models';
 import { SupabaseService } from './supabase.service';
 
 @Injectable({
@@ -324,7 +324,7 @@ export class ExcelService {
   /**
    * Export pick history to Excel with date range
    */
-  exportPickHistoryToExcel(picks: any[], startDate: string, endDate: string): void {
+  exportPickHistoryToExcel(picks: any[], startDate: string, endDate: string, undos?: any[]): void {
     const workbook = XLSX.utils.book_new();
 
     // Pick History Sheet
@@ -343,11 +343,30 @@ export class ExcelService {
     const picksSheet = XLSX.utils.aoa_to_sheet([header, ...data]);
     XLSX.utils.book_append_sheet(workbook, picksSheet, 'Pick History');
 
+    // Undo History Sheet
+    if (undos && undos.length > 0) {
+      const undoHeader = ['Undone At', 'Undone By', 'Originally Picked At', 'Originally Picked By', 'SO Number', 'Part Number', 'Tool Number', 'Qty'];
+      const undoData = undos.map(undo => [
+        new Date(undo.undone_at).toLocaleString(),
+        undo.undone_by || 'Unknown',
+        new Date(undo.picked_at).toLocaleString(),
+        undo.picked_by || 'Unknown',
+        `SO-${undo.so_number}`,
+        undo.part_number,
+        undo.tool_number,
+        undo.qty_picked,
+      ]);
+
+      const undoSheet = XLSX.utils.aoa_to_sheet([undoHeader, ...undoData]);
+      XLSX.utils.book_append_sheet(workbook, undoSheet, 'Undo History');
+    }
+
     // Summary Sheet
     const totalPicks = picks.length;
     const totalQty = picks.reduce((sum: number, p: any) => sum + p.qty_picked, 0);
     const uniqueUsers = new Set(picks.map((p: any) => p.picked_by || 'Unknown')).size;
     const uniqueParts = new Set(picks.map((p: any) => p.part_number)).size;
+    const totalUndos = undos ? undos.length : 0;
 
     const startFormatted = new Date(startDate).toLocaleDateString();
     const endFormatted = new Date(endDate).toLocaleDateString();
@@ -361,6 +380,7 @@ export class ExcelService {
       ['Total Qty Picked', totalQty],
       ['Unique Users', uniqueUsers],
       ['Unique Parts', uniqueParts],
+      ['Total Undos', totalUndos],
       [],
       ['Export Date', new Date().toLocaleString()],
     ];
@@ -465,7 +485,7 @@ export class ExcelService {
 
     try {
       // Fetch all data from each table
-      const [orders, tools, lineItems, picks, issues, partsCatalog, bomTemplates, bomTemplateItems] = await Promise.all([
+      const [orders, tools, lineItems, picks, issues, partsCatalog, bomTemplates, bomTemplateItems, pickUndos] = await Promise.all([
         fetchAllFromTable<Order>('orders'),
         fetchAllFromTable<Tool>('tools'),
         fetchAllFromTable<any>('line_items'),
@@ -474,6 +494,7 @@ export class ExcelService {
         fetchAllFromTable<PartsCatalogItem>('parts_catalog'),
         fetchAllFromTable<BOMTemplate>('bom_templates'),
         fetchAllFromTable<BOMTemplateItem>('bom_template_items'),
+        fetchAllFromTable<PickUndo>('pick_undos'),
       ]);
 
       // Orders sheet
@@ -603,6 +624,28 @@ export class ExcelService {
         XLSX.utils.book_append_sheet(workbook, templateItemsSheet, 'BOM Template Items');
       }
 
+      // Pick Undos sheet
+      if (pickUndos.length > 0) {
+        const pickUndosData = pickUndos.map(pu => ({
+          id: pu.id,
+          original_pick_id: pu.original_pick_id,
+          line_item_id: pu.line_item_id,
+          tool_id: pu.tool_id,
+          qty_picked: pu.qty_picked,
+          picked_by: pu.picked_by || '',
+          notes: pu.notes || '',
+          picked_at: pu.picked_at,
+          part_number: pu.part_number,
+          tool_number: pu.tool_number,
+          so_number: pu.so_number,
+          order_id: pu.order_id,
+          undone_by: pu.undone_by,
+          undone_at: pu.undone_at,
+        }));
+        const pickUndosSheet = XLSX.utils.json_to_sheet(pickUndosData);
+        XLSX.utils.book_append_sheet(workbook, pickUndosSheet, 'Pick Undos');
+      }
+
       // Add metadata sheet
       const metadataSheet = XLSX.utils.aoa_to_sheet([
         ['Backup Date', new Date().toISOString()],
@@ -618,6 +661,7 @@ export class ExcelService {
         ['Parts Catalog', partsCatalog.length],
         ['BOM Templates', bomTemplates.length],
         ['BOM Template Items', bomTemplateItems.length],
+        ['Pick Undos', pickUndos.length],
       ]);
       XLSX.utils.book_append_sheet(workbook, metadataSheet, 'Metadata');
 

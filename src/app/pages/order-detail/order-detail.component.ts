@@ -1413,13 +1413,13 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     if (history.length === 0) return;
 
     this.isSubmitting = item.id;
-    await this.picksService.undoPick(history[0].pick.id);
+    await this.picksService.undoPick(history[0].pick.id, this.settingsService.getUserName());
     this.isSubmitting = null;
   }
 
   async handleDeletePick(pick: Pick): Promise<void> {
     this.isSubmitting = pick.line_item_id;
-    await this.picksService.undoPick(pick.id);
+    await this.picksService.undoPick(pick.id, this.settingsService.getUserName());
     this.isSubmitting = null;
   }
 
@@ -1434,8 +1434,9 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     );
 
     // Delete all picks
+    const userName = this.settingsService.getUserName();
     for (const pick of toolPicks) {
-      await this.picksService.undoPick(pick.id);
+      await this.picksService.undoPick(pick.id, userName);
     }
 
     this.isSubmitting = null;

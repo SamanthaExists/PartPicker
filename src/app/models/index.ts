@@ -154,10 +154,28 @@ export interface ImportedLineItem {
   tool_ids?: string[];
 }
 
+// Pick Undo audit trail
+export interface PickUndo {
+  id: string;
+  original_pick_id: string;
+  line_item_id: string;
+  tool_id: string;
+  qty_picked: number;
+  picked_by: string | null;
+  notes: string | null;
+  picked_at: string;
+  part_number: string;
+  tool_number: string;
+  so_number: string;
+  order_id: string;
+  undone_by: string;
+  undone_at: string;
+}
+
 // Activity feed
 export interface RecentActivity {
   id: string;
-  type: 'pick' | 'order_created' | 'order_completed';
+  type: 'pick' | 'pick_undo' | 'order_created' | 'order_completed';
   message: string;
   timestamp: string;
   user?: string;

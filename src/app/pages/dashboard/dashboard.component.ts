@@ -161,9 +161,10 @@ import { OrderWithProgress, RecentActivity, ConsolidatedPart, ItemToOrder } from
               </div>
               <div *ngIf="!activityLoading && activities.length > 0">
                 <div *ngFor="let activity of activities.slice(0, 8)" class="d-flex align-items-start mb-3">
-                  <i class="bi bi-check-circle-fill text-success me-2 mt-1"></i>
+                  <i *ngIf="activity.type === 'pick_undo'" class="bi bi-arrow-counterclockwise text-danger me-2 mt-1"></i>
+                  <i *ngIf="activity.type !== 'pick_undo'" class="bi bi-check-circle-fill text-success me-2 mt-1"></i>
                   <div class="flex-grow-1">
-                    <p class="mb-0 small">{{ activity.message }}</p>
+                    <p class="mb-0 small" [class.text-danger]="activity.type === 'pick_undo'">{{ activity.message }}</p>
                     <p class="text-muted small mb-0">{{ activity.user }} - SO-{{ activity.so_number }}</p>
                   </div>
                   <small class="text-muted">{{ utils.formatRelativeTime(activity.timestamp) }}</small>

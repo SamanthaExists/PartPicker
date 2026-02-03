@@ -125,7 +125,7 @@ export interface ItemToOrder {
   total_needed: number;
   total_picked: number;
   remaining: number;
-  qty_to_order: number; // How many we need to order (remaining - qty_available)
+  qty_to_order: number; // How many we need to order (remaining - qty_available - qty_on_order)
   orders: {
     order_id: string;
     so_number: string;

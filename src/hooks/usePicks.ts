@@ -452,12 +452,12 @@ export function useRecentActivity() {
   useEffect(() => {
     fetchActivity();
 
-    // Subscribe to real-time updates
+    // Subscribe to real-time updates (listen to all pick events including deletes from undos)
     const subscription = supabase
       .channel('activity-feed')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'picks' },
+        { event: '*', schema: 'public', table: 'picks' },
         () => fetchActivity()
       )
       .on(

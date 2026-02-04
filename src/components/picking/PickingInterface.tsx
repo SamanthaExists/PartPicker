@@ -34,9 +34,6 @@ type SortMode = 'part_number' | 'location' | 'assembly';
 
 const SORT_PREFERENCE_KEY = 'picking-sort-preference';
 
-// Swipe threshold in pixels for touch gestures
-const SWIPE_THRESHOLD = 100;
-
 interface PickingInterfaceProps {
   tool: Tool;
   allTools: Tool[];
@@ -132,7 +129,6 @@ export function PickingInterface({
   const [distributeItem, setDistributeItem] = useState<LineItem | null>(null);
   const [scrollToItemId, setScrollToItemId] = useState<string | null>(null);
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const [swipeStates, setSwipeStates] = useState<Map<string, number>>(new Map());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [deleteConfirmPick, setDeleteConfirmPick] = useState<Pick | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -511,64 +507,6 @@ export function PickingInterface({
     setDeleteConfirmPick(null);
   };
 
-  // Swipe handling for mobile
-  const touchStartRef = useRef<Map<string, { x: number; y: number }>>(new Map());
-
-  const handleTouchStart = useCallback((itemId: string, e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    touchStartRef.current.set(itemId, { x: touch.clientX, y: touch.clientY });
-  }, []);
-
-  const handleTouchMove = useCallback((itemId: string, e: React.TouchEvent) => {
-    const start = touchStartRef.current.get(itemId);
-    if (!start) return;
-
-    const touch = e.touches[0];
-    const deltaX = touch.clientX - start.x;
-    const deltaY = Math.abs(touch.clientY - start.y);
-
-    // Only track horizontal swipes (ignore vertical scrolling)
-    if (deltaY > 30) {
-      touchStartRef.current.delete(itemId);
-      setSwipeStates(prev => {
-        const next = new Map(prev);
-        next.delete(itemId);
-        return next;
-      });
-      return;
-    }
-
-    // Only allow right swipes (positive deltaX)
-    if (deltaX > 0) {
-      setSwipeStates(prev => {
-        const next = new Map(prev);
-        next.set(itemId, Math.min(deltaX, SWIPE_THRESHOLD + 50));
-        return next;
-      });
-    }
-  }, []);
-
-  const handleTouchEnd = useCallback(async (item: LineItem) => {
-    const swipeDistance = swipeStates.get(item.id) || 0;
-
-    // Reset swipe state
-    touchStartRef.current.delete(item.id);
-    setSwipeStates(prev => {
-      const next = new Map(prev);
-      next.delete(item.id);
-      return next;
-    });
-
-    // If swiped far enough, trigger quick pick
-    if (swipeDistance >= SWIPE_THRESHOLD) {
-      const pickedForTool = toolPicks.get(item.id) || 0;
-      const remaining = item.qty_per_unit - pickedForTool;
-      if (remaining > 0) {
-        await handleQuickPick(item);
-      }
-    }
-  }, [swipeStates, toolPicks, handleQuickPick]);
-
   // Render desktop line item row with expandable pick history
   const renderDesktopLineItem = (item: LineItem) => {
     const pickedForTool = toolPicks.get(item.id) || 0;
@@ -901,13 +839,12 @@ export function PickingInterface({
     );
   };
 
-  // Render mobile line item with swipe support
+  // Render mobile line item
   const renderMobileLineItem = (item: LineItem) => {
     const pickedForTool = toolPicks.get(item.id) || 0;
     const remaining = item.qty_per_unit - pickedForTool;
     const isComplete = remaining <= 0;
     const itemHasIssue = hasOpenIssue ? hasOpenIssue(item.id) : false;
-    const swipeOffset = swipeStates.get(item.id) || 0;
 
     // Get total picks across all tools
     const totalData = totalPicksMap.get(item.id);
@@ -925,37 +862,18 @@ export function PickingInterface({
 
     return (
       <div
-        className="relative overflow-hidden rounded-xl md:hidden"
+        className="rounded-xl md:hidden"
       >
-        {/* Swipe indicator background */}
-        <div
-          className={cn(
-            "absolute inset-0 bg-green-500 flex items-center pl-4 transition-opacity",
-            swipeOffset > 0 ? "opacity-100" : "opacity-0"
-          )}
-        >
-          <div className="flex items-center gap-2 text-white font-semibold">
-            <Check className="h-6 w-6" />
-            <span className="text-lg">Pick {remaining}</span>
-          </div>
-        </div>
-
         {/* Main item content */}
         <div
           className={cn(
-            'relative flex flex-col p-4 border rounded-xl shadow-sm bg-white dark:bg-card transition-transform',
+            'relative flex flex-col p-4 border rounded-xl shadow-sm bg-white dark:bg-card',
             allToolsComplete ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' : '',
             isKeyboardSelected && 'ring-2 ring-blue-500 ring-offset-1',
             itemHasIssue && !allToolsComplete && 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800',
             isLowStock && !itemHasIssue && 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800',
             isSubmitting === item.id && 'opacity-50'
           )}
-          style={{
-            transform: `translateX(${swipeOffset}px)`,
-          }}
-          onTouchStart={(e) => !isComplete && handleTouchStart(item.id, e)}
-          onTouchMove={(e) => !isComplete && handleTouchMove(item.id, e)}
-          onTouchEnd={() => !isComplete && handleTouchEnd(item)}
         >
           {/* Top row: Part number and status */}
           <div className="flex items-start justify-between mb-2">
@@ -1172,13 +1090,6 @@ export function PickingInterface({
             </div>
           )}
 
-          {/* Swipe hint - hide when distribute is shown since swipe picks full qty */}
-          {!isComplete && swipeOffset === 0 && !shouldShowDistribute(item) && (
-            <div className="flex items-center justify-center mt-3 text-xs text-muted-foreground">
-              <ChevronRight className="h-4 w-4 animate-pulse" />
-              <span>Swipe right to quick pick</span>
-            </div>
-          )}
         </div>
       </div>
     );

@@ -254,14 +254,12 @@ export function PickHistory() {
         }
       }
 
-      if (allPicksData.length > 0) {
-        const totalQty = allPicksData.reduce((sum: number, p: any) => sum + (p.qty_picked || 0), 0);
-        const uniqueParts = new Set(allPicksData.map((p: any) => p.line_items?.part_number).filter(Boolean)).size;
-        const uniqueUsers = new Set(allPicksData.map((p: any) => p.picked_by).filter(Boolean)).size;
-        setTotalQtyPicked(totalQty);
-        setAllUniqueParts(uniqueParts);
-        setAllUniqueUsers(uniqueUsers);
-      }
+      const totalQty = allPicksData.reduce((sum: number, p: any) => sum + (p.qty_picked || 0), 0);
+      const uniqueParts = new Set(allPicksData.map((p: any) => p.line_items?.part_number).filter(Boolean)).size;
+      const uniqueUsers = new Set(allPicksData.map((p: any) => p.picked_by).filter(Boolean)).size;
+      setTotalQtyPicked(totalQty);
+      setAllUniqueParts(uniqueParts);
+      setAllUniqueUsers(uniqueUsers);
 
       // Fetch issues (only on first page to avoid complexity)
       if (page === 0) {
@@ -416,6 +414,39 @@ export function PickHistory() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
+  // Subscribe to real-time changes so activity history auto-refreshes
+  useEffect(() => {
+    if (!hasSearched) return;
+
+    const subscription = supabase
+      .channel('pick-history-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'picks' },
+        () => fetchData()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'pick_undos' },
+        () => fetchData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'activity_log' },
+        () => fetchData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'issues' },
+        () => fetchData()
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [hasSearched, fetchData]);
+
   // Helper to get timestamp from any activity record
   const getActivityTimestamp = (a: ActivityRecord): string => {
     switch (a.type) {
@@ -525,30 +556,19 @@ export function PickHistory() {
     }, {} as Record<string, ActivityRecord[]>);
   }, [filteredActivities]);
 
-  // Calculate summary stats
+  // Calculate summary stats using full-dataset state variables (not just current page)
   const summaryStats = useMemo(() => {
-    const picksOnly = filteredActivities.filter((a): a is PickRecord => a.type === 'pick');
-    const issuesOnly = filteredActivities.filter((a): a is IssueRecord => a.type === 'issue_created' || a.type === 'issue_resolved');
-    const undosOnly = filteredActivities.filter((a): a is UndoRecord => a.type === 'undo');
-    const activityLogsOnly = filteredActivities.filter((a): a is ActivityLogRecord =>
-      a.type === 'part_added' || a.type === 'part_removed' || a.type === 'order_imported'
-    );
+    const pickCount = showPicks ? totalPickCount : 0;
+    const totalQty = showPicks ? totalQtyPicked : 0;
+    const uniqueParts = showPicks ? allUniqueParts : 0;
+    const uniqueUsers = allUniqueUsers;
+    const issueCount = showIssues ? totalIssueCount : 0;
+    const undoCount = showUndos ? totalUndoCount : 0;
+    const partChangesCount = showPartChanges ? activityLogs.filter(a => a.type === 'part_added' || a.type === 'part_removed').length : 0;
+    const importsCount = showImports ? activityLogs.filter(a => a.type === 'order_imported').length : 0;
 
-    const totalQty = picksOnly.reduce((sum, p) => sum + p.qty_picked, 0);
-    const uniqueParts = new Set(picksOnly.map(p => p.part_number)).size;
-    const uniqueUsers = new Set([
-      ...picksOnly.filter(p => p.picked_by).map(p => p.picked_by),
-      ...issuesOnly.filter(i => i.user).map(i => i.user),
-      ...undosOnly.map(u => u.undone_by),
-      ...activityLogsOnly.filter(a => a.performed_by).map(a => a.performed_by),
-    ]).size;
-    const issueCount = issuesOnly.length;
-    const undoCount = undosOnly.length;
-    const partChangesCount = activityLogsOnly.filter(a => a.type === 'part_added' || a.type === 'part_removed').length;
-    const importsCount = activityLogsOnly.filter(a => a.type === 'order_imported').length;
-
-    return { totalQty, uniqueParts, uniqueUsers, pickCount: picksOnly.length, issueCount, undoCount, partChangesCount, importsCount };
-  }, [filteredActivities]);
+    return { totalQty, uniqueParts, uniqueUsers, pickCount, issueCount, undoCount, partChangesCount, importsCount };
+  }, [showPicks, showIssues, showUndos, showPartChanges, showImports, totalPickCount, totalQtyPicked, allUniqueParts, allUniqueUsers, totalIssueCount, totalUndoCount, activityLogs]);
 
   // Handle preset selection - also triggers search
   const handlePreset = useCallback((preset: typeof datePresets[0]) => {
@@ -649,7 +669,7 @@ export function PickHistory() {
           }
         }
 
-        if (allPicksData.length > 0) {
+        {
           const totalQty = allPicksData.reduce((sum: number, p: any) => sum + (p.qty_picked || 0), 0);
           const uniqueParts = new Set(allPicksData.map((p: any) => p.line_items?.part_number).filter(Boolean)).size;
           const uniqueUsers = new Set(allPicksData.map((p: any) => p.picked_by).filter(Boolean)).size;

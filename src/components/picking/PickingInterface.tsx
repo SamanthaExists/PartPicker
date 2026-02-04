@@ -74,98 +74,6 @@ interface PickingInterfaceProps {
   toolFilter?: string; // 'all' or specific tool ID to filter by
 }
 
-// Tool Status Indicators Component
-interface ToolStatusIndicatorsProps {
-  tools: Tool[];
-  lineItem: LineItem;
-  picksMap: Map<string, Map<string, number>>;
-  currentToolId: string;
-  onPickTool: (toolId: string) => void;
-  onUndoTool: (toolId: string, toolNumber: string) => void;
-  onPartialToolClick: (toolId: string, toolNumber: string, picked: number, remaining: number) => void;
-  disabled?: boolean;
-}
-
-function ToolStatusIndicators({
-  tools,
-  lineItem,
-  picksMap,
-  currentToolId,
-  onPickTool,
-  onUndoTool,
-  onPartialToolClick,
-  disabled
-}: ToolStatusIndicatorsProps) {
-  // Filter to only applicable tools based on line item's tool_ids
-  const applicableTools = lineItem.tool_ids && lineItem.tool_ids.length > 0
-    ? tools.filter(t => lineItem.tool_ids!.includes(t.id))
-    : tools;
-
-  return (
-    <div className="flex gap-1 flex-wrap">
-      {applicableTools.map(tool => {
-        const toolPicks = picksMap.get(tool.id);
-        const picked = toolPicks?.get(lineItem.id) || 0;
-        const needed = lineItem.qty_per_unit;
-        const isComplete = picked >= needed;
-        const isPartial = picked > 0 && picked < needed;
-        const isCurrent = tool.id === currentToolId;
-
-        // Extract short tool identifier (last part after dash or last 2 chars)
-        const toolLabel = tool.tool_number.includes('-')
-          ? tool.tool_number.split('-').pop() || tool.tool_number.slice(-2)
-          : tool.tool_number.slice(-2);
-
-        return (
-          <button
-            key={tool.id}
-            onClick={() => {
-              if (disabled) return;
-              if (isComplete) {
-                // Undo when fully complete
-                onUndoTool(tool.id, tool.tool_number);
-              } else if (isPartial) {
-                // Show options dialog for partial picks
-                onPartialToolClick(tool.id, tool.tool_number, picked, needed - picked);
-              } else {
-                // Pick all when not started
-                onPickTool(tool.id);
-              }
-            }}
-            disabled={disabled}
-            className={cn(
-              "relative rounded text-xs font-bold transition-all cursor-pointer",
-              "flex items-center justify-center",
-              isComplete
-                ? "bg-green-500 text-white hover:bg-red-500 min-w-[1.75rem] h-7 px-1"
-                : isPartial
-                  ? "bg-amber-500 text-white hover:bg-amber-600 min-w-[1.75rem] h-7 px-1"
-                  : "bg-gray-200 dark:bg-gray-700 hover:bg-blue-200 dark:hover:bg-blue-800 min-w-[1.75rem] h-7 px-1",
-              isCurrent && !isComplete && "ring-2 ring-blue-500 ring-offset-1",
-              disabled && "opacity-50 cursor-not-allowed"
-            )}
-            title={
-              isComplete
-                ? `${tool.tool_number}: Complete - Click to undo`
-                : isPartial
-                  ? `${tool.tool_number}: Partial (${picked}/${needed}) - Click for options`
-                  : `${tool.tool_number}: Click to pick ${needed}`
-            }
-          >
-            {toolLabel}
-            {isComplete && (
-              <Check className="h-2.5 w-2.5 ml-0.5" strokeWidth={3} />
-            )}
-            {isPartial && (
-              <span className="text-[9px] ml-0.5 opacity-90">{picked}/{needed}</span>
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 export function PickingInterface({
   tool,
   allTools,
@@ -230,21 +138,6 @@ export function PickingInterface({
   const [isDeleting, setIsDeleting] = useState(false);
   const [overPickWarning, setOverPickWarning] = useState<string | null>(null);
   const [deleteConfirmLineItem, setDeleteConfirmLineItem] = useState<LineItem | null>(null);
-  const [undoToolConfirm, setUndoToolConfirm] = useState<{
-    lineItem: LineItem;
-    toolId: string;
-    toolNumber: string;
-    pickedQty: number;
-  } | null>(null);
-  // Dialog for partial pick options (pick remaining or undo)
-  const [partialToolAction, setPartialToolAction] = useState<{
-    lineItem: LineItem;
-    toolId: string;
-    toolNumber: string;
-    pickedQty: number;
-    remainingQty: number;
-  } | null>(null);
-  const [partialToolCustomQty, setPartialToolCustomQty] = useState('1');
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     const saved = localStorage.getItem(SORT_PREFERENCE_KEY);
     return (saved as SortMode) || 'part_number';
@@ -424,26 +317,6 @@ export function PickingInterface({
     },
   });
 
-  // Pick for a specific tool from the tool indicators
-  const handlePickForSpecificTool = useCallback(async (item: LineItem, targetToolId: string) => {
-    const targetToolPicks = allToolsPicksMap.get(targetToolId);
-    const pickedForTool = targetToolPicks?.get(item.id) || 0;
-    const remaining = item.qty_per_unit - pickedForTool;
-
-    if (remaining <= 0) return;
-
-    setIsSubmitting(item.id);
-    const result = await onRecordPick(item.id, targetToolId, remaining, getUserName());
-
-    // Check for over-pick warning
-    if (result && 'overPickWarning' in result && result.overPickWarning) {
-      setOverPickWarning(result.overPickWarning);
-      setTimeout(() => setOverPickWarning(null), 8000);
-    }
-
-    setIsSubmitting(null);
-  }, [allToolsPicksMap, onRecordPick, getUserName]);
-
   // Pick for all remaining tools at once
   const handlePickAllTools = useCallback(async (item: LineItem) => {
     if (onPickAllRemainingTools) {
@@ -551,100 +424,6 @@ export function PickingInterface({
 
     return success;
   }, [distributeItem, onBatchUpdateAllocations, getUserName]);
-
-  // Open undo confirmation dialog for a specific tool
-  const handleOpenUndoToolConfirm = useCallback((item: LineItem, toolId: string, toolNumber: string) => {
-    const toolPicks = allToolsPicksMap.get(toolId);
-    const pickedQty = toolPicks?.get(item.id) || 0;
-    setUndoToolConfirm({ lineItem: item, toolId, toolNumber, pickedQty });
-  }, [allToolsPicksMap]);
-
-  // Open partial tool action dialog (pick remaining or undo)
-  const handleOpenPartialToolAction = useCallback((item: LineItem, toolId: string, toolNumber: string, pickedQty: number, remainingQty: number) => {
-    setPartialToolAction({ lineItem: item, toolId, toolNumber, pickedQty, remainingQty });
-    setPartialToolCustomQty('1'); // Reset to 1 when opening
-  }, []);
-
-  // Pick remaining qty for a partial tool from the dialog
-  const handlePickRemainingFromDialog = async () => {
-    if (!partialToolAction) return;
-
-    setIsSubmitting(partialToolAction.lineItem.id);
-    const result = await onRecordPick(
-      partialToolAction.lineItem.id,
-      partialToolAction.toolId,
-      partialToolAction.remainingQty,
-      getUserName()
-    );
-
-    if (result && 'overPickWarning' in result && result.overPickWarning) {
-      setOverPickWarning(result.overPickWarning);
-      setTimeout(() => setOverPickWarning(null), 8000);
-    }
-
-    setIsSubmitting(null);
-    setPartialToolAction(null);
-  };
-
-  // Pick custom qty for a partial tool from the dialog
-  const handlePickCustomQtyFromDialog = async () => {
-    if (!partialToolAction) return;
-
-    const qty = parseInt(partialToolCustomQty, 10);
-    if (isNaN(qty) || qty <= 0 || qty > partialToolAction.remainingQty) return;
-
-    setIsSubmitting(partialToolAction.lineItem.id);
-    const result = await onRecordPick(
-      partialToolAction.lineItem.id,
-      partialToolAction.toolId,
-      qty,
-      getUserName()
-    );
-
-    if (result && 'overPickWarning' in result && result.overPickWarning) {
-      setOverPickWarning(result.overPickWarning);
-      setTimeout(() => setOverPickWarning(null), 8000);
-    }
-
-    setIsSubmitting(null);
-    setPartialToolAction(null);
-  };
-
-  // Undo picks for a partial tool from the dialog
-  const handleUndoFromPartialDialog = async () => {
-    if (!partialToolAction) return;
-
-    setIsSubmitting(partialToolAction.lineItem.id);
-
-    // Get all picks for this line item and tool
-    const pickHistory = getPickHistory(partialToolAction.lineItem.id, partialToolAction.toolId);
-
-    // Delete all picks
-    for (const pick of pickHistory) {
-      await onUndoPick(pick.id, getUserName());
-    }
-
-    setIsSubmitting(null);
-    setPartialToolAction(null);
-  };
-
-  // Perform the undo - delete all picks for this line item + tool
-  const handleConfirmUndoTool = async () => {
-    if (!undoToolConfirm) return;
-
-    setIsSubmitting(undoToolConfirm.lineItem.id);
-
-    // Get all picks for this line item and tool
-    const pickHistory = getPickHistory(undoToolConfirm.lineItem.id, undoToolConfirm.toolId);
-
-    // Delete all picks
-    for (const pick of pickHistory) {
-      await onUndoPick(pick.id, getUserName());
-    }
-
-    setIsSubmitting(null);
-    setUndoToolConfirm(null);
-  };
 
   // Sets the pending pick quantity (does not record yet - user clicks checkmark to confirm)
   const handleSetPendingPick = () => {
@@ -910,23 +689,20 @@ export function PickingInterface({
             )}
           </div>
 
-          {/* Tool Status Indicators - only show when multiple tools */}
+          {/* Total for multi-tool orders */}
           {hasMultipleTools && (
-            <div className="col-span-2">
-              <div className="flex items-center gap-2">
-                <ToolStatusIndicators
-                  tools={allTools}
-                  lineItem={item}
-                  picksMap={allToolsPicksMap}
-                  currentToolId={tool.id}
-                  onPickTool={(toolId) => handlePickForSpecificTool(item, toolId)}
-                  onUndoTool={(toolId, toolNumber) => handleOpenUndoToolConfirm(item, toolId, toolNumber)}
-                  onPartialToolClick={(toolId, toolNumber, picked, remaining) => handleOpenPartialToolAction(item, toolId, toolNumber, picked, remaining)}
-                  disabled={isSubmitting === item.id}
-                />
-                <span className="text-sm text-muted-foreground">
-                  {totalPicked}/{totalNeeded}
+            <div className="col-span-2 text-center">
+              <div className="flex items-center justify-center gap-1">
+                <span
+                  className={cn(
+                    'font-semibold',
+                    allToolsComplete ? 'text-green-600 dark:text-green-400' : ''
+                  )}
+                >
+                  {totalPicked}
                 </span>
+                <span className="text-muted-foreground text-sm">/</span>
+                <span className="text-sm">{totalNeeded}</span>
               </div>
             </div>
           )}
@@ -1265,24 +1041,6 @@ export function PickingInterface({
             </div>
           </div>
 
-          {/* Tool Status Indicators - only show when multiple tools */}
-          {hasMultipleTools && (
-            <div className="flex items-center justify-between mb-4 py-2 px-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-              <span className="text-sm text-muted-foreground">Tools:</span>
-              <div className="flex items-center gap-2">
-                <ToolStatusIndicators
-                  tools={allTools}
-                  lineItem={item}
-                  picksMap={allToolsPicksMap}
-                  currentToolId={tool.id}
-                  onPickTool={(toolId) => handlePickForSpecificTool(item, toolId)}
-                  onUndoTool={(toolId, toolNumber) => handleOpenUndoToolConfirm(item, toolId, toolNumber)}
-                  onPartialToolClick={(toolId, toolNumber, picked, remaining) => handleOpenPartialToolAction(item, toolId, toolNumber, picked, remaining)}
-                  disabled={isSubmitting === item.id}
-                />
-              </div>
-            </div>
-          )}
 
           {/* Bottom row: Actions */}
           {!allToolsComplete && (
@@ -1547,17 +1305,8 @@ export function PickingInterface({
         <div className="col-span-2">Description</div>
         <div className="col-span-2">Location</div>
         <div className="col-span-1 text-center">Stock</div>
-        {hasMultipleTools ? (
-          <>
-            <div className="col-span-2">Tools</div>
-            <div className="col-span-3 text-right">Actions</div>
-          </>
-        ) : (
-          <>
-            <div className="col-span-2 text-center">Qty</div>
-            <div className="col-span-3 text-center">Actions</div>
-          </>
-        )}
+        <div className="col-span-2 text-center">{hasMultipleTools ? 'Total' : 'Qty'}</div>
+        <div className="col-span-3 text-center">Actions</div>
       </div>
 
       {/* Line Items */}
@@ -1815,153 +1564,6 @@ export function PickingInterface({
               disabled={isDeleting}
             >
               {isDeleting ? 'Deleting...' : 'Delete Pick'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Undo Tool Pick Confirmation Dialog */}
-      <Dialog
-        open={undoToolConfirm !== null}
-        onOpenChange={(open) => !open && setUndoToolConfirm(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Undo Pick for {undoToolConfirm?.toolNumber}?</DialogTitle>
-            <DialogDescription>
-              This will remove all picks for this part on the selected tool.
-            </DialogDescription>
-          </DialogHeader>
-
-          {undoToolConfirm && (
-            <div className="py-4">
-              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-2">
-                <div className="font-medium">{undoToolConfirm.lineItem.part_number}</div>
-                {undoToolConfirm.lineItem.description && (
-                  <div className="text-sm text-muted-foreground">
-                    {undoToolConfirm.lineItem.description}
-                  </div>
-                )}
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="destructive">{undoToolConfirm.pickedQty}x will be removed</Badge>
-                  <span className="text-sm text-muted-foreground">
-                    from {undoToolConfirm.toolNumber}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setUndoToolConfirm(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmUndoTool}
-              disabled={isSubmitting === undoToolConfirm?.lineItem.id}
-            >
-              {isSubmitting === undoToolConfirm?.lineItem.id ? 'Undoing...' : 'Undo Pick'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Partial Tool Action Dialog */}
-      <Dialog
-        open={partialToolAction !== null}
-        onOpenChange={(open) => !open && setPartialToolAction(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Partial Pick - {partialToolAction?.toolNumber}</DialogTitle>
-            <DialogDescription>
-              This tool has {partialToolAction?.pickedQty} of {(partialToolAction?.pickedQty || 0) + (partialToolAction?.remainingQty || 0)} picked.
-            </DialogDescription>
-          </DialogHeader>
-
-          {partialToolAction && (
-            <div className="py-4 space-y-4">
-              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-2">
-                <div className="font-medium">{partialToolAction.lineItem.part_number}</div>
-                {partialToolAction.lineItem.description && (
-                  <div className="text-sm text-muted-foreground">
-                    {partialToolAction.lineItem.description}
-                  </div>
-                )}
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                    {partialToolAction.pickedQty} picked
-                  </Badge>
-                  <Badge variant="outline">
-                    {partialToolAction.remainingQty} remaining
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Custom quantity picker */}
-              <div className="border rounded-lg p-4 space-y-3">
-                <Label className="text-sm font-medium">Pick a custom amount:</Label>
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setPartialToolCustomQty(String(Math.max(1, parseInt(partialToolCustomQty) - 1)))}
-                    disabled={parseInt(partialToolCustomQty) <= 1}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    type="number"
-                    min="1"
-                    max={partialToolAction.remainingQty}
-                    value={partialToolCustomQty}
-                    onChange={(e) => setPartialToolCustomQty(e.target.value)}
-                    className="w-20 text-center"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setPartialToolCustomQty(String(Math.min(parseInt(partialToolCustomQty) + 1, partialToolAction.remainingQty)))}
-                    disabled={parseInt(partialToolCustomQty) >= partialToolAction.remainingQty}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    onClick={handlePickCustomQtyFromDialog}
-                    disabled={
-                      isSubmitting === partialToolAction.lineItem.id ||
-                      parseInt(partialToolCustomQty) <= 0 ||
-                      parseInt(partialToolCustomQty) > partialToolAction.remainingQty
-                    }
-                  >
-                    <Check className="h-4 w-4 mr-2" />
-                    Pick {partialToolCustomQty}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setPartialToolAction(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleUndoFromPartialDialog}
-              disabled={isSubmitting === partialToolAction?.lineItem.id}
-            >
-              <Undo2 className="h-4 w-4 mr-2" />
-              Undo ({partialToolAction?.pickedQty})
-            </Button>
-            <Button
-              variant="success"
-              onClick={handlePickRemainingFromDialog}
-              disabled={isSubmitting === partialToolAction?.lineItem.id}
-            >
-              <Check className="h-4 w-4 mr-2" />
-              Pick All Remaining ({partialToolAction?.remainingQty})
             </Button>
           </DialogFooter>
         </DialogContent>

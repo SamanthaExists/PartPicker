@@ -23,7 +23,7 @@ import { exportConsolidatedPartsToExcel, exportPartNumbersToExcel } from '@/lib/
 import { MultiOrderPickDialog } from '@/components/picking/MultiOrderPickDialog';
 import type { ConsolidatedPart } from '@/types';
 
-type SortMode = 'part_number' | 'location';
+type SortMode = 'part_number' | 'location' | 'assembly';
 
 // Shared PartCard component to avoid code duplication
 interface PartCardProps {
@@ -429,7 +429,7 @@ export function ConsolidatedParts() {
   });
 
   // Sort and group filtered parts
-  const { sortedParts, locationGroups } = useMemo(() => {
+  const { sortedParts, locationGroups, assemblyGroups } = useMemo(() => {
     const items = [...filteredParts];
 
     if (sortMode === 'location') {
@@ -461,11 +461,43 @@ export function ConsolidatedParts() {
         }
       });
 
-      return { sortedParts: items, locationGroups: groups };
+      return { sortedParts: items, locationGroups: groups, assemblyGroups: null };
+    } else if (sortMode === 'assembly') {
+      // Determine assembly for each part from its orders' tool_model
+      const getPartAssembly = (part: ConsolidatedPart): string => {
+        const models = new Set(part.orders.map(o => o.tool_model).filter(Boolean) as string[]);
+        if (models.size === 0) return 'No Assembly';
+        if (models.size === 1) return [...models][0];
+        return [...models].sort((a, b) => alphanumericCompare(a, b)).join(', ');
+      };
+
+      // Sort by assembly name, then part number within each group
+      items.sort((a, b) => {
+        const asmA = getPartAssembly(a);
+        const asmB = getPartAssembly(b);
+        const cmp = alphanumericCompare(asmA, asmB);
+        if (cmp !== 0) return cmp;
+        return alphanumericCompare(a.part_number, b.part_number);
+      });
+
+      // Group by assembly
+      const groups = new Map<string, typeof filteredParts>();
+      items.forEach(part => {
+        const assembly = getPartAssembly(part);
+        if (!groups.has(assembly)) {
+          groups.set(assembly, []);
+        }
+        const group = groups.get(assembly);
+        if (group) {
+          group.push(part);
+        }
+      });
+
+      return { sortedParts: items, locationGroups: null, assemblyGroups: groups };
     } else {
       // Sort by part number (alphanumeric)
       items.sort((a, b) => alphanumericCompare(a.part_number, b.part_number));
-      return { sortedParts: items, locationGroups: null };
+      return { sortedParts: items, locationGroups: null, assemblyGroups: null };
     }
   }, [filteredParts, sortMode]);
 
@@ -613,6 +645,7 @@ export function ConsolidatedParts() {
                   <SelectContent>
                     <SelectItem value="part_number">Sort by Part Number</SelectItem>
                     <SelectItem value="location">Sort by Location</SelectItem>
+                    <SelectItem value="assembly">Sort by Assembly</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -723,6 +756,36 @@ export function ConsolidatedParts() {
               <div className="flex items-center gap-2 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-950/20 dark:border-blue-800">
                 <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 <span className="font-semibold text-lg text-blue-800 dark:text-blue-200">{prefix}</span>
+                <Badge variant="secondary" className="ml-auto">
+                  {groupParts.length} {groupParts.length === 1 ? 'part' : 'parts'}
+                </Badge>
+              </div>
+              {/* Parts in this group */}
+              {groupParts.map((part) => (
+                <PartCard
+                  key={part.part_number}
+                  part={part}
+                  isExpanded={expandedParts.has(part.part_number)}
+                  onToggleExpand={toggleExpanded}
+                  onPickClick={handlePickClick}
+                  refCallback={(el) => {
+                    if (el) partRefs.current.set(part.part_number, el);
+                    else partRefs.current.delete(part.part_number);
+                  }}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : sortMode === 'assembly' && assemblyGroups ? (
+        // Render with assembly group headers
+        <div className="space-y-4">
+          {Array.from(assemblyGroups.entries()).map(([assembly, groupParts]) => (
+            <div key={assembly} className="space-y-2">
+              {/* Assembly Group Header */}
+              <div className="flex items-center gap-2 px-4 py-3 bg-purple-50 border border-purple-200 rounded-lg dark:bg-purple-950/20 dark:border-purple-800">
+                <Layers className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <span className="font-semibold text-lg text-purple-800 dark:text-purple-200">{assembly}</span>
                 <Badge variant="secondary" className="ml-auto">
                   {groupParts.length} {groupParts.length === 1 ? 'part' : 'parts'}
                 </Badge>

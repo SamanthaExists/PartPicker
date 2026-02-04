@@ -1,5 +1,5 @@
 -- Activity Log table for tracking part additions, removals, and order imports
-CREATE TABLE activity_log (
+CREATE TABLE IF NOT EXISTS activity_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   type TEXT NOT NULL,          -- 'part_added', 'part_removed', 'order_imported'
   order_id UUID REFERENCES orders(id),
@@ -12,13 +12,19 @@ CREATE TABLE activity_log (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_activity_log_created_at ON activity_log(created_at);
-CREATE INDEX idx_activity_log_type ON activity_log(type);
-CREATE INDEX idx_activity_log_order_id ON activity_log(order_id);
+CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_activity_log_type ON activity_log(type);
+CREATE INDEX IF NOT EXISTS idx_activity_log_order_id ON activity_log(order_id);
 
 -- Enable RLS
 ALTER TABLE activity_log ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all operations on activity_log" ON activity_log FOR ALL USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "Allow all operations on activity_log" ON activity_log FOR ALL USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
--- Enable realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE activity_log;
+-- Enable realtime (ignore if already added)
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE activity_log;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

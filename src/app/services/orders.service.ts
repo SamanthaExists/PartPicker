@@ -165,6 +165,7 @@ export class OrdersService implements OnDestroy {
           customer_name: imported.customer_name || null,
           order_date: imported.order_date || null,
           due_date: imported.due_date || null,
+          estimated_ship_date: imported.estimated_ship_date || null,
           status: 'active',
         })
         .select()
@@ -215,6 +216,7 @@ export class OrdersService implements OnDestroy {
             qty_per_unit: item.qty_per_unit,
             total_qty_needed: item.total_qty_needed,
             tool_ids: toolIds,
+            assembly_group: item.assembly_group || null,
           };
         });
 
@@ -289,13 +291,14 @@ export class OrdersService implements OnDestroy {
   }
 
   // Tool management
-  async addTool(orderId: string, toolNumber: string, serialNumber?: string): Promise<Tool | null> {
+  async addTool(orderId: string, toolNumber: string, serialNumber?: string, toolModel?: string): Promise<Tool | null> {
     try {
       const { data, error } = await this.supabase.from('tools')
         .insert({
           order_id: orderId,
           tool_number: toolNumber,
           serial_number: serialNumber || null,
+          tool_model: toolModel || null,
           status: 'pending' as const,
         })
         .select()

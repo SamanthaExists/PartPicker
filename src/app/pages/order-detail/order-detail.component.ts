@@ -11,12 +11,13 @@ import { SettingsService } from '../../services/settings.service';
 import { ExcelService } from '../../services/excel.service';
 import { UtilsService } from '../../services/utils.service';
 import { BomTemplatesService } from '../../services/bom-templates.service';
+import { ActivityLogService } from '../../services/activity-log.service';
 import { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '../../models';
 import { SaveAsTemplateDialogComponent } from '../../components/dialogs/save-as-template-dialog.component';
 import { PrintPickListComponent } from '../../components/picking/print-pick-list.component';
 import { DistributeInventoryDialogComponent } from '../../components/dialogs/distribute-inventory-dialog.component';
 
-type SortMode = 'part_number' | 'location';
+type SortMode = 'part_number' | 'location' | 'assembly';
 
 interface PickHistoryItem {
   pick: Pick;
@@ -260,11 +261,37 @@ interface PickHistoryItem {
           <div class="dropdown">
             <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
               <i class="bi bi-sort-down me-1"></i>
-              {{ sortMode === 'part_number' ? 'Part Number' : 'Location' }}
+              {{ sortMode === 'part_number' ? 'Part Number' : (sortMode === 'location' ? 'Location' : 'Assembly') }}
             </button>
             <ul class="dropdown-menu">
-              <li><a class="dropdown-item" [class.active]="sortMode === 'part_number'" (click)="sortMode = 'part_number'">Sort by Part Number</a></li>
-              <li><a class="dropdown-item" [class.active]="sortMode === 'location'" (click)="sortMode = 'location'">Sort by Location</a></li>
+              <li><a class="dropdown-item" [class.active]="sortMode === 'part_number'" (click)="setSortMode('part_number')">Sort by Part Number</a></li>
+              <li><a class="dropdown-item" [class.active]="sortMode === 'location'" (click)="setSortMode('location')">Sort by Location</a></li>
+              <li><a class="dropdown-item" [class.active]="sortMode === 'assembly'" (click)="setSortMode('assembly')">Sort by Assembly</a></li>
+            </ul>
+          </div>
+
+          <!-- Hide Completed Toggle -->
+          <button class="btn btn-sm" [ngClass]="hideCompleted ? 'btn-primary' : 'btn-outline-secondary'"
+                  (click)="toggleHideCompleted()" title="Hide fully picked items">
+            <i class="bi" [ngClass]="hideCompleted ? 'bi-eye-slash-fill' : 'bi-eye'"></i>
+            <span class="d-none d-md-inline ms-1">{{ hideCompleted ? 'Show All' : 'Hide Done' }}</span>
+          </button>
+
+          <!-- Tool Filter Dropdown (multi-tool only) -->
+          <div class="dropdown" *ngIf="tools.length > 1">
+            <button class="btn btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown"
+                    [ngClass]="toolFilter ? 'btn-primary' : 'btn-outline-secondary'">
+              <i class="bi bi-funnel me-1"></i>
+              {{ toolFilter ? getToolFilterLabel(toolFilter) : 'All Tools' }}
+            </button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" [class.active]="!toolFilter" (click)="toolFilter = null">All Tools</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li *ngFor="let tool of tools">
+                <a class="dropdown-item" [class.active]="toolFilter === tool.id" (click)="toolFilter = tool.id">
+                  {{ tool.tool_number }}<span *ngIf="tool.tool_model" class="text-muted ms-1">[{{ tool.tool_model }}]</span>
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -290,15 +317,22 @@ interface PickHistoryItem {
               <span class="small text-muted">Tools:</span>
               <div class="d-flex gap-1 flex-wrap">
                 <span *ngFor="let tool of tools"
-                      class="badge d-flex align-items-center gap-1"
+                      class="badge d-flex flex-column align-items-center cursor-pointer"
+                      style="padding: 0.3em 0.5em;"
                       [ngClass]="{
                         'bg-success': getToolProgress(tool.id) === 100,
                         'bg-warning text-dark': getToolProgress(tool.id) > 0 && getToolProgress(tool.id) < 100,
                         'bg-body-secondary text-body border': getToolProgress(tool.id) === 0
-                      }">
-                  {{ tool.tool_number }}
-                  <small *ngIf="tool.serial_number" class="opacity-75">({{ tool.serial_number }})</small>
-                  <i class="bi bi-check-circle-fill" *ngIf="getToolProgress(tool.id) === 100"></i>
+                      }"
+                      [style.outline]="toolFilter === tool.id ? '2px solid #0d6efd' : 'none'"
+                      [title]="getToolTooltip(tool)"
+                      (click)="toolFilter = toolFilter === tool.id ? null : tool.id">
+                  <span class="d-flex align-items-center gap-1">
+                    {{ tool.tool_number }}
+                    <small class="opacity-75">{{ getToolProgress(tool.id) }}%</small>
+                    <i class="bi bi-check-circle-fill" *ngIf="getToolProgress(tool.id) === 100"></i>
+                  </span>
+                  <small *ngIf="tool.tool_model" class="opacity-75" style="font-size: 0.6rem; line-height: 1;">{{ tool.tool_model }}</small>
                 </span>
               </div>
             </div>
@@ -350,6 +384,20 @@ interface PickHistoryItem {
                       </td>
                     </tr>
 
+                    <!-- Assembly Group Header (when sorting by assembly) -->
+                    <tr *ngIf="sortMode === 'assembly' && shouldShowAssemblyHeader(item, idx)" class="assembly-group-header">
+                      <td colspan="8" class="py-2">
+                        <div class="d-flex align-items-center gap-2">
+                          <i class="bi bi-box-seam text-purple"></i>
+                          <strong>{{ item.assembly_group || 'No Assembly' }}</strong>
+                          <span class="badge bg-secondary">{{ getAssemblyGroupCount(item) }} parts</span>
+                          <span class="badge bg-success" *ngIf="isAssemblyGroupComplete(item)">
+                            <i class="bi bi-check-circle me-1"></i>Complete
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+
                     <!-- Main Row -->
                     <tr [class.table-success]="isItemComplete(item)"
                         [class.table-warning]="isItemPartial(item)"
@@ -368,6 +416,13 @@ interface PickHistoryItem {
                         <span class="font-monospace fw-medium">{{ item.part_number }}</span>
                         <span class="badge bg-danger ms-1" *ngIf="hasOpenIssue(item.id)">
                           <i class="bi bi-exclamation-triangle-fill"></i> Issue
+                        </span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary ms-1"
+                              *ngIf="item.tool_ids && item.tool_ids.length > 0 && item.tool_ids.length < tools.length">
+                          {{ item.tool_ids.length }} of {{ tools.length }} tools
+                        </span>
+                        <span class="text-muted small d-block" *ngIf="item.assembly_group && sortMode !== 'assembly'">
+                          Assy: {{ item.assembly_group }}
                         </span>
                       </td>
                       <!-- Description -->
@@ -456,6 +511,13 @@ interface PickHistoryItem {
                                   title="Report issue">
                             <i class="bi bi-exclamation-triangle"></i>
                           </button>
+                          <!-- Remove Part -->
+                          <button class="btn btn-sm btn-outline-danger"
+                                  (click)="openDeleteLineItemModal(item)"
+                                  [disabled]="isSubmitting === item.id"
+                                  title="Remove part from order">
+                            <i class="bi bi-trash"></i>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -530,6 +592,11 @@ interface PickHistoryItem {
                        [placeholder]="generateNextToolNumber()">
               </div>
               <div class="mb-3">
+                <label class="form-label">Tool Model</label>
+                <input type="text" class="form-control" [(ngModel)]="newToolModel"
+                       [placeholder]="order?.tool_model || ''">
+              </div>
+              <div class="mb-3">
                 <label class="form-label">Serial Number (optional)</label>
                 <input type="text" class="form-control" [(ngModel)]="newToolSerial">
               </div>
@@ -559,6 +626,7 @@ interface PickHistoryItem {
                 <div *ngFor="let tool of tools" class="list-group-item d-flex justify-content-between align-items-center">
                   <div>
                     <strong>{{ tool.tool_number }}</strong>
+                    <span *ngIf="tool.tool_model" class="badge bg-info text-dark ms-2">{{ tool.tool_model }}</span>
                     <span *ngIf="tool.serial_number" class="text-muted ms-2">SN: {{ tool.serial_number }}</span>
                     <div class="small text-muted">Progress: {{ getToolProgress(tool.id) }}%</div>
                   </div>
@@ -572,13 +640,17 @@ interface PickHistoryItem {
               <hr>
               <h6>Add New Tool</h6>
               <div class="row g-2">
-                <div class="col-6">
+                <div class="col-5">
                   <input type="text" class="form-control form-control-sm" [(ngModel)]="newToolNumber"
                          placeholder="Tool Number">
                 </div>
-                <div class="col-4">
+                <div class="col-3">
+                  <input type="text" class="form-control form-control-sm" [(ngModel)]="newToolModel"
+                         [placeholder]="order?.tool_model || 'Model'">
+                </div>
+                <div class="col-2">
                   <input type="text" class="form-control form-control-sm" [(ngModel)]="newToolSerial"
-                         placeholder="Serial (optional)">
+                         placeholder="Serial">
                 </div>
                 <div class="col-2">
                   <button class="btn btn-primary btn-sm w-100" (click)="handleAddTool()">
@@ -760,6 +832,33 @@ interface PickHistoryItem {
       </div>
       <div class="modal-backdrop fade show" *ngIf="showReportIssueModal"></div>
 
+      <!-- Delete Line Item Confirmation Modal -->
+      <div class="modal fade" [class.show]="showDeleteLineItemModal" [style.display]="showDeleteLineItemModal ? 'block' : 'none'" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Remove Part from Order</h5>
+              <button type="button" class="btn-close" (click)="showDeleteLineItemModal = false"></button>
+            </div>
+            <div class="modal-body" *ngIf="deleteLineItemTarget">
+              <p>Are you sure you want to remove <strong>{{ deleteLineItemTarget.part_number }}</strong> from this order? This cannot be undone.</p>
+              <div class="alert alert-warning" *ngIf="deleteLineItemTarget.total_picked > 0">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                This part has existing picks ({{ deleteLineItemTarget.total_picked }} picked). You must undo all picks before removing.
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" (click)="showDeleteLineItemModal = false">Cancel</button>
+              <button type="button" class="btn btn-danger" (click)="handleDeleteLineItem()"
+                      [disabled]="deleteLineItemTarget && deleteLineItemTarget.total_picked > 0">
+                <i class="bi bi-trash me-1"></i> Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-backdrop fade show" *ngIf="showDeleteLineItemModal"></div>
+
       <!-- Save as Template Dialog -->
       <app-save-as-template-dialog
         [(show)]="showSaveTemplateModal"
@@ -849,6 +948,19 @@ interface PickHistoryItem {
     :host-context([data-bs-theme="dark"]) .table-danger { background-color: rgba(220, 53, 69, 0.15) !important; }
     :host-context([data-bs-theme="dark"]) .table-info { background-color: rgba(13, 202, 240, 0.1) !important; }
 
+    .assembly-group-header td {
+      background-color: rgba(111, 66, 193, 0.08) !important;
+      border-left: 3px solid #6f42c1;
+    }
+
+    :host-context([data-bs-theme="dark"]) .assembly-group-header td {
+      background-color: rgba(111, 66, 193, 0.15) !important;
+    }
+
+    .text-purple {
+      color: #6f42c1;
+    }
+
     .keyboard-selected {
       outline: 2px solid #0d6efd !important;
       outline-offset: -2px;
@@ -886,13 +998,17 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   showSaveTemplateModal = false;
   showPrintModal = false;
   showDistributeModal = false;
+  showDeleteLineItemModal = false;
 
   sortMode: SortMode = 'part_number';
+  hideCompleted = false;
+  toolFilter: string | null = null;
   expandedItems: Set<string> = new Set();
   isSubmitting: string | null = null;
   partSearchQuery: string = '';
   keyboardSelectedIndex = -1;
   distributeItem: LineItemWithPicks | null = null;
+  deleteLineItemTarget: LineItemWithPicks | null = null;
   overPickWarning: string | null = null;
   scrollToItemId: string | null = null;
 
@@ -907,6 +1023,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   };
 
   newToolNumber = '';
+  newToolModel = '';
   newToolSerial = '';
 
   newLineItem = {
@@ -944,6 +1061,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     private settingsService: SettingsService,
     private excelService: ExcelService,
     private bomTemplatesService: BomTemplatesService,
+    private activityLogService: ActivityLogService,
     public utils: UtilsService
   ) {
     // Bind getToolPicked for child component
@@ -965,7 +1083,8 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     // Ignore if any modal is open
     if (this.showPartialPickModal || this.showUndoToolModal || this.showReportIssueModal ||
         this.showSaveTemplateModal || this.showPrintModal || this.showDistributeModal ||
-        this.showAddToolModal || this.showManageToolsModal || this.showAddLineItemModal) {
+        this.showAddToolModal || this.showManageToolsModal || this.showAddLineItemModal ||
+        this.showDeleteLineItemModal) {
       return;
     }
 
@@ -1065,8 +1184,14 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Load sort preference from localStorage
     const savedSort = localStorage.getItem('picking-sort-preference');
-    if (savedSort === 'location' || savedSort === 'part_number') {
+    if (savedSort === 'location' || savedSort === 'part_number' || savedSort === 'assembly') {
       this.sortMode = savedSort;
+    }
+
+    // Load hide completed preference
+    const savedHideCompleted = localStorage.getItem('picking-hide-completed');
+    if (savedHideCompleted === 'true') {
+      this.hideCompleted = true;
     }
 
     this.route.params.subscribe(params => {
@@ -1129,9 +1254,9 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   }
 
   get sortedLineItems(): LineItemWithPicks[] {
-    // First filter by search query
     let items = [...this.lineItemsWithPicks];
 
+    // Filter by search query
     if (this.partSearchQuery.trim()) {
       const query = this.partSearchQuery.toLowerCase();
       items = items.filter(item =>
@@ -1141,6 +1266,19 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
       );
     }
 
+    // Filter by tool
+    if (this.toolFilter) {
+      items = items.filter(item =>
+        !item.tool_ids || item.tool_ids.length === 0 || item.tool_ids.includes(this.toolFilter!)
+      );
+    }
+
+    // Hide completed items
+    if (this.hideCompleted) {
+      items = items.filter(item => !this.isItemComplete(item));
+    }
+
+    // Sort
     if (this.sortMode === 'location') {
       items.sort((a, b) => {
         const locA = a.location || '';
@@ -1149,6 +1287,16 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
         if (locA && !locB) return -1;
         if (!locA && !locB) return this.alphanumericCompare(a.part_number, b.part_number);
         const cmp = this.alphanumericCompare(locA, locB);
+        return cmp !== 0 ? cmp : this.alphanumericCompare(a.part_number, b.part_number);
+      });
+    } else if (this.sortMode === 'assembly') {
+      items.sort((a, b) => {
+        const groupA = a.assembly_group || '';
+        const groupB = b.assembly_group || '';
+        if (!groupA && groupB) return 1;
+        if (groupA && !groupB) return -1;
+        if (!groupA && !groupB) return this.alphanumericCompare(a.part_number, b.part_number);
+        const cmp = this.alphanumericCompare(groupA, groupB);
         return cmp !== 0 ? cmp : this.alphanumericCompare(a.part_number, b.part_number);
       });
     } else {
@@ -1194,6 +1342,61 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     return this.sortedLineItems
       .filter(i => this.getLocationPrefix(i.location) === prefix)
       .reduce((sum, i) => sum + i.remaining, 0);
+  }
+
+  // Assembly group helpers
+  shouldShowAssemblyHeader(item: LineItemWithPicks, index: number): boolean {
+    if (this.sortMode !== 'assembly') return false;
+    if (index === 0) return true;
+    const sorted = this.sortedLineItems;
+    const prevItem = sorted[index - 1];
+    return (item.assembly_group || '') !== (prevItem.assembly_group || '');
+  }
+
+  getAssemblyGroupCount(item: LineItemWithPicks): number {
+    const group = item.assembly_group || '';
+    return this.sortedLineItems.filter(i => (i.assembly_group || '') === group).length;
+  }
+
+  isAssemblyGroupComplete(item: LineItemWithPicks): boolean {
+    const group = item.assembly_group || '';
+    return this.sortedLineItems
+      .filter(i => (i.assembly_group || '') === group)
+      .every(i => this.isItemComplete(i));
+  }
+
+  // Sort mode with localStorage persistence
+  setSortMode(mode: SortMode): void {
+    this.sortMode = mode;
+    localStorage.setItem('picking-sort-preference', mode);
+  }
+
+  // Hide completed toggle with localStorage persistence
+  toggleHideCompleted(): void {
+    this.hideCompleted = !this.hideCompleted;
+    localStorage.setItem('picking-hide-completed', String(this.hideCompleted));
+  }
+
+  // Get tool number by ID for the filter dropdown display
+  getToolNumberById(toolId: string): string {
+    return this.tools.find(t => t.id === toolId)?.tool_number || toolId;
+  }
+
+  // Get tooltip text for tool badge
+  getToolTooltip(tool: Tool): string {
+    const parts = [tool.tool_number];
+    if (tool.tool_model) parts.push(`Model: ${tool.tool_model}`);
+    if (tool.serial_number) parts.push(`SN: ${tool.serial_number}`);
+    parts.push(`Progress: ${this.getToolProgress(tool.id)}%`);
+    return parts.join(' | ');
+  }
+
+  // Get label for tool filter button (tool number + model)
+  getToolFilterLabel(toolId: string): string {
+    const tool = this.tools.find(t => t.id === toolId);
+    if (!tool) return toolId;
+    if (tool.tool_model) return `${tool.tool_number} [${tool.tool_model}]`;
+    return tool.tool_number;
   }
 
   async handlePickAllInLocation(locationGroup: string): Promise<void> {
@@ -1248,8 +1451,12 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   // Tool-related helpers
   getToolProgress(toolId: string): number {
     const toolPicks = this.picksService.getPicksForTool(toolId);
-    const toolTotalItems = this.lineItems.length;
-    const toolCompletedItems = this.lineItems.filter(item => {
+    // Only count items applicable to this tool (respects tool_ids)
+    const applicableItems = this.lineItems.filter(item =>
+      !item.tool_ids || item.tool_ids.length === 0 || item.tool_ids.includes(toolId)
+    );
+    const toolTotalItems = applicableItems.length;
+    const toolCompletedItems = applicableItems.filter(item => {
       const picked = toolPicks.get(item.id) || 0;
       return picked >= item.qty_per_unit;
     }).length;
@@ -1581,8 +1788,10 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   async handleAddTool(): Promise<void> {
     if (!this.orderId) return;
     const toolNumber = this.newToolNumber.trim() || this.generateNextToolNumber();
-    await this.ordersService.addTool(this.orderId, toolNumber, this.newToolSerial || undefined);
+    const toolModel = this.newToolModel.trim() || this.order?.tool_model || undefined;
+    await this.ordersService.addTool(this.orderId, toolNumber, this.newToolSerial || undefined, toolModel);
     this.newToolNumber = '';
+    this.newToolModel = '';
     this.newToolSerial = '';
     this.showAddToolModal = false;
     await this.loadOrder();
@@ -1597,15 +1806,32 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   }
 
   async handleAddLineItem(): Promise<void> {
-    if (!this.orderId || !this.newLineItem.part_number.trim()) return;
+    if (!this.orderId || !this.newLineItem.part_number.trim() || !this.order) return;
 
-    await this.lineItemsService.addLineItem(this.orderId, {
-      part_number: this.newLineItem.part_number.trim(),
+    const partNumber = this.newLineItem.part_number.trim();
+    const result = await this.lineItemsService.addLineItem(this.orderId, {
+      part_number: partNumber,
       description: this.newLineItem.description.trim() || undefined,
       location: this.newLineItem.location.trim() || undefined,
       qty_per_unit: this.newLineItem.qty_per_unit,
       total_qty_needed: this.newLineItem.total_qty_needed,
     });
+
+    if (result) {
+      await this.activityLogService.logActivity({
+        type: 'part_added',
+        order_id: this.order.id,
+        so_number: this.order.so_number,
+        part_number: partNumber,
+        description: `Part ${partNumber} added to SO-${this.order.so_number}`,
+        performed_by: this.settingsService.getUserName(),
+        details: {
+          qty_per_unit: this.newLineItem.qty_per_unit,
+          total_qty_needed: this.newLineItem.total_qty_needed,
+          location: this.newLineItem.location.trim() || null,
+        },
+      });
+    }
 
     this.newLineItem = {
       part_number: '',
@@ -1619,6 +1845,46 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     if (this.orderId) {
       this.picksService.loadPicksForOrder(this.orderId);
     }
+  }
+
+  // Delete Line Item
+  openDeleteLineItemModal(item: LineItemWithPicks): void {
+    this.deleteLineItemTarget = item;
+    this.showDeleteLineItemModal = true;
+  }
+
+  async handleDeleteLineItem(): Promise<void> {
+    if (!this.deleteLineItemTarget || !this.orderId || !this.order) return;
+    if (this.deleteLineItemTarget.total_picked > 0) return;
+
+    const partNumber = this.deleteLineItemTarget.part_number;
+    const lineItemId = this.deleteLineItemTarget.id;
+    const details = {
+      qty_per_unit: this.deleteLineItemTarget.qty_per_unit,
+      total_qty_needed: this.deleteLineItemTarget.total_qty_needed,
+      location: this.deleteLineItemTarget.location || null,
+      description: this.deleteLineItemTarget.description || null,
+    };
+
+    const success = await this.lineItemsService.deleteLineItem(lineItemId);
+    if (success) {
+      await this.activityLogService.logActivity({
+        type: 'part_removed',
+        order_id: this.order.id,
+        so_number: this.order.so_number,
+        part_number: partNumber,
+        description: `Part ${partNumber} removed from SO-${this.order.so_number}`,
+        performed_by: this.settingsService.getUserName(),
+        details,
+      });
+      await this.loadOrder();
+      if (this.orderId) {
+        this.picksService.loadPicksForOrder(this.orderId);
+      }
+    }
+
+    this.showDeleteLineItemModal = false;
+    this.deleteLineItemTarget = null;
   }
 
   // Save as Template

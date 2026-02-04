@@ -324,7 +324,7 @@ export class ExcelService {
   /**
    * Export pick history to Excel with date range
    */
-  exportPickHistoryToExcel(picks: any[], startDate: string, endDate: string, undos?: any[]): void {
+  exportPickHistoryToExcel(picks: any[], startDate: string, endDate: string, undos?: any[], activityLogs?: any[]): void {
     const workbook = XLSX.utils.book_new();
 
     // Pick History Sheet
@@ -392,12 +392,32 @@ export class ExcelService {
       XLSX.utils.book_append_sheet(workbook, undoSheet, 'Undo History');
     }
 
+    // Activity Log Sheet
+    if (activityLogs && activityLogs.length > 0) {
+      const activityHeader = ['Timestamp', 'Type', 'Performed By', 'SO Number', 'Part Number', 'Description'];
+      const activityData = activityLogs.map((log: any) => [
+        new Date(log.created_at).toLocaleString(),
+        log.type === 'part_added' ? 'Part Added'
+          : log.type === 'part_removed' ? 'Part Removed'
+          : log.type === 'order_imported' ? 'Order Imported'
+          : log.type,
+        log.performed_by || '',
+        `SO-${log.so_number}`,
+        log.part_number || '',
+        log.description || '',
+      ]);
+
+      const activitySheet = XLSX.utils.aoa_to_sheet([activityHeader, ...activityData]);
+      XLSX.utils.book_append_sheet(workbook, activitySheet, 'Activity Log');
+    }
+
     // Summary Sheet
     const totalPicks = picks.length;
     const totalQty = picks.reduce((sum: number, p: any) => sum + p.qty_picked, 0);
     const uniqueUsers = new Set(picks.map((p: any) => p.picked_by || 'Unknown')).size;
     const uniqueParts = new Set(picks.map((p: any) => p.part_number)).size;
     const totalUndos = undos ? undos.length : 0;
+    const totalActivityLogs = activityLogs ? activityLogs.length : 0;
 
     const startFormatted = new Date(startDate).toLocaleDateString();
     const endFormatted = new Date(endDate).toLocaleDateString();
@@ -412,6 +432,7 @@ export class ExcelService {
       ['Unique Users', uniqueUsers],
       ['Unique Parts', uniqueParts],
       ['Total Undos', totalUndos],
+      ['Total Activity Log Records', totalActivityLogs],
       [],
       ['Export Date', new Date().toLocaleString()],
     ];

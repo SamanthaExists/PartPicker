@@ -17,6 +17,10 @@ export class PartsCatalogService implements OnDestroy {
   loading$ = this.loadingSubject.asObservable();
   error$ = this.errorSubject.asObservable();
 
+  getCurrentParts(): PartsCatalogItem[] {
+    return this.partsSubject.getValue();
+  }
+
   constructor(private supabase: SupabaseService) {
     this.fetchParts();
     this.setupRealtimeSubscription();

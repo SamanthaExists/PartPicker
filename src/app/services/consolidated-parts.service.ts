@@ -47,15 +47,15 @@ export class ConsolidatedPartsService implements OnDestroy {
 
       // Fetch active orders
       const { data: ordersData, error: ordersError } = await this.supabase.from('orders')
-        .select('id, so_number, order_date')
+        .select('id, so_number, order_date, tool_model')
         .eq('status', 'active');
 
       if (ordersError) throw ordersError;
 
       const activeOrderIds = (ordersData || []).map(o => o.id);
-      const orderMap = new Map<string, { so_number: string; order_date: string | null }>();
+      const orderMap = new Map<string, { so_number: string; order_date: string | null; tool_model: string | null }>();
       for (const order of ordersData || []) {
-        orderMap.set(order.id, { so_number: order.so_number, order_date: order.order_date });
+        orderMap.set(order.id, { so_number: order.so_number, order_date: order.order_date, tool_model: order.tool_model });
       }
 
       if (activeOrderIds.length === 0) {
@@ -138,6 +138,7 @@ export class ConsolidatedPartsService implements OnDestroy {
             order_id: item.order_id,
             so_number: orderInfo?.so_number || 'Unknown',
             order_date: orderInfo?.order_date || null,
+            tool_model: orderInfo?.tool_model || null,
             needed: item.total_qty_needed,
             picked: pickedQty,
             line_item_id: item.id,
@@ -147,6 +148,8 @@ export class ConsolidatedPartsService implements OnDestroy {
             part_number: item.part_number,
             description: item.description,
             location: item.location,
+            qty_available: item.qty_available ?? null,
+            qty_on_order: item.qty_on_order ?? null,
             total_needed: item.total_qty_needed,
             total_picked: pickedQty,
             remaining: item.total_qty_needed - pickedQty,
@@ -154,6 +157,7 @@ export class ConsolidatedPartsService implements OnDestroy {
               order_id: item.order_id,
               so_number: orderInfo?.so_number || 'Unknown',
               order_date: orderInfo?.order_date || null,
+              tool_model: orderInfo?.tool_model || null,
               needed: item.total_qty_needed,
               picked: pickedQty,
               line_item_id: item.id,
@@ -233,15 +237,15 @@ export class ItemsToOrderService implements OnDestroy {
 
       // Fetch active orders
       const { data: ordersData, error: ordersError } = await this.supabase.from('orders')
-        .select('id, so_number')
+        .select('id, so_number, tool_model')
         .eq('status', 'active');
 
       if (ordersError) throw ordersError;
 
       const activeOrderIds = (ordersData || []).map(o => o.id);
-      const orderMap = new Map<string, string>();
+      const orderMap = new Map<string, { so_number: string; tool_model: string | null }>();
       for (const order of ordersData || []) {
-        orderMap.set(order.id, order.so_number);
+        orderMap.set(order.id, { so_number: order.so_number, tool_model: order.tool_model });
       }
 
       if (activeOrderIds.length === 0) {
@@ -330,15 +334,18 @@ export class ItemsToOrderService implements OnDestroy {
             existing.qty_on_order = item.qty_on_order;
           }
           existing.qty_to_order = Math.max(0, existing.remaining - existing.qty_available - (existing.qty_on_order ?? 0));
+          const orderInfo = orderMap.get(item.order_id);
           existing.orders.push({
             order_id: item.order_id,
-            so_number: orderMap.get(item.order_id) || 'Unknown',
+            so_number: orderInfo?.so_number || 'Unknown',
+            tool_model: orderInfo?.tool_model || null,
             needed: item.total_qty_needed,
             picked: pickedQty,
           });
         } else {
           const qtyOnOrder = item.qty_on_order ?? 0;
           const qtyAvailable = item.qty_available || 0;
+          const orderInfo = orderMap.get(item.order_id);
           itemMap.set(item.part_number, {
             part_number: item.part_number,
             description: item.description,
@@ -351,7 +358,8 @@ export class ItemsToOrderService implements OnDestroy {
             qty_to_order: Math.max(0, remaining - qtyAvailable - qtyOnOrder),
             orders: [{
               order_id: item.order_id,
-              so_number: orderMap.get(item.order_id) || 'Unknown',
+              so_number: orderInfo?.so_number || 'Unknown',
+              tool_model: orderInfo?.tool_model || null,
               needed: item.total_qty_needed,
               picked: pickedQty,
             }],

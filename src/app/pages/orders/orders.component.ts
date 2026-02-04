@@ -72,6 +72,31 @@ type SortOption = 'created' | 'due-date' | 'so-number';
                   <i class="bi bi-arrow-down-up me-1"></i>
                   {{ sortBy === 'due-date' ? 'Due Date' : sortBy === 'created' ? 'Created' : 'SO#' }}
                 </button>
+                <div class="dropdown" (click)="$event.stopPropagation()">
+                  <button class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-1"
+                          type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                    <i class="bi bi-tools"></i>
+                    {{ selectedAssemblies.size === 0 ? 'All Assemblies' : selectedAssemblies.size + ' Assembly' + (selectedAssemblies.size !== 1 ? 's' : '') }}
+                  </button>
+                  <div class="dropdown-menu p-0" style="min-width: 220px;">
+                    <div class="d-flex border-bottom p-2 gap-2">
+                      <button class="btn btn-sm btn-ghost flex-fill" (click)="selectAllAssemblies()">Select All</button>
+                      <button class="btn btn-sm btn-ghost flex-fill" (click)="deselectAllAssemblies()">Clear</button>
+                    </div>
+                    <div style="max-height: 250px; overflow-y: auto;" class="p-2">
+                      <div *ngFor="let model of uniqueAssemblies"
+                           class="form-check px-2 py-1">
+                        <input class="form-check-input" type="checkbox"
+                               [id]="'assembly-' + model"
+                               [checked]="selectedAssemblies.has(model)"
+                               (change)="toggleAssembly(model)">
+                        <label class="form-check-label" [for]="'assembly-' + model">
+                          {{ model }}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -227,6 +252,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   statusFilter = 'active';
   hideCompleted = false;
   sortBy: SortOption = 'due-date';
+  selectedAssemblies = new Set<string>();
   showNewOrderModal = false;
 
   newOrder = {
@@ -272,8 +298,10 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
       const matchesStatus = this.statusFilter === 'all' || order.status === this.statusFilter;
       const matchesHideCompleted = !this.hideCompleted || order.status !== 'complete';
+      const matchesAssembly = this.selectedAssemblies.size === 0 ||
+        (!!order.tool_model && this.selectedAssemblies.has(order.tool_model));
 
-      return matchesSearch && matchesStatus && matchesHideCompleted;
+      return matchesSearch && matchesStatus && matchesHideCompleted && matchesAssembly;
     });
 
     return [...filtered].sort((a, b) => {
@@ -290,6 +318,31 @@ export class OrdersComponent implements OnInit, OnDestroy {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }
     });
+  }
+
+  get uniqueAssemblies(): string[] {
+    const models = new Set<string>();
+    this.orders.forEach(o => {
+      if (o.tool_model) models.add(o.tool_model);
+    });
+    return Array.from(models).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }
+
+  toggleAssembly(model: string): void {
+    if (this.selectedAssemblies.has(model)) {
+      this.selectedAssemblies.delete(model);
+    } else {
+      this.selectedAssemblies.add(model);
+    }
+    this.selectedAssemblies = new Set(this.selectedAssemblies);
+  }
+
+  selectAllAssemblies(): void {
+    this.selectedAssemblies = new Set(this.uniqueAssemblies);
+  }
+
+  deselectAllAssemblies(): void {
+    this.selectedAssemblies = new Set();
   }
 
   cycleSortBy(): void {

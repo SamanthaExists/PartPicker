@@ -9,6 +9,7 @@ export interface Order {
   quantity: number | null;
   order_date: string | null;
   due_date: string | null;
+  estimated_ship_date: string | null;
   status: 'active' | 'complete' | 'cancelled';
   notes: string | null;
   created_at: string;
@@ -34,7 +35,9 @@ export interface LineItem {
   qty_per_unit: number;
   total_qty_needed: number;
   qty_available: number | null;
+  qty_on_order: number | null;
   tool_ids: string[] | null;
+  assembly_group: string | null;
   created_at: string;
 }
 
@@ -96,6 +99,8 @@ export interface ConsolidatedPart {
   part_number: string;
   description: string | null;
   location: string | null;
+  qty_available: number | null;
+  qty_on_order: number | null;
   total_needed: number;
   total_picked: number;
   remaining: number;
@@ -103,6 +108,7 @@ export interface ConsolidatedPart {
     order_id: string;
     so_number: string;
     order_date: string | null;
+    tool_model: string | null;
     needed: number;
     picked: number;
     line_item_id: string;
@@ -123,6 +129,7 @@ export interface ItemToOrder {
   orders: {
     order_id: string;
     so_number: string;
+    tool_model: string | null;
     needed: number;
     picked: number;
   }[];
@@ -135,6 +142,7 @@ export interface ImportedOrder {
   customer_name?: string;
   order_date?: string;
   due_date?: string;
+  estimated_ship_date?: string;
   tools: ImportedTool[];
   line_items: ImportedLineItem[];
 }
@@ -152,6 +160,7 @@ export interface ImportedLineItem {
   qty_per_unit: number;
   total_qty_needed: number;
   tool_ids?: string[];
+  assembly_group?: string;
 }
 
 // Pick Undo audit trail
@@ -175,7 +184,7 @@ export interface PickUndo {
 // Activity feed
 export interface RecentActivity {
   id: string;
-  type: 'pick' | 'pick_undo' | 'order_created' | 'order_completed';
+  type: 'pick' | 'pick_undo' | 'order_created' | 'order_completed' | 'part_added' | 'part_removed' | 'order_imported';
   message: string;
   timestamp: string;
   user?: string;
@@ -183,10 +192,26 @@ export interface RecentActivity {
   so_number?: string;
 }
 
+// Activity Log (database table)
+export type ActivityLogType = 'part_added' | 'part_removed' | 'order_imported';
+
+export interface ActivityLogEntry {
+  id: string;
+  type: ActivityLogType;
+  order_id: string;
+  so_number: string;
+  part_number: string | null;
+  description: string | null;
+  performed_by: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+}
+
 // User settings
 export interface UserSettings {
   user_name: string;
   theme: 'light' | 'dark' | 'system';
+  isAuthenticated?: boolean;
 }
 
 // Parts Catalog
@@ -215,6 +240,7 @@ export interface BOMTemplateItem {
   description: string | null;
   location: string | null;
   qty_per_unit: number;
+  assembly_group: string | null;
 }
 
 export interface BOMTemplateWithItems extends BOMTemplate {
@@ -240,4 +266,5 @@ export interface LineItemInput {
   total_qty_needed: number;
   qty_available?: number;
   tool_ids?: string[];
+  assembly_group?: string;
 }

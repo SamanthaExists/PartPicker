@@ -7,6 +7,9 @@ import { OrdersService } from '../../services/orders.service';
 import { ExcelService } from '../../services/excel.service';
 import { PartsCatalogService } from '../../services/parts-catalog.service';
 import { BomTemplatesService } from '../../services/bom-templates.service';
+import { BomParserService, ParsedBOM, ToolMapping, MergedBOMResult } from '../../services/bom-parser.service';
+import { ActivityLogService } from '../../services/activity-log.service';
+import { SettingsService } from '../../services/settings.service';
 import { ImportedOrder, ImportedLineItem, PartConflict, BOMTemplateWithItems } from '../../models';
 import { TemplateSelectDialogComponent } from '../../components/dialogs/template-select-dialog.component';
 import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicate-parts-dialog.component';
@@ -21,6 +24,23 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
         <h1 class="h3 fw-bold mb-1">Import Order</h1>
         <p class="text-muted mb-0">Upload an Excel or CSV file to import a sales order</p>
       </div>
+
+      <!-- Tabs -->
+      <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+          <a class="nav-link" [class.active]="activeTab === 'standard'" (click)="activeTab = 'standard'" role="button">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Standard Import
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" [class.active]="activeTab === 'multi-bom'" (click)="activeTab = 'multi-bom'" role="button">
+            <i class="bi bi-files me-1"></i> Multi-BOM Import
+          </a>
+        </li>
+      </ul>
+
+      <!-- ======================== STANDARD IMPORT TAB ======================== -->
+      <div *ngIf="activeTab === 'standard'">
 
       <!-- Drop Zone -->
       <div class="card mb-4" *ngIf="!parseResult">
@@ -253,6 +273,241 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
         </div>
       </div>
 
+      </div><!-- end standard tab -->
+
+      <!-- ======================== MULTI-BOM IMPORT TAB ======================== -->
+      <div *ngIf="activeTab === 'multi-bom'">
+        <div *ngIf="!bomParseResult">
+          <!-- Order Info Form -->
+          <div class="card mb-4">
+            <div class="card-header"><span class="fw-semibold">Order Information</span></div>
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-sm-6 col-lg-4">
+                  <label class="form-label small">SO Number *</label>
+                  <input type="text" class="form-control form-control-sm" placeholder="e.g., 3930"
+                         [(ngModel)]="bomOrderInfo.soNumber" (input)="handleBomSoNumberChange()">
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                  <label class="form-label small">PO Number</label>
+                  <input type="text" class="form-control form-control-sm" placeholder="Optional"
+                         [(ngModel)]="bomOrderInfo.poNumber">
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                  <label class="form-label small">Customer Name</label>
+                  <input type="text" class="form-control form-control-sm" placeholder="e.g., Sonovision"
+                         [(ngModel)]="bomOrderInfo.customerName">
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                  <label class="form-label small">Purchase Date</label>
+                  <input type="date" class="form-control form-control-sm" [(ngModel)]="bomOrderInfo.purchaseDate">
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                  <label class="form-label small">Due Date</label>
+                  <input type="date" class="form-control form-control-sm" [(ngModel)]="bomOrderInfo.dueDate">
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                  <label class="form-label small">Est. Ship Date</label>
+                  <input type="date" class="form-control form-control-sm" [(ngModel)]="bomOrderInfo.estimatedShipDate">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOM File Upload -->
+          <div class="card mb-4">
+            <div class="card-header"><span class="fw-semibold">BOM Files</span></div>
+            <div class="card-body">
+              <div class="dropzone" [class.dragover]="isBomDragging"
+                   (drop)="onBomDrop($event)" (dragover)="onBomDragOver($event)" (dragleave)="onBomDragLeave($event)">
+                <i class="bi bi-files display-4 text-muted mb-3"></i>
+                <p class="h5 mb-1">Drop BOM CSV files here</p>
+                <p class="text-muted small mb-3">One CSV per tool variation (e.g., 230QR-10002.csv, 230QR-10003.csv)</p>
+                <label class="btn btn-outline-secondary">
+                  <i class="bi bi-upload me-1"></i> Browse CSV Files
+                  <input type="file" class="d-none" accept=".csv" multiple (change)="onBomFileSelect($event)">
+                </label>
+              </div>
+
+              <!-- File List -->
+              <div class="mt-3" *ngIf="bomFiles.length > 0">
+                <h6 class="small fw-semibold mb-2">Uploaded Files ({{ bomFiles.length }})</h6>
+                <div *ngFor="let entry of bomFiles; let i = index"
+                     class="d-flex align-items-center justify-content-between p-3 bg-body-secondary rounded mb-1">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-file-earmark-text text-muted"></i>
+                    <div>
+                      <span class="font-mono small">{{ entry.toolModel }}</span>
+                      <small class="text-muted d-block">Tool: {{ entry.toolNumber }}</small>
+                    </div>
+                  </div>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="removeBomFile(i)">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Parse Errors -->
+              <div class="alert alert-danger mt-3" *ngIf="bomParseErrors.length > 0">
+                <div class="d-flex align-items-center mb-2">
+                  <i class="bi bi-exclamation-circle me-2"></i>
+                  <strong>Parse Failed</strong>
+                </div>
+                <ul class="mb-0 ps-3">
+                  <li *ngFor="let error of bomParseErrors">{{ error }}</li>
+                </ul>
+              </div>
+
+              <!-- Parse Button -->
+              <div class="d-flex justify-content-end mt-3" *ngIf="bomFiles.length > 0">
+                <button class="btn btn-primary" (click)="handleParseBOMs()">Parse &amp; Preview</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Multi-BOM Help -->
+          <div class="card">
+            <div class="card-header"><span class="fw-semibold">Multi-BOM Format Guide</span></div>
+            <div class="card-body">
+              <p class="small text-muted">Use this mode when each tool has its own multi-level BOM (e.g., Sonovision orders where tools are variations of each other).</p>
+              <div class="mb-3">
+                <h6 class="fw-semibold">Expected CSV Format</h6>
+                <ul class="small text-muted">
+                  <li>Columns: Level, Part Number, Type, Qty, Description</li>
+                  <li>Multi-level hierarchy (Level 0 = root, Level 1 = top assembly, etc.)</li>
+                  <li>Only leaf parts (no sub-components) are extracted for picking</li>
+                  <li>Quantities are multiplied through the hierarchy</li>
+                </ul>
+              </div>
+              <div>
+                <h6 class="fw-semibold">How Merging Works</h6>
+                <ul class="small text-muted mb-0">
+                  <li>Parts shared across all BOMs at the same qty become shared line items</li>
+                  <li>Parts unique to specific tools become tool-specific line items</li>
+                  <li>Descriptions and locations are auto-filled from your Parts Catalog</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Multi-BOM Preview -->
+        <div class="card" *ngIf="bomParseResult">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+              <i class="bi bi-check-circle-fill text-success me-2"></i>
+              <span class="fw-semibold">Preview: SO-{{ bomOrderInfo.soNumber }}</span>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" (click)="clearBomResult()"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="card-body">
+            <!-- Warnings -->
+            <div class="alert alert-warning" *ngIf="bomParseResult.warnings.length > 0">
+              <strong>Warnings</strong>
+              <ul class="mb-0 ps-3">
+                <li *ngFor="let warning of bomParseResult.warnings">{{ warning }}</li>
+              </ul>
+            </div>
+
+            <!-- Summary Stats -->
+            <div class="row g-3 mb-4">
+              <div class="col-4">
+                <div class="p-3 bg-body-secondary rounded text-center">
+                  <div class="h4 fw-bold mb-0">{{ bomParseResult.merged.stats.totalParts }}</div>
+                  <small class="text-muted">Total Parts</small>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="p-3 rounded text-center" style="background-color: rgba(25, 135, 84, 0.1);">
+                  <div class="h4 fw-bold mb-0 text-success">{{ bomParseResult.merged.stats.sharedCount }}</div>
+                  <small class="text-muted">Shared</small>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="p-3 rounded text-center" style="background-color: rgba(13, 110, 253, 0.1);">
+                  <div class="h4 fw-bold mb-0 text-primary">{{ bomParseResult.merged.stats.toolSpecificCount }}</div>
+                  <small class="text-muted">Tool-Specific</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tools -->
+            <div class="mb-4">
+              <h6 class="fw-semibold mb-2">Tools ({{ bomParseResult.order.tools.length }})</h6>
+              <div class="d-flex flex-wrap gap-2">
+                <span *ngFor="let tool of bomParseResult.order.tools" class="badge bg-secondary">
+                  {{ tool.tool_number }}
+                  <span *ngIf="tool.tool_model"> [{{ tool.tool_model }}]</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Conflicts Warning -->
+            <div class="alert alert-warning d-flex align-items-center justify-content-between" *ngIf="partConflicts.length > 0">
+              <div>
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>{{ partConflicts.length }} part(s)</strong> have different values than the Parts Catalog.
+              </div>
+              <button class="btn btn-sm btn-warning" (click)="showDuplicatesDialog = true">Review Conflicts</button>
+            </div>
+
+            <!-- Line Items Preview -->
+            <div class="mb-4">
+              <h6 class="fw-semibold mb-2">Line Items ({{ bomParseResult.order.line_items.length }})</h6>
+              <div class="table-responsive border rounded" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm mb-0">
+                  <thead class="table-secondary sticky-top">
+                    <tr>
+                      <th>Part Number</th>
+                      <th>Description</th>
+                      <th>Assembly</th>
+                      <th class="text-center">Scope</th>
+                      <th class="text-center">Qty/Unit</th>
+                      <th class="text-center">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let mergedItem of bomParseResult.merged.lineItems.slice(0, 100); let i = index">
+                      <td class="font-mono">{{ mergedItem.partNumber }}</td>
+                      <td class="text-muted">{{ bomParseResult.order.line_items[i]?.description || mergedItem.description || '-' }}</td>
+                      <td class="font-mono small text-muted">{{ mergedItem.assemblyGroup || '-' }}</td>
+                      <td class="text-center">
+                        <span *ngIf="mergedItem.isShared" class="badge bg-success-subtle text-success border border-success">Shared</span>
+                        <span *ngIf="!mergedItem.isShared" class="badge bg-primary-subtle text-primary border border-primary">
+                          {{ mergedItem.toolModels.length }} tool{{ mergedItem.toolModels.length !== 1 ? 's' : '' }}
+                        </span>
+                      </td>
+                      <td class="text-center">{{ mergedItem.qtyPerUnit }}</td>
+                      <td class="text-center">{{ bomParseResult.order.line_items[i]?.total_qty_needed || '-' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="small text-muted text-center mt-2" *ngIf="bomParseResult.merged.lineItems.length > 100">
+                ...and {{ bomParseResult.merged.lineItems.length - 100 }} more items
+              </p>
+            </div>
+
+            <!-- Options -->
+            <div class="mb-4 p-3 bg-body-secondary rounded">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="bomSaveToCatalog" [(ngModel)]="saveToCatalog">
+                <label class="form-check-label" for="bomSaveToCatalog">Save new parts to Parts Catalog</label>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="d-flex justify-content-end gap-2">
+              <button class="btn btn-outline-secondary" (click)="clearBomResult()">Cancel</button>
+              <button class="btn btn-primary" (click)="handleBomImport()" [disabled]="isImporting">
+                <i class="bi me-1" [class]="isImporting ? 'bi-arrow-clockwise spin' : 'bi-check-circle'"></i>
+                {{ isImporting ? 'Importing...' : 'Import Order' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div><!-- end multi-bom tab -->
+
       <!-- Template Select Dialog -->
       <app-template-select-dialog
         [(show)]="showTemplateDialog"
@@ -333,12 +588,34 @@ export class ImportComponent implements OnInit, OnDestroy {
 
   private subscriptions: Subscription[] = [];
 
+  // Multi-BOM tab state
+  activeTab: 'standard' | 'multi-bom' = 'standard';
+  isBomDragging = false;
+  bomFiles: { file: File; toolModel: string; toolNumber: string }[] = [];
+  bomOrderInfo = {
+    soNumber: '',
+    poNumber: '',
+    customerName: '',
+    purchaseDate: '',
+    dueDate: '',
+    estimatedShipDate: '',
+  };
+  bomParseResult: {
+    merged: MergedBOMResult;
+    order: ImportedOrder;
+    warnings: string[];
+  } | null = null;
+  bomParseErrors: string[] = [];
+
   constructor(
     private router: Router,
     private ordersService: OrdersService,
     private excelService: ExcelService,
     private partsCatalogService: PartsCatalogService,
-    private bomTemplatesService: BomTemplatesService
+    private bomTemplatesService: BomTemplatesService,
+    private bomParserService: BomParserService,
+    private activityLogService: ActivityLogService,
+    private settingsService: SettingsService
   ) {}
 
   ngOnInit(): void {
@@ -503,6 +780,24 @@ export class ImportComponent implements OnInit, OnDestroy {
     this.isImporting = false;
 
     if (result) {
+      const toolNumbers = this.parseResult.order.tools.map(t => t.tool_number);
+      await this.activityLogService.logActivity({
+        type: 'order_imported',
+        order_id: result.id,
+        so_number: this.parseResult.order.so_number,
+        description: `Order SO-${this.parseResult.order.so_number} imported with ${this.parseResult.order.line_items.length} parts and ${this.parseResult.order.tools.length} tools`,
+        performed_by: this.settingsService.getUserName(),
+        details: {
+          part_count: this.parseResult.order.line_items.length,
+          tool_count: this.parseResult.order.tools.length,
+          tool_numbers: toolNumbers,
+        },
+      });
+
+      // Auto-extract template
+      const toolModel = this.parseResult.order.tools[0]?.tool_model || null;
+      await this.bomTemplatesService.autoExtractTemplate(this.parseResult.order.line_items, toolModel, this.parseResult.order.so_number);
+
       this.router.navigate(['/orders', result.id]);
     }
   }
@@ -517,5 +812,164 @@ export class ImportComponent implements OnInit, OnDestroy {
 
   downloadTemplate(type: 'single' | 'multi'): void {
     this.excelService.downloadImportTemplate(type);
+  }
+
+  // ===================== Multi-BOM Methods =====================
+
+  handleBomSoNumberChange(): void {
+    // Update tool numbers when SO number changes
+    for (const entry of this.bomFiles) {
+      entry.toolNumber = this.bomOrderInfo.soNumber
+        ? `${this.bomOrderInfo.soNumber}-${entry.toolModel}`
+        : entry.toolModel;
+    }
+  }
+
+  onBomDragOver(event: DragEvent): void {
+    event.preventDefault();
+    this.isBomDragging = true;
+  }
+
+  onBomDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    this.isBomDragging = false;
+  }
+
+  onBomDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.isBomDragging = false;
+    const files = event.dataTransfer?.files;
+    if (files) {
+      this.addBomFiles(Array.from(files));
+    }
+  }
+
+  onBomFileSelect(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files) {
+      this.addBomFiles(Array.from(input.files));
+      input.value = '';
+    }
+  }
+
+  private addBomFiles(files: File[]): void {
+    for (const file of files) {
+      if (!file.name.endsWith('.csv')) continue;
+      const toolModel = file.name.replace(/\.csv$/i, '').trim();
+      const toolNumber = this.bomOrderInfo.soNumber
+        ? `${this.bomOrderInfo.soNumber}-${toolModel}`
+        : toolModel;
+      // Avoid duplicates
+      if (!this.bomFiles.some(f => f.toolModel === toolModel)) {
+        this.bomFiles.push({ file, toolModel, toolNumber });
+      }
+    }
+  }
+
+  removeBomFile(index: number): void {
+    this.bomFiles.splice(index, 1);
+  }
+
+  async handleParseBOMs(): Promise<void> {
+    this.bomParseErrors = [];
+    this.bomParseResult = null;
+
+    if (!this.bomOrderInfo.soNumber) {
+      this.bomParseErrors = ['SO Number is required'];
+      return;
+    }
+
+    if (this.bomFiles.length === 0) {
+      this.bomParseErrors = ['Please add at least one BOM file'];
+      return;
+    }
+
+    const allWarnings: string[] = [];
+    const parsedBOMs: ParsedBOM[] = [];
+
+    for (const entry of this.bomFiles) {
+      const text = await entry.file.text();
+      const parsed = this.bomParserService.parseBOMCsv(text, entry.file.name);
+      allWarnings.push(...parsed.warnings);
+      if (parsed.leafParts.length === 0) {
+        this.bomParseErrors.push(`No parts found in ${entry.file.name}`);
+      }
+      parsedBOMs.push(parsed);
+    }
+
+    if (this.bomParseErrors.length > 0) return;
+
+    const toolMappings: ToolMapping[] = this.bomFiles.map(entry => ({
+      toolModel: entry.toolModel,
+      toolNumber: entry.toolNumber,
+    }));
+
+    // Get catalog parts for description/location enrichment
+    const catalogParts = this.partsCatalogService.getCurrentParts();
+
+    const merged = this.bomParserService.mergeMultipleBOMs(parsedBOMs, toolMappings);
+    const order = this.bomParserService.buildImportedOrder(
+      merged,
+      {
+        soNumber: this.bomOrderInfo.soNumber,
+        poNumber: this.bomOrderInfo.poNumber || undefined,
+        customerName: this.bomOrderInfo.customerName || undefined,
+        purchaseDate: this.bomOrderInfo.purchaseDate || undefined,
+        dueDate: this.bomOrderInfo.dueDate || undefined,
+        estimatedShipDate: this.bomOrderInfo.estimatedShipDate || undefined,
+      },
+      toolMappings,
+      catalogParts
+    );
+
+    this.bomParseResult = { merged, order, warnings: allWarnings };
+
+    // Check for catalog conflicts
+    this.checkForConflicts(order.line_items);
+  }
+
+  async handleBomImport(): Promise<void> {
+    if (!this.bomParseResult?.order) return;
+
+    this.isImporting = true;
+
+    // Save new parts to catalog if enabled
+    if (this.saveToCatalog) {
+      await this.partsCatalogService.savePartsFromImport(
+        this.bomParseResult.order.line_items,
+        true
+      );
+    }
+
+    const result = await this.ordersService.importOrder(this.bomParseResult.order);
+    this.isImporting = false;
+
+    if (result) {
+      const toolNumbers = this.bomParseResult.order.tools.map(t => t.tool_number);
+      await this.activityLogService.logActivity({
+        type: 'order_imported',
+        order_id: result.id,
+        so_number: this.bomParseResult.order.so_number,
+        description: `Order SO-${this.bomParseResult.order.so_number} imported with ${this.bomParseResult.order.line_items.length} parts and ${this.bomParseResult.order.tools.length} tools`,
+        performed_by: this.settingsService.getUserName(),
+        details: {
+          part_count: this.bomParseResult.order.line_items.length,
+          tool_count: this.bomParseResult.order.tools.length,
+          tool_numbers: toolNumbers,
+        },
+      });
+
+      // Auto-extract template
+      const toolModel = this.bomParseResult.order.tools[0]?.tool_model || null;
+      await this.bomTemplatesService.autoExtractTemplate(this.bomParseResult.order.line_items, toolModel, this.bomParseResult.order.so_number);
+
+      this.router.navigate(['/orders', result.id]);
+    }
+  }
+
+  clearBomResult(): void {
+    this.bomParseResult = null;
+    this.bomParseErrors = [];
+    this.partConflicts = [];
   }
 }

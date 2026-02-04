@@ -205,6 +205,33 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
                 </div>
               </div>
 
+              <!-- Assembly Filter Dropdown -->
+              <div class="dropdown" (click)="$event.stopPropagation()">
+                <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2"
+                        type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                  <i class="bi bi-tools"></i>
+                  {{ selectedAssemblies.size === 0 ? 'All Assemblies' : selectedAssemblies.size + ' Assembly' + (selectedAssemblies.size !== 1 ? 's' : '') }}
+                </button>
+                <div class="dropdown-menu p-0" style="min-width: 220px;">
+                  <div class="d-flex border-bottom p-2 gap-2">
+                    <button class="btn btn-sm btn-ghost flex-fill" (click)="selectAllAssemblies()">Select All</button>
+                    <button class="btn btn-sm btn-ghost flex-fill" (click)="deselectAllAssemblies()">Clear</button>
+                  </div>
+                  <div style="max-height: 250px; overflow-y: auto;" class="p-2">
+                    <div *ngFor="let model of uniqueAssemblies"
+                         class="form-check px-2 py-1">
+                      <input class="form-check-input" type="checkbox"
+                             [id]="'ito-assembly-' + model"
+                             [checked]="selectedAssemblies.has(model)"
+                             (change)="toggleAssembly(model)">
+                      <label class="form-check-label" [for]="'ito-assembly-' + model">
+                        {{ model }}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Clear Filters -->
               <button *ngIf="hasActiveFilters" class="btn btn-sm btn-link text-muted text-decoration-none"
                       (click)="clearFilters()">
@@ -353,6 +380,7 @@ export class ItemsToOrderComponent implements OnInit, OnDestroy {
   sortMode: SortMode = 'remaining';
   selectedOrders = new Set<string>();
   selectedLocations = new Set<string>();
+  selectedAssemblies = new Set<string>();
 
   private subscriptions: Subscription[] = [];
 
@@ -411,7 +439,7 @@ export class ItemsToOrderComponent implements OnInit, OnDestroy {
   }
 
   get hasActiveFilters(): boolean {
-    return this.selectedOrders.size > 0 || this.selectedLocations.size > 0;
+    return this.selectedOrders.size > 0 || this.selectedLocations.size > 0 || this.selectedAssemblies.size > 0;
   }
 
   get filteredItems(): ItemToOrder[] {
@@ -430,7 +458,11 @@ export class ItemsToOrderComponent implements OnInit, OnDestroy {
       const matchesLocation = this.selectedLocations.size === 0 ||
         (!!item.location && this.selectedLocations.has(item.location));
 
-      return matchesSearch && matchesOrder && matchesLocation;
+      // Assembly filter
+      const matchesAssembly = this.selectedAssemblies.size === 0 ||
+        item.orders.some(o => !!o.tool_model && this.selectedAssemblies.has(o.tool_model));
+
+      return matchesSearch && matchesOrder && matchesLocation && matchesAssembly;
     });
 
     // Sort
@@ -520,6 +552,34 @@ export class ItemsToOrderComponent implements OnInit, OnDestroy {
     this.selectedLocations = new Set();
   }
 
+  // Assembly filter
+  get uniqueAssemblies(): string[] {
+    const models = new Set<string>();
+    this.currentItems.forEach(item => {
+      item.orders.forEach(o => {
+        if (o.tool_model) models.add(o.tool_model);
+      });
+    });
+    return Array.from(models).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }
+
+  toggleAssembly(model: string): void {
+    if (this.selectedAssemblies.has(model)) {
+      this.selectedAssemblies.delete(model);
+    } else {
+      this.selectedAssemblies.add(model);
+    }
+    this.selectedAssemblies = new Set(this.selectedAssemblies);
+  }
+
+  selectAllAssemblies(): void {
+    this.selectedAssemblies = new Set(this.uniqueAssemblies);
+  }
+
+  deselectAllAssemblies(): void {
+    this.selectedAssemblies = new Set();
+  }
+
   onSortChange(): void {
     localStorage.setItem(ITEMS_TO_ORDER_SORT_KEY, this.sortMode);
   }
@@ -527,6 +587,7 @@ export class ItemsToOrderComponent implements OnInit, OnDestroy {
   clearFilters(): void {
     this.selectedOrders = new Set();
     this.selectedLocations = new Set();
+    this.selectedAssemblies = new Set();
   }
 
   handleExport(): void {

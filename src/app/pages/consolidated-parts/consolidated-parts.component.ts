@@ -37,7 +37,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
           <div class="card cursor-pointer" [class.border-primary]="filter === 'all'" (click)="setFilter('all')">
             <div class="card-body">
               <p class="text-muted small mb-1">Total Parts</p>
-              <h3 class="mb-0 fw-bold">{{ parts.length }}</h3>
+              <h3 class="mb-0 fw-bold">{{ filteredParts.length }}</h3>
             </div>
           </div>
         </div>
@@ -103,6 +103,31 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                         [class.btn-success]="filter === 'complete'"
                         [class.btn-outline-success]="filter !== 'complete'"
                         (click)="setFilter('complete')">Complete</button>
+                <div class="dropdown" (click)="$event.stopPropagation()">
+                  <button class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-1"
+                          type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                    <i class="bi bi-tools"></i>
+                    {{ selectedAssemblies.size === 0 ? 'All Assemblies' : selectedAssemblies.size + ' Assembly' + (selectedAssemblies.size !== 1 ? 's' : '') }}
+                  </button>
+                  <div class="dropdown-menu p-0" style="min-width: 220px;">
+                    <div class="d-flex border-bottom p-2 gap-2">
+                      <button class="btn btn-sm btn-ghost flex-fill" (click)="selectAllAssemblies()">Select All</button>
+                      <button class="btn btn-sm btn-ghost flex-fill" (click)="deselectAllAssemblies()">Clear</button>
+                    </div>
+                    <div style="max-height: 250px; overflow-y: auto;" class="p-2">
+                      <div *ngFor="let model of uniqueAssemblies"
+                           class="form-check px-2 py-1">
+                        <input class="form-check-input" type="checkbox"
+                               [id]="'parts-assembly-' + model"
+                               [checked]="selectedAssemblies.has(model)"
+                               (change)="toggleAssembly(model)">
+                        <label class="form-check-label" [for]="'parts-assembly-' + model">
+                          {{ model }}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div class="form-check ms-3">
                   <input class="form-check-input" type="checkbox" id="hideOutOfStock"
                          [(ngModel)]="hideOutOfStock">
@@ -220,6 +245,7 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   filter: FilterType = 'all';
   copyMessage = '';
   hideOutOfStock = false;
+  selectedAssemblies = new Set<string>();
 
   // Multi-order pick dialog
   showMultiOrderPick = false;
@@ -294,6 +320,33 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
 
+  get uniqueAssemblies(): string[] {
+    const models = new Set<string>();
+    this.parts.forEach(p => {
+      p.orders.forEach(o => {
+        if (o.tool_model) models.add(o.tool_model);
+      });
+    });
+    return Array.from(models).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }
+
+  toggleAssembly(model: string): void {
+    if (this.selectedAssemblies.has(model)) {
+      this.selectedAssemblies.delete(model);
+    } else {
+      this.selectedAssemblies.add(model);
+    }
+    this.selectedAssemblies = new Set(this.selectedAssemblies);
+  }
+
+  selectAllAssemblies(): void {
+    this.selectedAssemblies = new Set(this.uniqueAssemblies);
+  }
+
+  deselectAllAssemblies(): void {
+    this.selectedAssemblies = new Set();
+  }
+
   setFilter(filter: FilterType): void {
     this.filter = filter;
   }
@@ -329,26 +382,30 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
       // Hide out of stock filter - excludes parts where qty_available is 0
       const matchesStock = !this.hideOutOfStock || (this.getQtyAvailable(part) !== 0);
 
-      return matchesSearch && matchesFilter && matchesStock;
+      // Assembly filter - check if any of the part's orders match a selected assembly
+      const matchesAssembly = this.selectedAssemblies.size === 0 ||
+        part.orders.some(o => !!o.tool_model && this.selectedAssemblies.has(o.tool_model));
+
+      return matchesSearch && matchesFilter && matchesStock && matchesAssembly;
     });
   }
 
   get lowStockCount(): number {
-    return this.parts.filter(p => {
+    return this.filteredParts.filter(p => {
       const available = this.getQtyAvailable(p);
       return available !== null && available < p.remaining && available > 0;
     }).length;
   }
 
   get outOfStockCount(): number {
-    return this.parts.filter(p => {
+    return this.filteredParts.filter(p => {
       const qty = this.getQtyAvailable(p);
       return qty === 0 && p.remaining > 0;
     }).length;
   }
 
   get completeCount(): number {
-    return this.parts.filter(p => p.remaining === 0).length;
+    return this.filteredParts.filter(p => p.remaining === 0).length;
   }
 
   get totalNeeded(): number {

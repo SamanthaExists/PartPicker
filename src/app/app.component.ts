@@ -151,6 +151,7 @@ export class AppComponent implements OnInit {
     { path: '/items-to-order', label: 'Items to Order', icon: 'bi-cart' },
     { path: '/issues', label: 'Issues', icon: 'bi-exclamation-triangle' },
     { path: '/activity', label: 'Activity History', icon: 'bi-clock-history' },
+    { path: '/templates', label: 'Templates', icon: 'bi-file-earmark-text' },
     { path: '/import', label: 'Import', icon: 'bi-upload' },
     { path: '/settings', label: 'Settings', icon: 'bi-gear' },
   ];

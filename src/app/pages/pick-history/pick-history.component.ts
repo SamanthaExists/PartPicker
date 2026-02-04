@@ -46,7 +46,19 @@ interface UndoRecord {
   order_id: string;
 }
 
-type ActivityRecord = PickRecord | IssueRecord | UndoRecord;
+interface ActivityLogRecord {
+  id: string;
+  type: 'part_added' | 'part_removed' | 'order_imported';
+  so_number: string;
+  part_number: string | null;
+  description: string | null;
+  performed_by: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+  order_id: string;
+}
+
+type ActivityRecord = PickRecord | IssueRecord | UndoRecord | ActivityLogRecord;
 
 interface GroupedActivities {
   [date: string]: ActivityRecord[];
@@ -139,6 +151,14 @@ const PAGE_SIZE = 50;
               <input class="form-check-input" type="checkbox" id="showUndos" [(ngModel)]="showUndos">
               <label class="form-check-label" for="showUndos">Undos</label>
             </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="showPartChanges" [(ngModel)]="showPartChanges">
+              <label class="form-check-label" for="showPartChanges">Part Changes</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="showImports" [(ngModel)]="showImports">
+              <label class="form-check-label" for="showImports">Imports</label>
+            </div>
           </div>
 
           <!-- Search Button -->
@@ -162,12 +182,12 @@ const PAGE_SIZE = 50;
 
       <!-- Results -->
       <ng-container *ngIf="hasSearched">
-        <!-- Summary Stats -->
+        <!-- Summary Stats (filter-reactive via summaryStats) -->
         <div class="row g-3">
           <div class="col-6 col-sm">
             <div class="card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ totalPickCount | number }}</div>
+                <div class="fs-4 fw-bold">{{ summaryStats.pickCount | number }}</div>
                 <p class="text-muted small mb-0">Picks</p>
               </div>
             </div>
@@ -175,7 +195,7 @@ const PAGE_SIZE = 50;
           <div class="col-6 col-sm">
             <div class="card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ totalQtyPicked | number }}</div>
+                <div class="fs-4 fw-bold">{{ summaryStats.totalQty | number }}</div>
                 <p class="text-muted small mb-0">Qty Picked</p>
               </div>
             </div>
@@ -183,7 +203,7 @@ const PAGE_SIZE = 50;
           <div class="col-6 col-sm">
             <div class="card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ allUniqueParts }}</div>
+                <div class="fs-4 fw-bold">{{ summaryStats.uniqueParts }}</div>
                 <p class="text-muted small mb-0">Unique Parts</p>
               </div>
             </div>
@@ -191,7 +211,7 @@ const PAGE_SIZE = 50;
           <div class="col-6 col-sm">
             <div class="card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ allUniqueUsers }}</div>
+                <div class="fs-4 fw-bold">{{ summaryStats.uniqueUsers }}</div>
                 <p class="text-muted small mb-0">Users</p>
               </div>
             </div>
@@ -199,7 +219,7 @@ const PAGE_SIZE = 50;
           <div class="col-6 col-sm">
             <div class="card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ totalIssueCount }}</div>
+                <div class="fs-4 fw-bold">{{ summaryStats.issueCount }}</div>
                 <p class="text-muted small mb-0">Issues</p>
               </div>
             </div>
@@ -207,8 +227,24 @@ const PAGE_SIZE = 50;
           <div class="col-6 col-sm">
             <div class="card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold text-danger">{{ totalUndoCount }}</div>
+                <div class="fs-4 fw-bold text-danger">{{ summaryStats.undoCount }}</div>
                 <p class="text-muted small mb-0">Undos</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-sm">
+            <div class="card">
+              <div class="card-body py-3">
+                <div class="fs-4 fw-bold">{{ summaryStats.partChangesCount }}</div>
+                <p class="text-muted small mb-0">Part Changes</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-sm">
+            <div class="card">
+              <div class="card-body py-3">
+                <div class="fs-4 fw-bold text-primary">{{ summaryStats.importsCount }}</div>
+                <p class="text-muted small mb-0">Imports</p>
               </div>
             </div>
           </div>
@@ -309,14 +345,22 @@ const PAGE_SIZE = 50;
                         </span>
                       </div>
                       <p class="small mb-0 mt-1">
-                        <span class="font-monospace fw-medium" [class.text-danger]="activity.type === 'undo'">{{ activity.part_number }}</span>
                         <ng-container *ngIf="activity.type === 'pick'">
+                          <span class="font-monospace fw-medium">{{ activity.part_number }}</span>
                           <span *ngIf="activity.description" class="text-muted"> - {{ activity.description }}</span>
                         </ng-container>
                         <ng-container *ngIf="activity.type === 'undo'">
+                          <span class="font-monospace fw-medium text-danger">{{ activity.part_number }}</span>
                           <span class="text-muted"> - originally picked by {{ activity.picked_by || 'Unknown' }}</span>
                         </ng-container>
-                        <ng-container *ngIf="activity.type !== 'pick' && activity.type !== 'undo'">
+                        <ng-container *ngIf="activity.type === 'part_added' || activity.type === 'part_removed'">
+                          <span class="font-monospace fw-medium">{{ activity.part_number }}</span>
+                        </ng-container>
+                        <ng-container *ngIf="activity.type === 'order_imported'">
+                          <span *ngIf="activity.description" class="text-muted">{{ activity.description }}</span>
+                        </ng-container>
+                        <ng-container *ngIf="activity.type === 'issue_created' || activity.type === 'issue_resolved'">
+                          <span class="font-monospace fw-medium">{{ activity.part_number }}</span>
                           <span class="text-muted"> - {{ activity.issue_type.replace('_', ' ') }}</span>
                         </ng-container>
                       </p>
@@ -326,7 +370,10 @@ const PAGE_SIZE = 50;
                       <p *ngIf="activity.type === 'pick' && activity.notes" class="text-muted small mb-0 mt-1 fst-italic">
                         Note: {{ activity.notes }}
                       </p>
-                      <p *ngIf="activity.type !== 'pick' && activity.type !== 'undo' && activity.description" class="text-muted small mb-0 mt-1 fst-italic">
+                      <p *ngIf="(activity.type === 'issue_created' || activity.type === 'issue_resolved') && activity.description" class="text-muted small mb-0 mt-1 fst-italic">
+                        {{ activity.description }}
+                      </p>
+                      <p *ngIf="(activity.type === 'part_added' || activity.type === 'part_removed') && activity.description" class="text-muted small mb-0 mt-1 fst-italic">
                         {{ activity.description }}
                       </p>
                     </div>
@@ -390,6 +437,7 @@ export class PickHistoryComponent implements OnInit {
   picks: PickRecord[] = [];
   issues: IssueRecord[] = [];
   undos: UndoRecord[] = [];
+  activityLogs: ActivityLogRecord[] = [];
   loading = false;
   searchQuery = '';
   page = 0;
@@ -400,6 +448,7 @@ export class PickHistoryComponent implements OnInit {
   allUniqueUsers = 0;
   totalIssueCount = 0;
   totalUndoCount = 0;
+  totalActivityLogCount = 0;
   hasSearched = false;
   exporting = false;
 
@@ -407,6 +456,8 @@ export class PickHistoryComponent implements OnInit {
   showPicks = true;
   showIssues = true;
   showUndos = true;
+  showPartChanges = true;
+  showImports = true;
 
   // Date filters - default to today
   startDate = '';
@@ -496,6 +547,15 @@ export class PickHistoryComponent implements OnInit {
       activities.push(...this.undos);
     }
 
+    if (this.page === 0) {
+      if (this.showPartChanges) {
+        activities.push(...this.activityLogs.filter(a => a.type === 'part_added' || a.type === 'part_removed'));
+      }
+      if (this.showImports) {
+        activities.push(...this.activityLogs.filter(a => a.type === 'order_imported'));
+      }
+    }
+
     // Sort by timestamp descending
     activities.sort((a, b) => {
       const timeA = this.getActivityTimestamp(a);
@@ -528,7 +588,14 @@ export class PickHistoryComponent implements OnInit {
           activity.so_number.toLowerCase().includes(query) ||
           activity.tool_number.toLowerCase().includes(query)
         );
-      } else {
+      } else if (activity.type === 'part_added' || activity.type === 'part_removed' || activity.type === 'order_imported') {
+        return (
+          (activity.performed_by && activity.performed_by.toLowerCase().includes(query)) ||
+          (activity.part_number && activity.part_number.toLowerCase().includes(query)) ||
+          activity.so_number.toLowerCase().includes(query) ||
+          (activity.description && activity.description.toLowerCase().includes(query))
+        );
+      } else if (activity.type === 'issue_created' || activity.type === 'issue_resolved') {
         return (
           (activity.user && activity.user.toLowerCase().includes(query)) ||
           activity.part_number.toLowerCase().includes(query) ||
@@ -536,6 +603,8 @@ export class PickHistoryComponent implements OnInit {
           activity.issue_type.toLowerCase().includes(query) ||
           (activity.description && activity.description.toLowerCase().includes(query))
         );
+      } else {
+        return false;
       }
     });
   }
@@ -559,19 +628,27 @@ export class PickHistoryComponent implements OnInit {
     return Object.keys(this.groupedActivities).sort((a, b) => b.localeCompare(a));
   }
 
-  get summaryStats(): { totalQty: number; uniqueParts: number; uniqueUsers: number; pickCount: number; issueCount: number } {
+  get summaryStats(): { totalQty: number; uniqueParts: number; uniqueUsers: number; pickCount: number; issueCount: number; undoCount: number; partChangesCount: number; importsCount: number } {
     const picksOnly = this.filteredActivities.filter((a): a is PickRecord => a.type === 'pick');
-    const issuesOnly = this.filteredActivities.filter((a): a is IssueRecord => a.type !== 'pick');
+    const issuesOnly = this.filteredActivities.filter((a): a is IssueRecord => a.type === 'issue_created' || a.type === 'issue_resolved');
+    const undosOnly = this.filteredActivities.filter((a): a is UndoRecord => a.type === 'undo');
+    const activityLogsOnly = this.filteredActivities.filter((a): a is ActivityLogRecord =>
+      a.type === 'part_added' || a.type === 'part_removed' || a.type === 'order_imported'
+    );
 
     const totalQty = picksOnly.reduce((sum, p) => sum + p.qty_picked, 0);
     const uniqueParts = new Set(picksOnly.map(p => p.part_number)).size;
-    const users = [
+    const uniqueUsers = new Set([
       ...picksOnly.filter(p => p.picked_by).map(p => p.picked_by),
-      ...issuesOnly.filter(i => i.user).map(i => i.user)
-    ];
-    const uniqueUsers = new Set(users).size;
+      ...issuesOnly.filter(i => i.user).map(i => i.user),
+      ...undosOnly.map(u => u.undone_by),
+      ...activityLogsOnly.filter(a => a.performed_by).map(a => a.performed_by),
+    ]).size;
+    const undoCount = undosOnly.length;
+    const partChangesCount = activityLogsOnly.filter(a => a.type === 'part_added' || a.type === 'part_removed').length;
+    const importsCount = activityLogsOnly.filter(a => a.type === 'order_imported').length;
 
-    return { totalQty, uniqueParts, uniqueUsers, pickCount: picksOnly.length, issueCount: issuesOnly.length };
+    return { totalQty, uniqueParts, uniqueUsers, pickCount: picksOnly.length, issueCount: issuesOnly.length, undoCount, partChangesCount, importsCount };
   }
 
   get totalPages(): number {
@@ -772,11 +849,38 @@ export class PickHistoryComponent implements OnInit {
         }));
         this.totalUndoCount = this.undos.length;
       }
+
+      // Fetch activity logs (only on first page)
+      if (this.page === 0) {
+        const { data: activityLogData, error: activityLogError } = await this.supabase.from('activity_log')
+          .select('*')
+          .gte('created_at', startISO)
+          .lte('created_at', endISO)
+          .order('created_at', { ascending: false });
+
+        if (activityLogError) {
+          console.error('Error fetching activity logs:', activityLogError);
+        }
+
+        this.activityLogs = (activityLogData || []).map((log: any) => ({
+          id: log.id,
+          type: log.type as 'part_added' | 'part_removed' | 'order_imported',
+          so_number: log.so_number,
+          part_number: log.part_number,
+          description: log.description,
+          performed_by: log.performed_by,
+          details: log.details,
+          created_at: log.created_at,
+          order_id: log.order_id,
+        }));
+        this.totalActivityLogCount = this.activityLogs.length;
+      }
     } catch (err) {
       console.error('Error fetching data:', err);
       this.picks = [];
       this.issues = [];
       this.undos = [];
+      this.activityLogs = [];
     } finally {
       this.loading = false;
     }
@@ -883,11 +987,28 @@ export class PickHistoryComponent implements OnInit {
         so_number: undo.so_number,
       }));
 
+      // Fetch activity logs for export
+      const { data: activityLogExportData } = await this.supabase.from('activity_log')
+        .select('*')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
+        .order('created_at', { ascending: false });
+
+      const activityLogExport = (activityLogExportData || []).map((log: any) => ({
+        created_at: log.created_at,
+        type: log.type,
+        performed_by: log.performed_by,
+        so_number: log.so_number,
+        part_number: log.part_number,
+        description: log.description,
+      }));
+
       this.excelService.exportPickHistoryToExcel(
         exportData,
         this.startDate,
         this.endDate,
-        undoExport
+        undoExport,
+        activityLogExport
       );
     } catch (err) {
       console.error('Export failed:', err);
@@ -921,7 +1042,13 @@ export class PickHistoryComponent implements OnInit {
     if (activity.type === 'undo') {
       return activity.undone_by || 'Unknown';
     }
-    return activity.user || 'Unknown';
+    if (activity.type === 'part_added' || activity.type === 'part_removed' || activity.type === 'order_imported') {
+      return activity.performed_by || 'Unknown';
+    }
+    if (activity.type === 'issue_created' || activity.type === 'issue_resolved') {
+      return activity.user || 'Unknown';
+    }
+    return 'Unknown';
   }
 
   getActivityTimestamp(activity: ActivityRecord): string {
@@ -931,7 +1058,13 @@ export class PickHistoryComponent implements OnInit {
     if (activity.type === 'undo') {
       return activity.undone_at;
     }
-    return activity.timestamp;
+    if (activity.type === 'part_added' || activity.type === 'part_removed' || activity.type === 'order_imported') {
+      return activity.created_at;
+    }
+    if (activity.type === 'issue_created' || activity.type === 'issue_resolved') {
+      return activity.timestamp;
+    }
+    return '';
   }
 
   getActivityIconClass(type: ActivityRecord['type']): string {
@@ -944,6 +1077,12 @@ export class PickHistoryComponent implements OnInit {
         return 'bi bi-exclamation-triangle-fill text-warning';
       case 'issue_resolved':
         return 'bi bi-check-circle-fill text-primary';
+      case 'part_added':
+        return 'bi bi-plus-circle-fill text-success';
+      case 'part_removed':
+        return 'bi bi-dash-circle-fill text-danger';
+      case 'order_imported':
+        return 'bi bi-upload text-primary';
       default:
         return 'bi bi-box text-muted';
     }
@@ -958,6 +1097,12 @@ export class PickHistoryComponent implements OnInit {
       case 'issue_created':
         return 'badge bg-warning-subtle text-warning border border-warning-subtle';
       case 'issue_resolved':
+        return 'badge bg-primary-subtle text-primary border border-primary-subtle';
+      case 'part_added':
+        return 'badge bg-success-subtle text-success border border-success-subtle';
+      case 'part_removed':
+        return 'badge bg-danger-subtle text-danger border border-danger-subtle';
+      case 'order_imported':
         return 'badge bg-primary-subtle text-primary border border-primary-subtle';
       default:
         return 'badge bg-secondary-subtle text-secondary';
@@ -974,6 +1119,12 @@ export class PickHistoryComponent implements OnInit {
         return 'Issue';
       case 'issue_resolved':
         return 'Resolved';
+      case 'part_added':
+        return 'Part Added';
+      case 'part_removed':
+        return 'Part Removed';
+      case 'order_imported':
+        return 'Order Imported';
       default:
         return 'Unknown';
     }

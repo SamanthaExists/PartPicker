@@ -26,6 +26,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/issues/issues.component').then(m => m.IssuesComponent)
   },
   {
+    path: 'templates',
+    loadComponent: () => import('./pages/templates/templates.component').then(m => m.TemplatesComponent)
+  },
+  {
     path: 'import',
     loadComponent: () => import('./pages/import/import.component').then(m => m.ImportComponent)
   },

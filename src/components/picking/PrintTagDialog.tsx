@@ -110,9 +110,9 @@ export function PrintTagDialog({
                 fontFamily: 'Arial, sans-serif',
               }}
             >
-              <div className="flex-1 flex flex-col justify-between min-w-0">
+              <div className="flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
                 <div className="flex justify-between items-start gap-1" style={{ fontSize: '11px' }}>
-                  <span className="font-black font-mono truncate" style={{ fontSize: '14px' }}>
+                  <span className="font-black font-mono truncate min-w-0 flex-1" style={{ fontSize: '14px' }}>
                     {firstTag.partNumber}
                   </span>
                   <span className="text-gray-600 truncate flex-shrink-0" style={{ fontSize: '10px' }}>
@@ -120,7 +120,7 @@ export function PrintTagDialog({
                   </span>
                   <span className="text-gray-500 font-medium flex-shrink-0">Qty: {firstTag.qtyPicked}</span>
                 </div>
-                <div className="truncate text-gray-700" style={{ fontSize: '9px' }}>
+                <div className="truncate text-gray-700 overflow-hidden" style={{ fontSize: '9px' }}>
                   {firstTag.description || '-'}
                 </div>
                 <div className="flex justify-between items-end" style={{ fontSize: '8px' }}>
@@ -271,6 +271,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
           flex-direction: column;
           justify-content: space-between;
           min-width: 0;
+          overflow: hidden;
         }
 
         .barcode-container {
@@ -295,6 +296,10 @@ function generateTagsHTML(tagsArray: TagData[]): string {
 
         .tag-row-middle {
           font-size: 9px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          min-width: 0;
         }
 
         .tag-row-bottom {
@@ -311,6 +316,8 @@ function generateTagsHTML(tagsArray: TagData[]): string {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          min-width: 0;
+          flex: 1;
         }
 
         .location {
@@ -332,6 +339,8 @@ function generateTagsHTML(tagsArray: TagData[]): string {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          display: block;
+          max-width: 100%;
         }
 
         .order-info {

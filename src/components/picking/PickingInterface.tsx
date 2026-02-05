@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Plus, Minus, Check, MapPin, MessageSquare, ArrowUpDown, AlertTriangle, CheckCircle2, ChevronRight, ChevronDown, Undo2, Trash2, Clock, User, Package, Eye, EyeOff, X } from 'lucide-react';
+import { Plus, Minus, Check, MapPin, MessageSquare, ArrowUpDown, AlertTriangle, CheckCircle2, ChevronRight, ChevronDown, Undo2, Trash2, Clock, User, Package, Eye, EyeOff, X, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -917,6 +917,19 @@ export function PickingInterface({
               </>
             )}
 
+            {/* Edit Picks button - when all tools are complete */}
+            {allToolsComplete && onBatchUpdateAllocations && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDistributeItem(item)}
+                className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950/30"
+              >
+                <Pencil className="h-4 w-4 mr-1" />
+                Edit Picks
+              </Button>
+            )}
+
             {/* Report Issue button */}
             {onReportIssue && !allToolsComplete && (
               <Button
@@ -1127,7 +1140,7 @@ export function PickingInterface({
 
 
           {/* Bottom row: Actions */}
-          {!allToolsComplete && (
+          {!allToolsComplete ? (
             <div className="flex flex-col gap-2">
               {/* Pick button - always require dialog for picking */}
               {shouldShowDistribute(item) ? (
@@ -1228,6 +1241,18 @@ export function PickingInterface({
                   )}
                 </>
               )}
+            </div>
+          ) : onBatchUpdateAllocations && (
+            <div className="flex flex-col gap-2">
+              <Button
+                size="touch-lg"
+                variant="outline"
+                onClick={() => setDistributeItem(item)}
+                className="w-full gap-2 h-14 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950/30"
+              >
+                <Pencil className="h-6 w-6" />
+                <span className="text-lg">Edit Picks</span>
+              </Button>
             </div>
           )}
 

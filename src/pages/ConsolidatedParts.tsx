@@ -134,7 +134,7 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
 
           {/* Row 5: Action buttons */}
           <div className="flex gap-2">
-            {!isComplete && (
+            {!isComplete ? (
               <Button
                 size="sm"
                 variant="default"
@@ -144,11 +144,21 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
                 <ClipboardList className="h-4 w-4 mr-2" />
                 Pick Parts
               </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                onClick={(e) => onPickClick(part, e)}
+              >
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Edit Picks
+              </Button>
             )}
             <Button
               size="sm"
               variant={hasIssue ? "destructive" : "outline"}
-              className={isComplete ? "flex-1" : ""}
+              className={isComplete ? "" : ""}
               onClick={(e) => {
                 e.stopPropagation();
                 onReportIssue(part);
@@ -212,16 +222,18 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
             </div>
           )}
 
-          {/* Qty On Order */}
-          {part.qty_on_order !== null && part.qty_on_order > 0 && (
-            <div className="text-center shrink-0 min-w-[70px]">
-              <div className="text-lg font-bold text-blue-600 dark:text-blue-400 flex items-center justify-center gap-1">
-                <Truck className="h-4 w-4" />
-                {part.qty_on_order}
-              </div>
-              <p className="text-xs text-muted-foreground">on order</p>
-            </div>
-          )}
+          {/* Qty On Order - always reserve space for alignment */}
+          <div className="text-center shrink-0 min-w-[70px]">
+            {part.qty_on_order !== null && part.qty_on_order > 0 && (
+              <>
+                <div className="text-lg font-bold text-blue-600 dark:text-blue-400 flex items-center justify-center gap-1">
+                  <Truck className="h-4 w-4" />
+                  {part.qty_on_order}
+                </div>
+                <p className="text-xs text-muted-foreground">on order</p>
+              </>
+            )}
+          </div>
 
           <div className="text-right shrink-0">
             <div className="flex items-center gap-2">
@@ -243,7 +255,7 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
 
           {/* Action Buttons */}
           <div className="flex gap-2 shrink-0">
-            {!isComplete && (
+            {!isComplete ? (
               <Button
                 size="sm"
                 variant="default"
@@ -251,6 +263,15 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
               >
                 <ClipboardList className="h-4 w-4 mr-1" />
                 Pick
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => onPickClick(part, e)}
+              >
+                <ClipboardList className="h-4 w-4 mr-1" />
+                Edit Picks
               </Button>
             )}
             <Button
@@ -472,10 +493,27 @@ export function ConsolidatedParts() {
     return matchesSearch && matchesCompleted && matchesOrder && matchesStock && matchesOutOfStockOnly && matchesAssembly;
   });
 
-  // Count out of stock parts for badge display
+  // Count out of stock parts for badge display (apply all other active filters except out-of-stock itself)
   const outOfStockCount = useMemo(() => {
-    return parts.filter(part => part.qty_available === 0).length;
-  }, [parts]);
+    return parts.filter(part => {
+      if (part.qty_available !== 0) return false;
+
+      const matchesSearch =
+        part.part_number.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        part.description?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        part.location?.toLowerCase().includes(debouncedSearch.toLowerCase());
+
+      const matchesCompleted = showCompleted || part.remaining > 0;
+
+      const matchesOrder = selectedOrders.size === 0
+        || part.orders.some(o => selectedOrders.has(o.order_id));
+
+      const matchesAssembly = selectedAssemblies.size === 0
+        || part.orders.some(o => !!o.tool_model && selectedAssemblies.has(o.tool_model));
+
+      return matchesSearch && matchesCompleted && matchesOrder && matchesAssembly;
+    }).length;
+  }, [parts, debouncedSearch, showCompleted, selectedOrders, selectedAssemblies]);
 
   // Sort and group filtered parts
   const { sortedParts, locationGroups, assemblyGroups } = useMemo(() => {

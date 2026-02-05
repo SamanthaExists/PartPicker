@@ -42,11 +42,11 @@ export interface TagData {
                   <div class="flex-grow-1 d-flex flex-column justify-content-between overflow-hidden">
                     <div class="d-flex justify-content-between align-items-start gap-1" style="font-size: 11px;">
                       <span class="fw-bold font-monospace text-truncate">{{ firstTag?.partNumber }}</span>
-                      <span class="text-secondary flex-shrink-0" style="font-size: 10px;">LOC: {{ firstTag?.location || 'N/A' }}</span>
                       <span class="text-muted fw-medium flex-shrink-0">Qty: {{ firstTag?.qtyPicked }}</span>
                     </div>
-                    <div class="text-truncate text-secondary" style="font-size: 9px;">
-                      {{ firstTag?.description || '-' }}
+                    <div class="d-flex justify-content-between align-items-center gap-1 overflow-hidden" style="font-size: 9px;">
+                      <span class="text-secondary flex-shrink-0" style="font-size: 9px;">LOC: {{ firstTag?.location || 'N/A' }}</span>
+                      <span class="text-truncate text-secondary">{{ firstTag?.description || '-' }}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-end" style="font-size: 8px;">
                       <span class="text-secondary">{{ firstTag?.soNumber }} / {{ firstTag?.toolNumber }}</span>
@@ -174,10 +174,10 @@ export class PrintTagDialogComponent {
             <div class="tag-text">
               <div class="tag-row-top">
                 <span class="part-number">${this.escapeHtml(partNumber)}</span>
-                <span class="location">LOC: ${this.escapeHtml(location || 'N/A')}</span>
                 <span class="tag-count">Qty: ${qtyPicked}</span>
               </div>
               <div class="tag-row-middle">
+                <span class="location">LOC: ${this.escapeHtml(location || 'N/A')}</span>
                 <span class="description">${this.escapeHtml(description || '-')}</span>
               </div>
               <div class="tag-row-bottom">
@@ -266,6 +266,11 @@ export class PrintTagDialogComponent {
 
           .tag-row-middle {
             font-size: 9px;
+            display: flex;
+            align-items: center;
+            gap: 0.08in;
+            min-width: 0;
+            overflow: hidden;
           }
 
           .tag-row-bottom {
@@ -285,8 +290,6 @@ export class PrintTagDialogComponent {
 
           .location {
             color: #444;
-            overflow: hidden;
-            text-overflow: ellipsis;
             white-space: nowrap;
             flex-shrink: 0;
           }

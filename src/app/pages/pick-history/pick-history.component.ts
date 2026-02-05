@@ -18,6 +18,8 @@ interface PickRecord {
   tool_number: string;
   so_number: string;
   order_id: string;
+  undone_at: string | null;
+  undone_by: string | null;
 }
 
 interface IssueRecord {
@@ -312,7 +314,7 @@ const PAGE_SIZE = 50;
                   >
                     <!-- Icon -->
                     <div class="mt-1">
-                      <i [class]="getActivityIconClass(activity.type)"></i>
+                      <i [class]="getActivityIconClassForRecord(activity)"></i>
                     </div>
 
                     <!-- Content -->
@@ -325,8 +327,14 @@ const PAGE_SIZE = 50;
                         <span [class]="getActivityBadgeClass(activity.type)">
                           {{ getActivityBadgeText(activity.type) }}
                         </span>
-                        <span *ngIf="activity.type === 'pick'" class="badge bg-success-subtle text-success border border-success-subtle">
+                        <span *ngIf="activity.type === 'pick' && !activity.undone_at" class="badge bg-success-subtle text-success border border-success-subtle">
                           {{ activity.qty_picked }}x
+                        </span>
+                        <span *ngIf="activity.type === 'pick' && activity.undone_at" class="badge bg-danger-subtle text-danger border border-danger-subtle text-decoration-line-through">
+                          {{ activity.qty_picked }}x
+                        </span>
+                        <span *ngIf="activity.type === 'pick' && activity.undone_at" class="badge bg-danger text-white">
+                          Deleted
                         </span>
                         <span *ngIf="activity.type === 'undo'" class="badge bg-danger-subtle text-danger border border-danger-subtle">
                           {{ activity.qty_picked }}x
@@ -346,8 +354,9 @@ const PAGE_SIZE = 50;
                       </div>
                       <p class="small mb-0 mt-1">
                         <ng-container *ngIf="activity.type === 'pick'">
-                          <span class="font-monospace fw-medium">{{ activity.part_number }}</span>
-                          <span *ngIf="activity.description" class="text-muted"> - {{ activity.description }}</span>
+                          <span class="font-monospace fw-medium" [class.text-decoration-line-through]="activity.undone_at" [class.text-muted]="activity.undone_at">{{ activity.part_number }}</span>
+                          <span *ngIf="activity.description && !activity.undone_at" class="text-muted"> - {{ activity.description }}</span>
+                          <span *ngIf="activity.undone_at" class="text-danger small"> - deleted by {{ activity.undone_by || 'Unknown' }}</span>
                         </ng-container>
                         <ng-container *ngIf="activity.type === 'undo'">
                           <span class="font-monospace fw-medium text-danger">{{ activity.part_number }}</span>
@@ -628,27 +637,31 @@ export class PickHistoryComponent implements OnInit {
     return Object.keys(this.groupedActivities).sort((a, b) => b.localeCompare(a));
   }
 
-  get summaryStats(): { totalQty: number; uniqueParts: number; uniqueUsers: number; pickCount: number; issueCount: number; undoCount: number; partChangesCount: number; importsCount: number } {
+  get summaryStats(): { totalQty: number; uniqueParts: number; uniqueUsers: number; pickCount: number; issueCount: number; undoCount: number; partChangesCount: number; importsCount: number; deletedPickCount: number } {
     const picksOnly = this.filteredActivities.filter((a): a is PickRecord => a.type === 'pick');
+    // Separate active and deleted picks
+    const activePicks = picksOnly.filter(p => !p.undone_at);
+    const deletedPicks = picksOnly.filter(p => p.undone_at);
     const issuesOnly = this.filteredActivities.filter((a): a is IssueRecord => a.type === 'issue_created' || a.type === 'issue_resolved');
     const undosOnly = this.filteredActivities.filter((a): a is UndoRecord => a.type === 'undo');
     const activityLogsOnly = this.filteredActivities.filter((a): a is ActivityLogRecord =>
       a.type === 'part_added' || a.type === 'part_removed' || a.type === 'order_imported'
     );
 
-    const totalQty = picksOnly.reduce((sum, p) => sum + p.qty_picked, 0);
-    const uniqueParts = new Set(picksOnly.map(p => p.part_number)).size;
+    // Only count active picks in stats
+    const totalQty = activePicks.reduce((sum, p) => sum + p.qty_picked, 0);
+    const uniqueParts = new Set(activePicks.map(p => p.part_number)).size;
     const uniqueUsers = new Set([
-      ...picksOnly.filter(p => p.picked_by).map(p => p.picked_by),
+      ...activePicks.filter(p => p.picked_by).map(p => p.picked_by),
       ...issuesOnly.filter(i => i.user).map(i => i.user),
       ...undosOnly.map(u => u.undone_by),
       ...activityLogsOnly.filter(a => a.performed_by).map(a => a.performed_by),
     ]).size;
-    const undoCount = undosOnly.length;
+    const undoCount = undosOnly.length + deletedPicks.length; // Include deleted picks in undo count
     const partChangesCount = activityLogsOnly.filter(a => a.type === 'part_added' || a.type === 'part_removed').length;
     const importsCount = activityLogsOnly.filter(a => a.type === 'order_imported').length;
 
-    return { totalQty, uniqueParts, uniqueUsers, pickCount: picksOnly.length, issueCount: issuesOnly.length, undoCount, partChangesCount, importsCount };
+    return { totalQty, uniqueParts, uniqueUsers, pickCount: activePicks.length, issueCount: issuesOnly.length, undoCount, partChangesCount, importsCount, deletedPickCount: deletedPicks.length };
   }
 
   get totalPages(): number {
@@ -671,7 +684,7 @@ export class PickHistoryComponent implements OnInit {
       const startISO = new Date(this.startDate).toISOString();
       const endISO = new Date(this.endDate).toISOString();
 
-      // Fetch picks
+      // Fetch picks (including undone picks to show them in history)
       const { data: picksData, error: picksError, count: picksCount } = await this.supabase.from('picks')
         .select(`
           id,
@@ -679,6 +692,8 @@ export class PickHistoryComponent implements OnInit {
           picked_by,
           picked_at,
           notes,
+          undone_at,
+          undone_by,
           line_items!inner (
             part_number,
             description,
@@ -715,12 +730,14 @@ export class PickHistoryComponent implements OnInit {
         tool_number: pick.tools.tool_number,
         so_number: pick.line_items.orders.so_number,
         order_id: pick.line_items.order_id,
+        undone_at: pick.undone_at,
+        undone_by: pick.undone_by,
       }));
 
       this.totalPickCount = picksCount || 0;
       this.hasMore = (picksData?.length || 0) === PAGE_SIZE;
 
-      // Fetch ALL picks for accurate stats using pagination
+      // Fetch ALL active (non-undone) picks for accurate stats using pagination
       // Supabase has a server-side limit of 1000 rows per request
       const STATS_PAGE_SIZE = 1000;
       let allPicksData: any[] = [];
@@ -738,6 +755,7 @@ export class PickHistoryComponent implements OnInit {
           `)
           .gte('picked_at', startISO)
           .lte('picked_at', endISO)
+          .is('undone_at', null)
           .range(statsPage * STATS_PAGE_SIZE, (statsPage + 1) * STATS_PAGE_SIZE - 1);
 
         if (statsPageData && statsPageData.length > 0) {
@@ -921,6 +939,8 @@ export class PickHistoryComponent implements OnInit {
             picked_by,
             picked_at,
             notes,
+            undone_at,
+            undone_by,
             line_items!inner (
               part_number,
               orders!inner (
@@ -967,6 +987,9 @@ export class PickHistoryComponent implements OnInit {
         part_number: pick.line_items.part_number,
         tool_number: pick.tools.tool_number,
         so_number: pick.line_items.orders.so_number,
+        status: pick.undone_at ? 'Deleted' : 'Active',
+        undone_at: pick.undone_at || '',
+        undone_by: pick.undone_by || '',
       }));
 
       // Fetch undo records for export
@@ -1086,6 +1109,14 @@ export class PickHistoryComponent implements OnInit {
       default:
         return 'bi bi-box text-muted';
     }
+  }
+
+  getActivityIconClassForRecord(activity: ActivityRecord): string {
+    // Check if it's an undone pick
+    if (activity.type === 'pick' && (activity as PickRecord).undone_at) {
+      return 'bi bi-x-circle-fill text-danger';
+    }
+    return this.getActivityIconClass(activity.type);
   }
 
   getActivityBadgeClass(type: ActivityRecord['type']): string {

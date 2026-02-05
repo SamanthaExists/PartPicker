@@ -67,9 +67,11 @@ export class GlobalSearchService {
 
       if (lineItemIds.length > 0) {
         // Supabase defaults to 1000 rows - need higher limit for accurate totals
+        // Only count active (non-undone) picks
         const { data: picksData, error: picksError } = await this.supabase.from('picks')
           .select('line_item_id, qty_picked')
           .in('line_item_id', lineItemIds)
+          .is('undone_at', null)
           .limit(50000);
 
         if (picksError) throw picksError;

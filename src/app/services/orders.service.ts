@@ -71,7 +71,7 @@ export class OrdersService implements OnDestroy {
         }
       }
 
-      // Fetch all picks with pagination (Supabase default limit is 1000)
+      // Fetch all active (non-undone) picks with pagination (Supabase default limit is 1000)
       let picksData: { line_item_id: string; qty_picked: number }[] = [];
       const pageSize = 1000;
       let offset = 0;
@@ -80,6 +80,7 @@ export class OrdersService implements OnDestroy {
       while (hasMore) {
         const { data, error: picksError } = await this.supabase.from('picks')
           .select('line_item_id, qty_picked')
+          .is('undone_at', null)
           .range(offset, offset + pageSize - 1);
 
         if (picksError) throw picksError;

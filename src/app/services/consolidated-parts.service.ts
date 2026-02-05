@@ -88,7 +88,7 @@ export class ConsolidatedPartsService implements OnDestroy {
         }
       }
 
-      // Fetch picks for these line items with pagination
+      // Fetch active (non-undone) picks for these line items with pagination
       const lineItemIds = (lineItemsData || []).map(item => item.id);
       let picksData: any[] = [];
 
@@ -101,6 +101,7 @@ export class ConsolidatedPartsService implements OnDestroy {
           const { data, error: picksError } = await this.supabase.from('picks')
             .select('line_item_id, qty_picked')
             .in('line_item_id', lineItemIds)
+            .is('undone_at', null)
             .range(offset, offset + pageSize - 1);
 
           if (picksError) throw picksError;
@@ -115,7 +116,7 @@ export class ConsolidatedPartsService implements OnDestroy {
         }
       }
 
-      // Calculate picks by line item
+      // Calculate picks by line item (only active picks)
       const picksByLineItem = new Map<string, number>();
       for (const pick of picksData) {
         const current = picksByLineItem.get(pick.line_item_id) || 0;
@@ -279,7 +280,7 @@ export class ItemsToOrderService implements OnDestroy {
         }
       }
 
-      // Fetch picks for these line items with pagination
+      // Fetch active (non-undone) picks for these line items with pagination
       const lineItemIds = (lineItemsData || []).map(item => item.id);
       let picksData: any[] = [];
 
@@ -292,6 +293,7 @@ export class ItemsToOrderService implements OnDestroy {
           const { data, error: picksError } = await this.supabase.from('picks')
             .select('line_item_id, qty_picked')
             .in('line_item_id', lineItemIds)
+            .is('undone_at', null)
             .range(offset, offset + pageSize - 1);
 
           if (picksError) throw picksError;
@@ -306,7 +308,7 @@ export class ItemsToOrderService implements OnDestroy {
         }
       }
 
-      // Calculate picks by line item
+      // Calculate picks by line item (only active picks)
       const picksByLineItem = new Map<string, number>();
       for (const pick of picksData) {
         const current = picksByLineItem.get(pick.line_item_id) || 0;

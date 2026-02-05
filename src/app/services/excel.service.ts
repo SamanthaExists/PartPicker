@@ -327,8 +327,8 @@ export class ExcelService {
   exportPickHistoryToExcel(picks: any[], startDate: string, endDate: string, undos?: any[], activityLogs?: any[]): void {
     const workbook = XLSX.utils.book_new();
 
-    // Pick History Sheet
-    const header = ['Picked At', 'Picked By', 'SO Number', 'Part Number', 'Tool Number', 'Qty Picked', 'Location', 'Notes'];
+    // Pick History Sheet - includes Status column to show deleted picks
+    const header = ['Picked At', 'Picked By', 'SO Number', 'Part Number', 'Tool Number', 'Qty Picked', 'Status', 'Deleted At', 'Deleted By', 'Notes'];
     const data = picks.map(pick => [
       new Date(pick.picked_at).toLocaleString(),
       pick.picked_by || 'Unknown',
@@ -336,16 +336,21 @@ export class ExcelService {
       pick.part_number,
       pick.tool_number,
       pick.qty_picked,
-      pick.location || '',
+      pick.status || 'Active',
+      pick.undone_at ? new Date(pick.undone_at).toLocaleString() : '',
+      pick.undone_by || '',
       pick.notes || '',
     ]);
 
     const picksSheet = XLSX.utils.aoa_to_sheet([header, ...data]);
     XLSX.utils.book_append_sheet(workbook, picksSheet, 'Pick History');
 
-    // Part Totals Sheet - group by part number with total qty picked
+    // Part Totals Sheet - group by part number with total qty picked (only active picks)
     const partTotalsMap = new Map<string, { qty: number; pickCount: number; soNumbers: Set<string> }>();
     for (const pick of picks) {
+      // Only count active (non-deleted) picks in totals
+      if (pick.status === 'Deleted' || pick.undone_at) continue;
+
       const existing = partTotalsMap.get(pick.part_number);
       if (existing) {
         existing.qty += pick.qty_picked;
@@ -412,10 +417,15 @@ export class ExcelService {
     }
 
     // Summary Sheet
+    const activePicks = picks.filter((p: any) => !p.undone_at && p.status !== 'Deleted');
+    const deletedPicks = picks.filter((p: any) => p.undone_at || p.status === 'Deleted');
     const totalPicks = picks.length;
-    const totalQty = picks.reduce((sum: number, p: any) => sum + p.qty_picked, 0);
-    const uniqueUsers = new Set(picks.map((p: any) => p.picked_by || 'Unknown')).size;
-    const uniqueParts = new Set(picks.map((p: any) => p.part_number)).size;
+    const activePickCount = activePicks.length;
+    const deletedPickCount = deletedPicks.length;
+    const totalQty = activePicks.reduce((sum: number, p: any) => sum + p.qty_picked, 0);
+    const deletedQty = deletedPicks.reduce((sum: number, p: any) => sum + p.qty_picked, 0);
+    const uniqueUsers = new Set(activePicks.map((p: any) => p.picked_by || 'Unknown')).size;
+    const uniqueParts = new Set(activePicks.map((p: any) => p.part_number)).size;
     const totalUndos = undos ? undos.length : 0;
     const totalActivityLogs = activityLogs ? activityLogs.length : 0;
 
@@ -428,10 +438,14 @@ export class ExcelService {
       ['Date Range', `${startFormatted} - ${endFormatted}`],
       [],
       ['Total Pick Records', totalPicks],
-      ['Total Qty Picked', totalQty],
+      ['Active Picks', activePickCount],
+      ['Deleted Picks', deletedPickCount],
+      [],
+      ['Total Qty Picked (Active)', totalQty],
+      ['Total Qty Deleted', deletedQty],
       ['Unique Users', uniqueUsers],
       ['Unique Parts', uniqueParts],
-      ['Total Undos', totalUndos],
+      ['Total Undos (from pick_undos table)', totalUndos],
       ['Total Activity Log Records', totalActivityLogs],
       [],
       ['Export Date', new Date().toLocaleString()],
@@ -612,6 +626,9 @@ export class ExcelService {
           picked_by: p.picked_by || '',
           notes: p.notes || '',
           picked_at: p.picked_at,
+          status: p.undone_at ? 'Deleted' : 'Active',
+          undone_at: p.undone_at || '',
+          undone_by: p.undone_by || '',
         }));
         const picksSheet = XLSX.utils.json_to_sheet(picksData);
         XLSX.utils.book_append_sheet(workbook, picksSheet, 'Picks');

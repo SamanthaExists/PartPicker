@@ -49,6 +49,8 @@ export interface Pick {
   picked_by: string | null;
   notes: string | null;
   picked_at: string;
+  undone_at: string | null;
+  undone_by: string | null;
 }
 
 export type IssueType = 'out_of_stock' | 'wrong_part' | 'damaged' | 'other';

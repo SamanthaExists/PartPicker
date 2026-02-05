@@ -102,12 +102,15 @@ export class PicksService implements OnDestroy {
       }
 
       // Create line items with picks
+      // Only count non-undone picks toward total_picked
       const itemsWithPicks: LineItemWithPicks[] = (lineItemsData || []).map(item => {
         const itemPicks = picksByLineItem.get(item.id) || [];
-        const totalPicked = itemPicks.reduce((sum, p) => sum + p.qty_picked, 0);
+        // Filter to only active (non-undone) picks for quantity calculation
+        const activePicks = itemPicks.filter(p => !p.undone_at);
+        const totalPicked = activePicks.reduce((sum, p) => sum + p.qty_picked, 0);
         return {
           ...item,
-          picks: itemPicks,
+          picks: itemPicks, // Keep all picks (including undone) for history display
           total_picked: totalPicked,
           remaining: Math.max(0, item.total_qty_needed - totalPicked),
         };
@@ -135,9 +138,11 @@ export class PicksService implements OnDestroy {
         .eq('id', lineItemId)
         .single();
 
+      // Only count active (non-undone) picks
       const { data: existingPicks } = await this.supabase.from('picks')
         .select('qty_picked')
-        .eq('line_item_id', lineItemId);
+        .eq('line_item_id', lineItemId)
+        .is('undone_at', null);
 
       const currentTotal = (existingPicks || []).reduce((sum: number, p: any) => sum + p.qty_picked, 0);
       const newTotal = currentTotal + qtyPicked;
@@ -202,7 +207,9 @@ export class PicksService implements OnDestroy {
         soNumber = orderData?.so_number || '';
       }
 
-      // Insert audit snapshot into pick_undos BEFORE deleting
+      const undoneByUser = undoneBy || 'Unknown';
+
+      // Insert audit snapshot into pick_undos for backwards compatibility
       const { error: auditError } = await this.supabase.from('pick_undos')
         .insert({
           original_pick_id: pick.id,
@@ -216,14 +223,17 @@ export class PicksService implements OnDestroy {
           tool_number: toolData?.tool_number || '',
           so_number: soNumber,
           order_id: orderIdForUndo,
-          undone_by: undoneBy || 'Unknown',
+          undone_by: undoneByUser,
         });
 
       if (auditError) throw auditError;
 
-      // Now delete the pick
+      // Mark the pick as undone instead of deleting it
       const { error } = await this.supabase.from('picks')
-        .delete()
+        .update({
+          undone_at: new Date().toISOString(),
+          undone_by: undoneByUser,
+        })
         .eq('id', pickId);
 
       if (error) throw error;
@@ -234,12 +244,13 @@ export class PicksService implements OnDestroy {
     }
   }
 
-  // Get picks for a specific tool
+  // Get picks for a specific tool (only active, non-undone picks)
   getPicksForTool(toolId: string): Map<string, number> {
     const picks = this.picksSubject.getValue();
     const result = new Map<string, number>();
     for (const pick of picks) {
-      if (pick.tool_id === toolId) {
+      // Only count active (non-undone) picks
+      if (pick.tool_id === toolId && !pick.undone_at) {
         const current = result.get(pick.line_item_id) || 0;
         result.set(pick.line_item_id, current + pick.qty_picked);
       }
@@ -255,23 +266,28 @@ export class PicksService implements OnDestroy {
       .sort((a, b) => new Date(b.picked_at).getTime() - new Date(a.picked_at).getTime());
   }
 
-  // Get the most recent pick
+  // Get the most recent active (non-undone) pick
   getLastPick(lineItemId: string, toolId: string): Pick | null {
     const history = this.getPickHistory(lineItemId, toolId);
-    return history.length > 0 ? history[0] : null;
+    // Filter to only active (non-undone) picks
+    const activePicks = history.filter(p => !p.undone_at);
+    return activePicks.length > 0 ? activePicks[0] : null;
   }
 
-  // Get picks for all tools
+  // Get picks for all tools (only active, non-undone picks)
   getPicksForAllTools(): Map<string, Map<string, number>> {
     const picks = this.picksSubject.getValue();
     const result = new Map<string, Map<string, number>>();
     for (const pick of picks) {
-      if (!result.has(pick.tool_id)) {
-        result.set(pick.tool_id, new Map());
+      // Only count active (non-undone) picks
+      if (!pick.undone_at) {
+        if (!result.has(pick.tool_id)) {
+          result.set(pick.tool_id, new Map());
+        }
+        const toolMap = result.get(pick.tool_id)!;
+        const current = toolMap.get(pick.line_item_id) || 0;
+        toolMap.set(pick.line_item_id, current + pick.qty_picked);
       }
-      const toolMap = result.get(pick.tool_id)!;
-      const current = toolMap.get(pick.line_item_id) || 0;
-      toolMap.set(pick.line_item_id, current + pick.qty_picked);
     }
     return result;
   }
@@ -343,14 +359,20 @@ export class PicksService implements OnDestroy {
           if (error) throw error;
         } else if (delta < 0) {
           const pickHistory = this.getPickHistory(lineItemId, toolId);
+          // Only consider active (non-undone) picks for removal
+          const activePicks = pickHistory.filter(p => !p.undone_at);
           let qtyToRemove = Math.abs(delta);
 
-          for (const pick of pickHistory) {
+          for (const pick of activePicks) {
             if (qtyToRemove <= 0) break;
 
             if (pick.qty_picked <= qtyToRemove) {
+              // Mark the pick as undone instead of deleting
               const { error } = await this.supabase.from('picks')
-                .delete()
+                .update({
+                  undone_at: new Date().toISOString(),
+                  undone_by: pickedBy || 'System',
+                })
                 .eq('id', pick.id);
 
               if (error) throw error;
@@ -358,12 +380,17 @@ export class PicksService implements OnDestroy {
             } else {
               const newQty = pick.qty_picked - qtyToRemove;
 
-              const { error: deleteError } = await this.supabase.from('picks')
-                .delete()
+              // Mark the original pick as undone
+              const { error: undoError } = await this.supabase.from('picks')
+                .update({
+                  undone_at: new Date().toISOString(),
+                  undone_by: pickedBy || 'System',
+                })
                 .eq('id', pick.id);
 
-              if (deleteError) throw deleteError;
+              if (undoError) throw undoError;
 
+              // Create a new pick with the reduced quantity
               const { error: insertError } = await this.supabase.from('picks')
                 .insert({
                   line_item_id: lineItemId,
@@ -421,6 +448,7 @@ export class RecentActivityService implements OnDestroy {
     try {
       this.loadingSubject.next(true);
 
+      // Only fetch active (non-undone) picks for activity feed
       const { data: picksData, error: picksError } = await this.supabase.from('picks')
         .select(`
           id,
@@ -435,6 +463,7 @@ export class RecentActivityService implements OnDestroy {
             )
           )
         `)
+        .is('undone_at', null)
         .order('picked_at', { ascending: false })
         .limit(20);
 

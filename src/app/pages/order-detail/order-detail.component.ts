@@ -278,6 +278,14 @@ interface PickHistoryItem {
             <span class="d-none d-md-inline ms-1">{{ hideCompleted ? 'Show All' : 'Hide Done' }}</span>
           </button>
 
+          <!-- Out of Stock Filter -->
+          <button class="btn btn-sm" [ngClass]="showOutOfStockOnly ? 'btn-warning' : 'btn-outline-secondary'"
+                  (click)="toggleShowOutOfStockOnly()" title="Show only items with zero stock">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span class="d-none d-md-inline ms-1">Out of Stock</span>
+            <span class="badge bg-secondary ms-1" *ngIf="outOfStockCount > 0">{{ outOfStockCount }}</span>
+          </button>
+
           <!-- Tool Filter Dropdown (multi-tool only) -->
           <div class="dropdown" *ngIf="tools.length > 1">
             <button class="btn btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown"
@@ -1010,6 +1018,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
 
   sortMode: SortMode = 'part_number';
   hideCompleted = false;
+  showOutOfStockOnly = false;
   toolFilter: string | null = null;
   expandedItems: Set<string> = new Set();
   isSubmitting: string | null = null;
@@ -1206,6 +1215,12 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
       this.hideCompleted = true;
     }
 
+    // Load out of stock filter preference
+    const savedShowOutOfStock = localStorage.getItem('picking-show-out-of-stock');
+    if (savedShowOutOfStock === 'true') {
+      this.showOutOfStockOnly = true;
+    }
+
     this.route.params.subscribe(params => {
       this.orderId = params['id'];
       if (this.orderId) {
@@ -1288,6 +1303,11 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     // Hide completed items
     if (this.hideCompleted) {
       items = items.filter(item => !this.isItemComplete(item));
+    }
+
+    // Filter to show only out of stock items
+    if (this.showOutOfStockOnly) {
+      items = items.filter(item => item.qty_available === 0);
     }
 
     // Sort
@@ -1387,6 +1407,17 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   toggleHideCompleted(): void {
     this.hideCompleted = !this.hideCompleted;
     localStorage.setItem('picking-hide-completed', String(this.hideCompleted));
+  }
+
+  // Out of stock filter toggle with localStorage persistence
+  toggleShowOutOfStockOnly(): void {
+    this.showOutOfStockOnly = !this.showOutOfStockOnly;
+    localStorage.setItem('picking-show-out-of-stock', String(this.showOutOfStockOnly));
+  }
+
+  // Get count of items with zero stock
+  get outOfStockCount(): number {
+    return this.lineItemsWithPicks.filter(item => item.qty_available === 0).length;
   }
 
   // Get tool number by ID for the filter dropdown display

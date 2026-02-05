@@ -130,8 +130,18 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                 </div>
                 <div class="form-check ms-3">
                   <input class="form-check-input" type="checkbox" id="hideOutOfStock"
-                         [(ngModel)]="hideOutOfStock">
+                         [ngModel]="hideOutOfStock"
+                         (ngModelChange)="onHideOutOfStockChange($event)">
                   <label class="form-check-label" for="hideOutOfStock">Hide out of stock</label>
+                </div>
+                <div class="form-check ms-3">
+                  <input class="form-check-input" type="checkbox" id="showOutOfStockOnly"
+                         [ngModel]="showOutOfStockOnly"
+                         (ngModelChange)="onShowOutOfStockOnlyChange($event)">
+                  <label class="form-check-label" for="showOutOfStockOnly">
+                    Out of stock only
+                    <span *ngIf="totalOutOfStockCount > 0" class="badge bg-secondary ms-1">{{ totalOutOfStockCount }}</span>
+                  </label>
                 </div>
               </div>
             </div>
@@ -245,6 +255,7 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   filter: FilterType = 'all';
   copyMessage = '';
   hideOutOfStock = false;
+  showOutOfStockOnly = false;
   selectedAssemblies = new Set<string>();
 
   // Multi-order pick dialog
@@ -351,6 +362,20 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     this.filter = filter;
   }
 
+  onHideOutOfStockChange(checked: boolean): void {
+    this.hideOutOfStock = checked;
+    if (checked) {
+      this.showOutOfStockOnly = false;
+    }
+  }
+
+  onShowOutOfStockOnlyChange(checked: boolean): void {
+    this.showOutOfStockOnly = checked;
+    if (checked) {
+      this.hideOutOfStock = false;
+    }
+  }
+
   getQtyAvailable(part: ConsolidatedPart): number | null {
     return this.qtyAvailableMap.get(part.part_number) ?? null;
   }
@@ -382,11 +407,14 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
       // Hide out of stock filter - excludes parts where qty_available is 0
       const matchesStock = !this.hideOutOfStock || (this.getQtyAvailable(part) !== 0);
 
+      // Show out of stock only filter - includes only parts where qty_available is 0
+      const matchesOutOfStockOnly = !this.showOutOfStockOnly || this.getQtyAvailable(part) === 0;
+
       // Assembly filter - check if any of the part's orders match a selected assembly
       const matchesAssembly = this.selectedAssemblies.size === 0 ||
         part.orders.some(o => !!o.tool_model && this.selectedAssemblies.has(o.tool_model));
 
-      return matchesSearch && matchesFilter && matchesStock && matchesAssembly;
+      return matchesSearch && matchesFilter && matchesStock && matchesOutOfStockOnly && matchesAssembly;
     });
   }
 
@@ -406,6 +434,10 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
 
   get completeCount(): number {
     return this.filteredParts.filter(p => p.remaining === 0).length;
+  }
+
+  get totalOutOfStockCount(): number {
+    return this.parts.filter(p => this.getQtyAvailable(p) === 0).length;
   }
 
   get totalNeeded(): number {

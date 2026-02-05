@@ -96,7 +96,7 @@ src/
 - **Offline Support**: Service worker for offline picking
 - **Excel Import/Export**: Import orders from Excel, export pick lists
 - **Issue Tracking**: Report and track picking issues per line item
-- **Undo Audit Trail**: When picks are undone, a snapshot is saved to `pick_undos` for full traceability (who undid what, when, and who originally picked it)
+- **Undo Audit Trail**: When picks are undone, the pick is marked as undone (via `undone_at` and `undone_by` fields) but remains in the `picks` table for history. A snapshot is also saved to `pick_undos` for backwards compatibility. Undone picks are excluded from quantity calculations but visible in pick history with a "Deleted" indicator
 - **Parts Catalog**: Maintain a catalog of parts with locations
 - **BOM Templates**: Save and reuse bill of materials templates
 
@@ -106,7 +106,7 @@ Main tables:
 - `orders` - Sales orders with SO number, customer, dates, status
 - `tools` - Tools within orders (e.g., "3137-1", "3137-2")
 - `line_items` - Parts to pick (part_number, qty_per_unit, location)
-- `picks` - Pick records (who picked what, when, for which tool)
+- `picks` - Pick records (who picked what, when, for which tool, plus undone_at/undone_by for soft-delete)
 - `pick_undos` - Audit trail of undone picks (denormalized snapshots with part_number, tool_number, so_number, undone_by)
 - `issues` - Reported issues (out_of_stock, damaged, wrong_part, other)
 - `parts_catalog` - Master parts list with descriptions/locations

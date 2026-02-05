@@ -41,8 +41,8 @@ export interface TagData {
                      style="width: 340px; height: 66px; font-size: 10px; font-family: Arial, sans-serif; margin: 0 auto;">
                   <div class="flex-grow-1 d-flex flex-column justify-content-between overflow-hidden">
                     <div class="d-flex justify-content-between align-items-baseline gap-1">
-                      <span class="fw-bold font-monospace text-truncate" style="font-size: 13px;">{{ firstTag?.partNumber }}</span>
-                      <span class="text-muted fw-medium flex-shrink-0" style="font-size: 10px;">Qty: {{ firstTag?.qtyPicked }}</span>
+                      <span class="fw-bold font-monospace text-truncate" style="font-size: 11px;">{{ firstTag?.partNumber }}</span>
+                      <span class="text-muted fw-medium flex-shrink-0" style="font-size: 9px;">Qty: {{ firstTag?.qtyPicked }}</span>
                     </div>
                     <div class="text-truncate text-secondary" style="font-size: 8px;">{{ firstTag?.location || 'N/A' }}</div>
                     <div class="text-truncate text-secondary" style="font-size: 8px;">{{ firstTag?.description || '-' }}</div>
@@ -222,7 +222,7 @@ export class PrintTagDialogComponent {
           .tag {
             width: 3.4in;
             height: 0.66in;
-            padding: 0.02in 0.06in 0.02in 0.12in;
+            padding: 0.04in 0.06in 0.02in 0.12in;
             page-break-after: always;
           }
 
@@ -288,7 +288,7 @@ export class PrintTagDialogComponent {
           .part-number {
             font-weight: 900;
             font-family: 'Courier New', monospace;
-            font-size: 13px;
+            font-size: 11px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -302,7 +302,7 @@ export class PrintTagDialogComponent {
 
           .tag-count {
             color: #666;
-            font-size: 10px;
+            font-size: 9px;
             font-weight: 500;
             flex-shrink: 0;
           }

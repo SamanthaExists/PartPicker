@@ -41,7 +41,7 @@ export function Import() {
   const [showConflictDialog, setShowConflictDialog] = useState(false);
   const [saveToCatalog, setSaveToCatalog] = useState(true);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
-  const { templates, autoExtractTemplate } = useBOMTemplates();
+  const { templates, autoExtractTemplate, autoExtractAssemblyTemplates } = useBOMTemplates();
   const { logActivity } = useActivityLog();
   const { getUserName } = useSettings();
 
@@ -167,9 +167,12 @@ export function Import() {
         },
       });
 
-      // Auto-extract template
+      // Auto-extract BOM template
       const toolModel = parseResult.order.tools[0]?.tool_model || null;
       await autoExtractTemplate(parseResult.order.line_items, toolModel, parseResult.order.so_number);
+
+      // Auto-extract assembly templates
+      await autoExtractAssemblyTemplates(parseResult.order.line_items);
 
       navigate(`/orders/${result.id}`);
     }
@@ -389,9 +392,12 @@ export function Import() {
         },
       });
 
-      // Auto-extract template
+      // Auto-extract BOM template
       const toolModel = bomParseResult.order.tools[0]?.tool_model || null;
       await autoExtractTemplate(bomParseResult.order.line_items, toolModel, bomParseResult.order.so_number);
+
+      // Auto-extract assembly templates
+      await autoExtractAssemblyTemplates(bomParseResult.order.line_items);
 
       navigate(`/orders/${result.id}`);
     }

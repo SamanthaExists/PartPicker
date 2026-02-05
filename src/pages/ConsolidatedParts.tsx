@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Package, ChevronDown, ChevronRight, MapPin, X, Download, ClipboardList, CheckCircle2, Clock, Layers, List, Copy, FileSpreadsheet, Truck, Filter, Wrench } from 'lucide-react';
+import { Package, ChevronDown, ChevronRight, MapPin, X, Download, ClipboardList, CheckCircle2, Clock, Layers, List, Copy, FileSpreadsheet, Truck, Filter, Wrench, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { SearchInput } from '@/components/common/SearchInput';
 import { Badge } from '@/components/ui/badge';
@@ -8,10 +8,12 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { useConsolidatedParts, type OrderStatusFilter } from '@/hooks/useConsolidatedParts';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { usePartIssues } from '@/hooks/usePartIssues';
+import { ReportPartIssueDialog } from '@/components/picking/ReportPartIssueDialog';
 import { cn, getLocationPrefix, alphanumericCompare } from '@/lib/utils';
 import { exportConsolidatedPartsToExcel, exportPartNumbersToExcel } from '@/lib/excelExport';
 import { MultiOrderPickDialog } from '@/components/picking/MultiOrderPickDialog';
-import type { ConsolidatedPart } from '@/types';
+import type { ConsolidatedPart, PartIssueType } from '@/types';
 import {
   UnifiedFilterBar,
   type StatusButtonOption,
@@ -39,9 +41,11 @@ interface PartCardProps {
   onToggleExpand: (partNumber: string) => void;
   onPickClick: (part: ConsolidatedPart, e: React.MouseEvent) => void;
   refCallback?: (el: HTMLDivElement | null) => void;
+  hasIssue: boolean;
+  onReportIssue: (part: ConsolidatedPart) => void;
 }
 
-function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback }: PartCardProps) {
+function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, hasIssue, onReportIssue }: PartCardProps) {
   const isComplete = part.remaining === 0;
   const progressPercent =
     part.total_needed > 0
@@ -64,6 +68,12 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback }
                   {part.part_number}
                 </span>
                 {isComplete && <Badge variant="success" className="text-xs">Complete</Badge>}
+                {hasIssue && (
+                  <Badge variant="destructive" className="text-xs gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Issue
+                  </Badge>
+                )}
               </div>
               {part.description && (
                 <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
@@ -122,18 +132,32 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback }
             </div>
           </div>
 
-          {/* Row 4: Pick button */}
-          {!isComplete && (
+          {/* Row 5: Action buttons */}
+          <div className="flex gap-2">
+            {!isComplete && (
+              <Button
+                size="sm"
+                variant="default"
+                className="flex-1"
+                onClick={(e) => onPickClick(part, e)}
+              >
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Pick Parts
+              </Button>
+            )}
             <Button
               size="sm"
-              variant="default"
-              className="w-full"
-              onClick={(e) => onPickClick(part, e)}
+              variant={hasIssue ? "destructive" : "outline"}
+              className={isComplete ? "flex-1" : ""}
+              onClick={(e) => {
+                e.stopPropagation();
+                onReportIssue(part);
+              }}
             >
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Pick Parts
+              <AlertTriangle className="h-4 w-4 mr-1" />
+              {hasIssue ? 'Issue' : 'Report Issue'}
             </Button>
-          )}
+          </div>
         </div>
 
         {/* Desktop Layout */}
@@ -161,6 +185,12 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback }
                 </Badge>
               )}
               {isComplete && <Badge variant="success">Complete</Badge>}
+              {hasIssue && (
+                <Badge variant="destructive" className="gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Issue
+                </Badge>
+              )}
             </div>
             {part.description && (
               <p className="text-sm text-muted-foreground truncate">
@@ -211,23 +241,35 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback }
             <p className="text-xs text-center mt-1">{progressPercent}%</p>
           </div>
 
-          {/* Pick Button */}
-          {!isComplete && (
+          {/* Action Buttons */}
+          <div className="flex gap-2 shrink-0">
+            {!isComplete && (
+              <Button
+                size="sm"
+                variant="default"
+                onClick={(e) => onPickClick(part, e)}
+              >
+                <ClipboardList className="h-4 w-4 mr-1" />
+                Pick
+              </Button>
+            )}
             <Button
               size="sm"
-              variant="default"
-              className="shrink-0"
-              onClick={(e) => onPickClick(part, e)}
+              variant={hasIssue ? "destructive" : "ghost"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onReportIssue(part);
+              }}
             >
-              <ClipboardList className="h-4 w-4 mr-1" />
-              Pick
+              <AlertTriangle className="h-4 w-4 mr-1" />
+              {hasIssue ? 'Issue' : 'Report'}
             </Button>
-          )}
+          </div>
         </div>
 
         {/* Expanded: Per-Order Breakdown */}
         {isExpanded && (
-          <div className="mt-4 ml-12 border-t pt-4">
+          <div className="mt-4 sm:ml-12 border-t pt-4">
             <p className="text-sm font-medium mb-2">
               Orders using this part:
             </p>
@@ -284,6 +326,7 @@ export function ConsolidatedParts() {
     return (saved as OrderStatusFilter) || 'all';
   });
   const { parts, loading } = useConsolidatedParts(statusFilter);
+  const { reportIssue, resolveIssue, hasOpenIssue, getOpenIssue } = usePartIssues();
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
   const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set());
@@ -315,6 +358,10 @@ export function ConsolidatedParts() {
   // Multi-order pick dialog state
   const [selectedPart, setSelectedPart] = useState<ConsolidatedPart | null>(null);
   const [pickDialogOpen, setPickDialogOpen] = useState(false);
+
+  // Issue dialog state
+  const [issueDialogOpen, setIssueDialogOpen] = useState(false);
+  const [selectedPartForIssue, setSelectedPartForIssue] = useState<ConsolidatedPart | null>(null);
   const [scrollToPartNumber, setScrollToPartNumber] = useState<string | null>(null);
   const partRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -322,6 +369,27 @@ export function ConsolidatedParts() {
     e.stopPropagation();
     setSelectedPart(part);
     setPickDialogOpen(true);
+  };
+
+  // Handle reporting an issue for a part
+  const handleReportIssue = (part: ConsolidatedPart) => {
+    setSelectedPartForIssue(part);
+    setIssueDialogOpen(true);
+  };
+
+  // Submit issue handler
+  const handleSubmitIssue = async (
+    partNumber: string,
+    issueType: PartIssueType,
+    description?: string
+  ): Promise<boolean> => {
+    const result = await reportIssue(partNumber, issueType, description);
+    return result !== null;
+  };
+
+  // Resolve issue handler
+  const handleResolveIssue = async (issueId: string): Promise<boolean> => {
+    return await resolveIssue(issueId);
   };
 
   // Handle dialog close - track part for scroll if it was a save
@@ -710,6 +778,8 @@ export function ConsolidatedParts() {
                     if (el) partRefs.current.set(part.part_number, el);
                     else partRefs.current.delete(part.part_number);
                   }}
+                  hasIssue={hasOpenIssue(part.part_number)}
+                  onReportIssue={handleReportIssue}
                 />
               ))}
             </div>
@@ -740,6 +810,8 @@ export function ConsolidatedParts() {
                     if (el) partRefs.current.set(part.part_number, el);
                     else partRefs.current.delete(part.part_number);
                   }}
+                  hasIssue={hasOpenIssue(part.part_number)}
+                  onReportIssue={handleReportIssue}
                 />
               ))}
             </div>
@@ -759,6 +831,8 @@ export function ConsolidatedParts() {
                 if (el) partRefs.current.set(part.part_number, el);
                 else partRefs.current.delete(part.part_number);
               }}
+              hasIssue={hasOpenIssue(part.part_number)}
+              onReportIssue={handleReportIssue}
             />
           ))}
         </div>
@@ -769,6 +843,18 @@ export function ConsolidatedParts() {
         open={pickDialogOpen}
         onOpenChange={handleDialogOpenChange}
         part={selectedPart}
+      />
+
+      {/* Report Part Issue Dialog */}
+      <ReportPartIssueDialog
+        open={issueDialogOpen}
+        onOpenChange={setIssueDialogOpen}
+        partNumber={selectedPartForIssue?.part_number ?? null}
+        partDescription={selectedPartForIssue?.description}
+        partLocation={selectedPartForIssue?.location}
+        existingIssue={selectedPartForIssue ? getOpenIssue(selectedPartForIssue.part_number) : null}
+        onSubmit={handleSubmitIssue}
+        onResolve={handleResolveIssue}
       />
     </div>
   );

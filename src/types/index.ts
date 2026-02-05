@@ -54,6 +54,10 @@ export interface Pick {
 export type IssueType = 'out_of_stock' | 'wrong_part' | 'damaged' | 'other';
 export type IssueStatus = 'open' | 'resolved';
 
+// Part-level issues (inventory discrepancies, etc.)
+export type PartIssueType = 'inventory_discrepancy' | 'wrong_location' | 'damaged' | 'other';
+export type PartIssueStatus = 'open' | 'resolved';
+
 export interface Issue {
   id: string;
   line_item_id: string;
@@ -70,6 +74,19 @@ export interface Issue {
 export interface IssueWithDetails extends Issue {
   line_item?: LineItem;
   order?: Order;
+}
+
+// Part-level issue (for inventory discrepancies, etc.)
+export interface PartIssue {
+  id: string;
+  part_number: string;
+  issue_type: PartIssueType;
+  description: string | null;
+  reported_by: string | null;
+  status: PartIssueStatus;
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
 }
 
 // Extended types with relations
@@ -240,6 +257,7 @@ export interface BOMTemplate {
   id: string;
   name: string;
   tool_model: string | null;
+  template_type: 'bom' | 'assembly';
   created_at: string;
   updated_at: string;
 }

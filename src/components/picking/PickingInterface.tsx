@@ -54,7 +54,7 @@ interface PickingInterfaceProps {
   getPicksForTool: (toolId: string) => Map<string, number>;
   getPicksForAllTools: () => Map<string, Map<string, number>>;
   getPickHistory: (lineItemId: string, toolId: string) => Pick[];
-  onPickAllRemainingTools?: (lineItemId: string) => Promise<void>;
+  onPickAllRemainingTools?: (lineItemId: string) => Promise<{ toolNumber: string; qty: number }[]>;
   onReportIssue?: (
     lineItemId: string,
     orderId: string,
@@ -364,10 +364,28 @@ export function PickingInterface({
   const handlePickAllTools = useCallback(async (item: LineItem) => {
     if (onPickAllRemainingTools) {
       setIsSubmitting(item.id);
-      await onPickAllRemainingTools(item.id);
+      const pickedTools = await onPickAllRemainingTools(item.id);
       setIsSubmitting(null);
+
+      // Trigger tag printing for all tools that were picked
+      if (pickedTools.length > 0 && isTagPrintingEnabled()) {
+        const pickedBy = getUserName();
+        const pickedAt = new Date();
+        const tags = pickedTools.map(({ toolNumber, qty }) => ({
+          partNumber: item.part_number,
+          description: item.description,
+          location: item.location,
+          soNumber: soNumber,
+          toolNumber,
+          qtyPicked: qty,
+          pickedBy,
+          pickedAt,
+        }));
+        setPrintTagData(tags);
+        setShowPrintDialog(true);
+      }
     }
-  }, [onPickAllRemainingTools]);
+  }, [onPickAllRemainingTools, soNumber, getUserName, isTagPrintingEnabled]);
 
   // Pick all items in a location group for the current tool
   const [isPickingLocation, setIsPickingLocation] = useState<string | null>(null);
@@ -382,17 +400,23 @@ export function PickingInterface({
 
     const locationPrefix = itemsToPick[0]?.location?.split('-')[0] || 'location';
     setIsPickingLocation(locationPrefix);
+    const pickedBy = getUserName();
+    const pickedAt = new Date();
 
     try {
       // Pick all items sequentially to avoid race conditions
       let hasWarnings = false;
+      const successfulPicks: { item: LineItem; qty: number }[] = [];
       for (const item of itemsToPick) {
         const pickedForTool = toolPicks.get(item.id) || 0;
         const remaining = item.qty_per_unit - pickedForTool;
         if (remaining > 0) {
-          const result = await onRecordPick(item.id, tool.id, remaining, getUserName());
-          if (result && 'overPickWarning' in result && result.overPickWarning) {
-            hasWarnings = true;
+          const result = await onRecordPick(item.id, tool.id, remaining, pickedBy);
+          if (result) {
+            successfulPicks.push({ item, qty: remaining });
+            if ('overPickWarning' in result && result.overPickWarning) {
+              hasWarnings = true;
+            }
           }
         }
       }
@@ -400,10 +424,26 @@ export function PickingInterface({
         setOverPickWarning('Some items may have been over-picked. Another user may have picked items at the same time. Please review the quantities.');
         setTimeout(() => setOverPickWarning(null), 8000);
       }
+
+      // Trigger tag printing for all successful picks
+      if (successfulPicks.length > 0 && isTagPrintingEnabled()) {
+        const tags = successfulPicks.map(({ item, qty }) => ({
+          partNumber: item.part_number,
+          description: item.description,
+          location: item.location,
+          soNumber: soNumber,
+          toolNumber: tool.tool_number,
+          qtyPicked: qty,
+          pickedBy,
+          pickedAt,
+        }));
+        setPrintTagData(tags);
+        setShowPrintDialog(true);
+      }
     } finally {
       setIsPickingLocation(null);
     }
-  }, [toolPicks, tool.id, onRecordPick, getUserName]);
+  }, [toolPicks, tool.id, tool.tool_number, soNumber, onRecordPick, getUserName, isTagPrintingEnabled]);
 
   // Get count of unpicked items in a location group
   const getUnpickedCountInLocation = useCallback((locationItems: LineItem[]) => {

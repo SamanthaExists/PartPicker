@@ -229,27 +229,39 @@ export function OrderDetail() {
     return success;
   };
 
-  const handlePickAllRemainingTools = async (lineItemId: string): Promise<void> => {
+  const handlePickAllRemainingTools = async (lineItemId: string): Promise<{ toolNumber: string; qty: number }[]> => {
     const lineItem = lineItems.find(li => li.id === lineItemId);
-    if (!lineItem) return;
+    if (!lineItem) return [];
 
     const allToolsPicksMap = getPicksForAllTools();
     const userName = getUserName();
 
-    const pickPromises = tools
-      .filter(t => {
-        const toolPicks = allToolsPicksMap.get(t.id);
-        const picked = toolPicks?.get(lineItemId) || 0;
-        return picked < lineItem.qty_per_unit;
-      })
-      .map(t => {
-        const toolPicks = allToolsPicksMap.get(t.id);
-        const picked = toolPicks?.get(lineItemId) || 0;
-        const remaining = lineItem.qty_per_unit - picked;
-        return recordPick(lineItemId, t.id, remaining, userName);
-      });
+    const toolsToPick = tools.filter(t => {
+      const toolPicks = allToolsPicksMap.get(t.id);
+      const picked = toolPicks?.get(lineItemId) || 0;
+      return picked < lineItem.qty_per_unit;
+    });
 
-    await Promise.all(pickPromises);
+    const pickPromises = toolsToPick.map(t => {
+      const toolPicks = allToolsPicksMap.get(t.id);
+      const picked = toolPicks?.get(lineItemId) || 0;
+      const remaining = lineItem.qty_per_unit - picked;
+      return recordPick(lineItemId, t.id, remaining, userName);
+    });
+
+    const results = await Promise.all(pickPromises);
+
+    // Return data for successful picks
+    const pickedTools: { toolNumber: string; qty: number }[] = [];
+    for (let i = 0; i < results.length; i++) {
+      if (results[i]) {
+        const t = toolsToPick[i];
+        const toolPicks = allToolsPicksMap.get(t.id);
+        const picked = toolPicks?.get(lineItemId) || 0;
+        pickedTools.push({ toolNumber: t.tool_number, qty: lineItem.qty_per_unit - picked });
+      }
+    }
+    return pickedTools;
   };
 
   const getToolPickCount = (toolId: string): number => {

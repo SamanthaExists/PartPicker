@@ -110,6 +110,7 @@ export function useBOMTemplates() {
         .insert({
           name,
           tool_model: toolModel,
+          template_type: 'bom',
         })
         .select()
         .single();
@@ -152,6 +153,7 @@ export function useBOMTemplates() {
         .insert({
           name,
           tool_model: toolModel || null,
+          template_type: 'bom',
         })
         .select()
         .single();
@@ -348,6 +350,7 @@ export function useBOMTemplates() {
             .insert({
               name: templateName,
               tool_model: order.tool_model || null,
+              template_type: 'bom',
             })
             .select()
             .single();
@@ -429,6 +432,7 @@ export function useBOMTemplates() {
         .insert({
           name: templateName,
           tool_model: toolModel || null,
+          template_type: 'bom',
         })
         .select()
         .single();
@@ -458,6 +462,116 @@ export function useBOMTemplates() {
     }
   }, [fetchTemplates]);
 
+  /**
+   * Auto-extract assembly templates from imported line items.
+   * For each unique assembly_group, creates a separate assembly template
+   * if a matching fingerprint doesn't already exist.
+   */
+  const autoExtractAssemblyTemplates = useCallback(async (
+    lineItems: ImportedLineItem[]
+  ): Promise<{ created: number; skipped: number; assemblyNames: string[] }> => {
+    const result = { created: 0, skipped: 0, assemblyNames: [] as string[] };
+
+    try {
+      // 1. Get unique assembly groups (excluding null/empty)
+      const assemblyGroups = new Set<string>();
+      for (const item of lineItems) {
+        if (item.assembly_group && item.assembly_group.trim()) {
+          assemblyGroups.add(item.assembly_group.trim());
+        }
+      }
+
+      if (assemblyGroups.size === 0) {
+        return result;
+      }
+
+      // 2. Fetch all existing assembly templates with items
+      const existingTemplates = await fetchAllRows('bom_templates');
+      const existingTemplateItems = await fetchAllRows('bom_template_items');
+
+      const templateItemsByTemplate: Record<string, any[]> = {};
+      for (const ti of existingTemplateItems) {
+        if (!templateItemsByTemplate[ti.template_id]) {
+          templateItemsByTemplate[ti.template_id] = [];
+        }
+        templateItemsByTemplate[ti.template_id].push(ti);
+      }
+
+      // Build fingerprints for existing assembly templates
+      const existingFingerprints = new Set<string>();
+      for (const t of existingTemplates) {
+        if (t.template_type === 'assembly') {
+          const items = templateItemsByTemplate[t.id] || [];
+          existingFingerprints.add(generateBOMFingerprint(items));
+        }
+      }
+
+      // 3. For each assembly group, check fingerprint and create if new
+      for (const assemblyGroup of assemblyGroups) {
+        const assemblyItems = lineItems.filter(
+          item => item.assembly_group?.trim() === assemblyGroup
+        );
+
+        if (assemblyItems.length === 0) continue;
+
+        const fp = generateBOMFingerprint(assemblyItems);
+
+        if (existingFingerprints.has(fp)) {
+          result.skipped++;
+          continue;
+        }
+
+        // Create new assembly template
+        const templateName = `${assemblyGroup} Assembly`;
+
+        const { data: template, error: templateError } = await supabase
+          .from('bom_templates')
+          .insert({
+            name: templateName,
+            tool_model: null,
+            template_type: 'assembly',
+          })
+          .select()
+          .single();
+
+        if (templateError) {
+          console.error(`Failed to create assembly template for ${assemblyGroup}:`, templateError);
+          continue;
+        }
+
+        const itemsToInsert = assemblyItems.map(item => ({
+          template_id: template.id,
+          part_number: item.part_number,
+          description: item.description || null,
+          location: item.location || null,
+          qty_per_unit: item.qty_per_unit,
+          assembly_group: item.assembly_group || null,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('bom_template_items')
+          .insert(itemsToInsert);
+
+        if (itemsError) {
+          console.error(`Failed to insert items for assembly ${assemblyGroup}:`, itemsError);
+          continue;
+        }
+
+        existingFingerprints.add(fp);
+        result.created++;
+        result.assemblyNames.push(assemblyGroup);
+      }
+
+      if (result.created > 0) {
+        await fetchTemplates();
+      }
+    } catch (err) {
+      console.error('Error extracting assembly templates:', err);
+    }
+
+    return result;
+  }, [fetchTemplates]);
+
   return {
     templates,
     loading,
@@ -473,5 +587,6 @@ export function useBOMTemplates() {
     deleteTemplateItem,
     extractTemplatesFromOrders,
     autoExtractTemplate,
+    autoExtractAssemblyTemplates,
   };
 }

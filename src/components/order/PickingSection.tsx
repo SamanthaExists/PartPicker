@@ -33,7 +33,7 @@ interface PickingSectionProps {
   getPicksForTool: (toolId: string) => Map<string, number>;
   getPicksForAllTools: () => Map<string, Map<string, number>>;
   getPickHistory: (lineItemId: string, toolId: string) => Pick[];
-  onPickAllRemainingTools: (lineItemId: string) => Promise<void>;
+  onPickAllRemainingTools: (lineItemId: string) => Promise<{ toolNumber: string; qty: number }[]>;
   onReportIssue: (lineItemId: string, orderId: string, issueType: IssueType, description?: string, reportedBy?: string) => Promise<boolean>;
   hasOpenIssue: (lineItemId: string) => boolean;
   onBatchUpdateAllocations: (lineItemId: string, newAllocations: Map<string, number>, pickedBy?: string, notes?: string) => Promise<boolean>;

@@ -53,6 +53,7 @@ export function Templates() {
   // Filters
   const [search, setSearch] = useState('');
   const [modelFilter, setModelFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'bom' | 'assembly'>('all');
 
   // Assembly navigation
   const [selectedAssemblyFilter, setSelectedAssemblyFilter] = useState<string | null>(null);
@@ -100,16 +101,21 @@ export function Templates() {
         t.name.toLowerCase().includes(search.toLowerCase()) ||
         (t.tool_model && t.tool_model.toLowerCase().includes(search.toLowerCase()));
       const matchesModel = modelFilter === 'all' || t.tool_model === modelFilter;
-      return matchesSearch && matchesModel;
+      const matchesType = typeFilter === 'all' || t.template_type === typeFilter;
+      return matchesSearch && matchesModel && matchesType;
     });
-  }, [templates, search, modelFilter]);
+  }, [templates, search, modelFilter, typeFilter]);
 
   // Stats
   const stats = useMemo(() => {
     const models = new Set(templates.map(t => t.tool_model).filter(Boolean));
+    const bomCount = templates.filter(t => t.template_type === 'bom' || !t.template_type).length;
+    const assemblyCount = templates.filter(t => t.template_type === 'assembly').length;
     return {
       total: templates.length,
       toolModels: models.size,
+      bomCount,
+      assemblyCount,
     };
   }, [templates]);
 
@@ -351,8 +357,13 @@ export function Templates() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-3xl font-bold">{selectedTemplate.name}</h1>
+              {selectedTemplate.template_type === 'assembly' ? (
+                <Badge className="bg-purple-600 hover:bg-purple-700 text-white">Assembly</Badge>
+              ) : (
+                <Badge variant="outline">BOM</Badge>
+              )}
               {selectedTemplate.tool_model && (
                 <Badge variant="secondary">{selectedTemplate.tool_model}</Badge>
               )}
@@ -753,7 +764,7 @@ export function Templates() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -762,10 +773,72 @@ export function Templates() {
         </Card>
         <Card>
           <CardContent className="pt-6">
+            <div className="text-2xl font-bold">{stats.bomCount}</div>
+            <div className="text-sm text-muted-foreground">BOM Templates</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold">{stats.assemblyCount}</div>
+            <div className="text-sm text-muted-foreground">Assembly Templates</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
             <div className="text-2xl font-bold">{stats.toolModels}</div>
             <div className="text-sm text-muted-foreground">Tool Models</div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Type Filter Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+        <div className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground">
+          <button
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
+              typeFilter === 'all'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'hover:bg-background/50'
+            }`}
+            onClick={() => setTypeFilter('all')}
+          >
+            All
+            <Badge variant={typeFilter === 'all' ? 'default' : 'secondary'} className="ml-1.5 h-5 px-1.5 text-xs">
+              {stats.total}
+            </Badge>
+          </button>
+          <button
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
+              typeFilter === 'bom'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'hover:bg-background/50'
+            }`}
+            onClick={() => setTypeFilter('bom')}
+          >
+            BOM Templates
+            <Badge variant={typeFilter === 'bom' ? 'default' : 'secondary'} className="ml-1.5 h-5 px-1.5 text-xs">
+              {stats.bomCount}
+            </Badge>
+          </button>
+          <button
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
+              typeFilter === 'assembly'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'hover:bg-background/50'
+            }`}
+            onClick={() => setTypeFilter('assembly')}
+          >
+            Assembly Templates
+            <Badge
+              className={`ml-1.5 h-5 px-1.5 text-xs ${
+                typeFilter === 'assembly' ? 'bg-purple-600 hover:bg-purple-700' : ''
+              }`}
+              variant={typeFilter === 'assembly' ? 'default' : 'secondary'}
+            >
+              {stats.assemblyCount}
+            </Badge>
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -824,8 +897,13 @@ export function Templates() {
                 <div className="flex items-center gap-3 min-w-0">
                   <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium truncate">{template.name}</span>
+                      {template.template_type === 'assembly' ? (
+                        <Badge className="flex-shrink-0 bg-purple-600 hover:bg-purple-700 text-white">Assembly</Badge>
+                      ) : (
+                        <Badge variant="outline" className="flex-shrink-0">BOM</Badge>
+                      )}
                       {template.tool_model && (
                         <Badge variant="secondary" className="flex-shrink-0">{template.tool_model}</Badge>
                       )}

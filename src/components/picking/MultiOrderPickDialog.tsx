@@ -24,6 +24,7 @@ import {
   type BatchAllocations,
 } from '@/hooks/useConsolidatedPartsPicking';
 import { useSettings } from '@/hooks/useSettings';
+import { PrintTagDialog, type TagData } from '@/components/picking/PrintTagDialog';
 import { cn } from '@/lib/utils';
 
 interface MultiOrderPickDialogProps {
@@ -38,12 +39,14 @@ export function MultiOrderPickDialog({
   part,
 }: MultiOrderPickDialogProps) {
   const { pickingData, loading, error, fetchPickingDataForPart, saveBatchAllocations, clearPickingData } = useConsolidatedPartsPicking();
-  const { getUserName } = useSettings();
+  const { getUserName, isTagPrintingEnabled } = useSettings();
 
   // Draft allocations: line_item_id -> tool_id -> qty
   const [draftAllocations, setDraftAllocations] = useState<BatchAllocations>(new Map());
   const [isSaving, setIsSaving] = useState(false);
   const [collapsedOrders, setCollapsedOrders] = useState<Set<string>>(new Set());
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [printTagData, setPrintTagData] = useState<TagData[] | null>(null);
 
   // Fetch picking data when dialog opens
   useEffect(() => {
@@ -176,6 +179,39 @@ export function MultiOrderPickDialog({
     try {
       const success = await saveBatchAllocations(draftAllocations, getUserName());
       if (success) {
+        // Build print tags for newly picked quantities (delta only)
+        if (pickingData && part && isTagPrintingEnabled()) {
+          const pickedBy = getUserName();
+          const pickedAt = new Date();
+          const tags: TagData[] = [];
+
+          for (const order of pickingData.orders) {
+            const toolMap = draftAllocations.get(order.line_item_id);
+            for (const tool of order.tools) {
+              const newQty = toolMap?.get(tool.tool_id) ?? tool.current_picked;
+              const delta = newQty - tool.current_picked;
+              if (delta > 0) {
+                tags.push({
+                  partNumber: part.part_number,
+                  description: part.description ?? null,
+                  location: part.location ?? null,
+                  soNumber: order.so_number,
+                  toolNumber: tool.tool_number,
+                  qtyPicked: delta,
+                  pickedBy,
+                  pickedAt,
+                });
+              }
+            }
+          }
+
+          if (tags.length > 0) {
+            setPrintTagData(tags);
+            setShowPrintDialog(true);
+            return; // Keep dialog open until print dialog is dismissed
+          }
+        }
+
         onOpenChange(false);
       }
     } finally {
@@ -444,6 +480,19 @@ export function MultiOrderPickDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <PrintTagDialog
+        open={showPrintDialog}
+        onOpenChange={(open) => {
+          setShowPrintDialog(open);
+          if (!open) {
+            // Close the main dialog after print dialog is dismissed
+            setPrintTagData(null);
+            onOpenChange(false);
+          }
+        }}
+        tagData={printTagData}
+      />
     </Dialog>
   );
 }

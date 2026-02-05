@@ -222,7 +222,7 @@ export class PrintTagDialogComponent {
           .tag {
             width: 3.4in;
             height: 0.66in;
-            padding: 0.04in 0.06in 0.02in 0.12in;
+            padding: 0.04in 0.06in 0.04in 0.12in;
             page-break-after: always;
           }
 

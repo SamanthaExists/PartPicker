@@ -40,15 +40,13 @@ export interface TagData {
                 <div class="border bg-white p-2 d-flex gap-2"
                      style="width: 340px; height: 66px; font-size: 10px; font-family: Arial, sans-serif; margin: 0 auto;">
                   <div class="flex-grow-1 d-flex flex-column justify-content-between overflow-hidden">
-                    <div class="d-flex justify-content-between align-items-start gap-1" style="font-size: 11px;">
-                      <span class="fw-bold font-monospace text-truncate">{{ firstTag?.partNumber }}</span>
-                      <span class="text-muted fw-medium flex-shrink-0">Qty: {{ firstTag?.qtyPicked }}</span>
+                    <div class="d-flex justify-content-between align-items-baseline gap-1">
+                      <span class="fw-bold font-monospace text-truncate" style="font-size: 13px;">{{ firstTag?.partNumber }}</span>
+                      <span class="text-muted fw-medium flex-shrink-0" style="font-size: 10px;">Qty: {{ firstTag?.qtyPicked }}</span>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center gap-1 overflow-hidden" style="font-size: 9px;">
-                      <span class="text-secondary flex-shrink-0" style="font-size: 9px;">LOC: {{ firstTag?.location || 'N/A' }}</span>
-                      <span class="text-truncate text-secondary">{{ firstTag?.description || '-' }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-end" style="font-size: 8px;">
+                    <div class="text-truncate text-secondary" style="font-size: 8px;">{{ firstTag?.location || 'N/A' }}</div>
+                    <div class="text-truncate text-secondary" style="font-size: 8px;">{{ firstTag?.description || '-' }}</div>
+                    <div class="d-flex justify-content-between align-items-end" style="font-size: 7px;">
                       <span class="text-secondary">{{ firstTag?.soNumber }} / {{ firstTag?.toolNumber }}</span>
                       <span class="text-muted">{{ firstTag?.pickedBy }} {{ formatShortDate(firstTag?.pickedAt) }}</span>
                     </div>
@@ -176,8 +174,10 @@ export class PrintTagDialogComponent {
                 <span class="part-number">${this.escapeHtml(partNumber)}</span>
                 <span class="tag-count">Qty: ${qtyPicked}</span>
               </div>
+              <div class="tag-row-location">
+                <span class="location">${this.escapeHtml(location || 'N/A')}</span>
+              </div>
               <div class="tag-row-middle">
-                <span class="location">LOC: ${this.escapeHtml(location || 'N/A')}</span>
                 <span class="description">${this.escapeHtml(description || '-')}</span>
               </div>
               <div class="tag-row-bottom">
@@ -216,13 +216,13 @@ export class PrintTagDialogComponent {
           body {
             font-family: Arial, sans-serif;
             font-size: 10px;
-            line-height: 1.2;
+            line-height: 1.1;
           }
 
           .tag {
             width: 3.4in;
             height: 0.66in;
-            padding: 0.03in 0.06in;
+            padding: 0.02in 0.06in 0.02in 0.12in;
             page-break-after: always;
           }
 
@@ -259,52 +259,56 @@ export class PrintTagDialogComponent {
           .tag-row-top {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            font-size: 11px;
+            align-items: baseline;
             gap: 0.05in;
           }
 
-          .tag-row-middle {
-            font-size: 9px;
-            display: flex;
-            align-items: center;
-            gap: 0.08in;
-            min-width: 0;
+          .tag-row-location {
+            font-size: 8px;
             overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .tag-row-middle {
+            font-size: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
           }
 
           .tag-row-bottom {
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            font-size: 8px;
+            font-size: 7px;
           }
 
           .part-number {
-            font-weight: bold;
+            font-weight: 900;
             font-family: 'Courier New', monospace;
+            font-size: 13px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            min-width: 0;
+            flex: 1;
           }
 
           .location {
             color: #444;
-            white-space: nowrap;
-            flex-shrink: 0;
           }
 
           .tag-count {
             color: #666;
+            font-size: 10px;
             font-weight: 500;
             flex-shrink: 0;
           }
 
           .description {
             color: #333;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
           }
 
           .order-info {

@@ -176,3 +176,14 @@ export function getLocationPrefix(location: string | null | undefined): string {
 export function alphanumericCompare(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 }
+
+/**
+ * Extract the top-level assembly from a potentially multi-level assembly path.
+ * e.g., "ASSY-100 > SUB-200" → "ASSY-100"
+ * Single-level values pass through unchanged: "ASSY-100" → "ASSY-100"
+ */
+export function getTopLevelAssembly(assemblyGroup: string | null): string {
+  if (!assemblyGroup) return '';
+  const idx = assemblyGroup.indexOf(' > ');
+  return idx === -1 ? assemblyGroup : assemblyGroup.substring(0, idx);
+}

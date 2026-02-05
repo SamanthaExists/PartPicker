@@ -100,18 +100,19 @@ export function PrintTagDialog({
               Tag Preview (0.66" x 3.4"){totalTags > 1 && ` - showing 1 of ${totalTags}`}
             </div>
             <div
-              className="bg-white p-1.5 mx-auto my-3 flex gap-2"
+              className="bg-white mx-auto my-3 flex gap-2"
               style={{
                 width: '340px',
                 height: '66px',
                 border: '1px solid #ddd',
+                padding: '3px 6px 3px 12px',
                 fontSize: '10px',
                 fontFamily: 'Arial, sans-serif',
               }}
             >
               <div className="flex-1 flex flex-col justify-between min-w-0">
                 <div className="flex justify-between items-start gap-1" style={{ fontSize: '11px' }}>
-                  <span className="font-bold font-mono truncate">
+                  <span className="font-black font-mono truncate" style={{ fontSize: '14px' }}>
                     {firstTag.partNumber}
                   </span>
                   <span className="text-gray-600 truncate flex-shrink-0" style={{ fontSize: '10px' }}>
@@ -250,7 +251,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         .tag {
           width: 3.4in;
           height: 0.66in;
-          padding: 0.03in 0.06in;
+          padding: 0.03in 0.06in 0.03in 0.12in;
           page-break-after: always;
         }
 
@@ -304,8 +305,9 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         }
 
         .part-number {
-          font-weight: bold;
+          font-weight: 900;
           font-family: 'Courier New', monospace;
+          font-size: 14px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;

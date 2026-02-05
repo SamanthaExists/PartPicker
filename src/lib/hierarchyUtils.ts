@@ -64,18 +64,23 @@ export function resolveHierarchyLeaves(rows: HierarchyRow[]): ResolvedLeafPart[]
       }
     }
 
-    // Determine top-level assembly group (level 1 ancestor, or level 0 if flat)
+    // Build full assembly hierarchy path from ancestors
+    // Level 0/1 parts → their own part number
+    // Level 2 leaf → "L1-PART" (one ancestor)
+    // Level 3 leaf → "L1-PART > L2-PART"
+    // Level 4 leaf → "L1-PART > L2-PART > L3-PART"
     let assemblyGroup = '';
-    for (let lvl = 1; lvl >= 0; lvl--) {
-      const ancestor = assemblyStack.get(lvl);
-      if (ancestor) {
-        assemblyGroup = ancestor.partNumber;
-        break;
-      }
-    }
-    // If the current item IS level 0 or 1, it's its own assembly group
     if (row.level <= 1) {
       assemblyGroup = row.partNumber;
+    } else {
+      const pathParts: string[] = [];
+      for (let lvl = 1; lvl < row.level; lvl++) {
+        const ancestor = assemblyStack.get(lvl);
+        if (ancestor) {
+          pathParts.push(ancestor.partNumber);
+        }
+      }
+      assemblyGroup = pathParts.length > 0 ? pathParts.join(' > ') : row.partNumber;
     }
 
     if (isLeaf) {

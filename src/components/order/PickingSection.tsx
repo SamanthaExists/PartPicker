@@ -15,7 +15,7 @@ import { FilterMultiSelect } from '@/components/filters';
 import { PickingInterface } from '@/components/picking/PickingInterface';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import type { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '@/types';
-import { cn } from '@/lib/utils';
+import { cn, getTopLevelAssembly } from '@/lib/utils';
 
 interface PickingSectionProps {
   order: Order;
@@ -75,9 +75,10 @@ export function PickingSection({
       if (tool.tool_model) assemblies.add(tool.tool_model);
     });
 
-    // Add part subassemblies (assembly_group)
+    // Add part subassemblies (top-level assembly name only for clean dropdown)
     lineItems.forEach(item => {
-      if (item.assembly_group) assemblies.add(item.assembly_group);
+      const topLevel = getTopLevelAssembly(item.assembly_group);
+      if (topLevel) assemblies.add(topLevel);
     });
 
     return Array.from(assemblies)
@@ -97,10 +98,11 @@ export function PickingSection({
 
   // Filter items based on search query and assembly filter
   const filteredLineItems = lineItems.filter(item => {
-    // Assembly filter: check both tool assembly AND part's assembly_group
+    // Assembly filter: check both tool assembly AND part's assembly_group (top-level)
     if (selectedAssemblies.size > 0) {
-      // Check if part's own assembly_group matches
-      const partAssemblyMatches = item.assembly_group && selectedAssemblies.has(item.assembly_group);
+      // Check if part's top-level assembly matches
+      const topLevel = getTopLevelAssembly(item.assembly_group);
+      const partAssemblyMatches = topLevel && selectedAssemblies.has(topLevel);
 
       // Check if part belongs to a tool with matching assembly
       let toolAssemblyMatches = false;
@@ -130,9 +132,10 @@ export function PickingSection({
   });
 
   const filteredLineItemsWithPicks = lineItemsWithPicks.filter(item => {
-    // Assembly filter: check both tool assembly AND part's assembly_group
+    // Assembly filter: check both tool assembly AND part's assembly_group (top-level)
     if (selectedAssemblies.size > 0) {
-      const partAssemblyMatches = item.assembly_group && selectedAssemblies.has(item.assembly_group);
+      const topLevel = getTopLevelAssembly(item.assembly_group);
+      const partAssemblyMatches = topLevel && selectedAssemblies.has(topLevel);
 
       let toolAssemblyMatches = false;
       if (toolIdsForSelectedAssemblies && toolIdsForSelectedAssemblies.size > 0) {

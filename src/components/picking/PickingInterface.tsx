@@ -25,7 +25,7 @@ import type { Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '@/types
 import { Layers, SplitSquareVertical } from 'lucide-react';
 import { useSettings } from '@/hooks/useSettings';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
-import { cn, formatDateTime, getLocationPrefix, alphanumericCompare } from '@/lib/utils';
+import { cn, formatDateTime, getLocationPrefix, alphanumericCompare, getTopLevelAssembly } from '@/lib/utils';
 import { ReportIssueDialog } from './ReportIssueDialog';
 import { DistributeInventoryDialog } from './DistributeInventoryDialog';
 import { PrintTagDialog, type TagData } from './PrintTagDialog';
@@ -243,24 +243,27 @@ export function PickingInterface({
 
       return { sortedItems: items, locationGroups: groups, assemblyGroups: null, hiddenCount: hiddenItemsCount, outOfStockCount: outOfStockItemsCount };
     } else if (sortMode === 'assembly') {
-      // Sort by assembly group, then by part number within each group
+      // Sort by top-level assembly, then full path, then part number
       items.sort((a, b) => {
-        const agA = a.assembly_group || '';
-        const agB = b.assembly_group || '';
+        const topA = getTopLevelAssembly(a.assembly_group);
+        const topB = getTopLevelAssembly(b.assembly_group);
 
-        if (!agA && agB) return 1;
-        if (agA && !agB) return -1;
-        if (!agA && !agB) return alphanumericCompare(a.part_number, b.part_number);
+        if (!topA && topB) return 1;
+        if (topA && !topB) return -1;
+        if (!topA && !topB) return alphanumericCompare(a.part_number, b.part_number);
 
-        const cmp = alphanumericCompare(agA, agB);
+        const cmp = alphanumericCompare(topA, topB);
         if (cmp !== 0) return cmp;
+        // Secondary sort by full path so sub-assemblies cluster together
+        const pathCmp = alphanumericCompare(a.assembly_group || '', b.assembly_group || '');
+        if (pathCmp !== 0) return pathCmp;
         return alphanumericCompare(a.part_number, b.part_number);
       });
 
-      // Group by assembly_group
+      // Group by top-level assembly so sub-assembly parts cluster under the same header
       const groups = new Map<string, LineItem[]>();
       items.forEach(item => {
-        const group_key = item.assembly_group || 'No Assembly Group';
+        const group_key = getTopLevelAssembly(item.assembly_group) || 'No Assembly Group';
         if (!groups.has(group_key)) {
           groups.set(group_key, []);
         }

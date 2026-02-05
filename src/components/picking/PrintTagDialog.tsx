@@ -115,13 +115,15 @@ export function PrintTagDialog({
                   <span className="font-black font-mono truncate min-w-0 flex-1" style={{ fontSize: '14px' }}>
                     {firstTag.partNumber}
                   </span>
-                  <span className="text-gray-600 truncate flex-shrink-0" style={{ fontSize: '10px' }}>
-                    LOC: {firstTag.location || 'N/A'}
-                  </span>
                   <span className="text-gray-500 font-medium flex-shrink-0">Qty: {firstTag.qtyPicked}</span>
                 </div>
-                <div className="truncate text-gray-700 overflow-hidden" style={{ fontSize: '9px' }}>
-                  {firstTag.description || '-'}
+                <div className="flex justify-between items-center gap-1 overflow-hidden" style={{ fontSize: '9px' }}>
+                  <span className="text-gray-600 flex-shrink-0" style={{ fontSize: '9px' }}>
+                    LOC: {firstTag.location || 'N/A'}
+                  </span>
+                  <span className="truncate text-gray-700 overflow-hidden min-w-0">
+                    {firstTag.description || '-'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-end" style={{ fontSize: '8px' }}>
                   <span className="text-gray-600">
@@ -202,10 +204,10 @@ function generateTagsHTML(tagsArray: TagData[]): string {
           <div class="tag-text">
             <div class="tag-row-top">
               <span class="part-number">${escapeHtml(partNumber)}</span>
-              <span class="location">LOC: ${escapeHtml(location || 'N/A')}</span>
               <span class="tag-count">Qty: ${qtyPicked}</span>
             </div>
             <div class="tag-row-middle">
+              <span class="location">LOC: ${escapeHtml(location || 'N/A')}</span>
               <span class="description">${escapeHtml(description || '-')}</span>
             </div>
             <div class="tag-row-bottom">
@@ -296,10 +298,11 @@ function generateTagsHTML(tagsArray: TagData[]): string {
 
         .tag-row-middle {
           font-size: 9px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          display: flex;
+          align-items: center;
+          gap: 0.08in;
           min-width: 0;
+          overflow: hidden;
         }
 
         .tag-row-bottom {
@@ -322,8 +325,6 @@ function generateTagsHTML(tagsArray: TagData[]): string {
 
         .location {
           color: #444;
-          overflow: hidden;
-          text-overflow: ellipsis;
           white-space: nowrap;
           flex-shrink: 0;
         }

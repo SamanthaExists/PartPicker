@@ -112,10 +112,10 @@ export function PrintTagDialog({
             >
               <div className="flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
                 <div className="flex justify-between items-baseline gap-1">
-                  <span className="font-black font-mono truncate min-w-0 flex-1" style={{ fontSize: '13px' }}>
+                  <span className="font-black font-mono truncate min-w-0 flex-1" style={{ fontSize: '11px' }}>
                     {firstTag.partNumber}
                   </span>
-                  <span className="text-gray-500 font-medium flex-shrink-0" style={{ fontSize: '10px' }}>Qty: {firstTag.qtyPicked}</span>
+                  <span className="text-gray-500 font-medium flex-shrink-0" style={{ fontSize: '9px' }}>Qty: {firstTag.qtyPicked}</span>
                 </div>
                 <div className="truncate text-gray-600" style={{ fontSize: '8px' }}>
                   {firstTag.location || 'N/A'}
@@ -253,7 +253,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         .tag {
           width: 3.4in;
           height: 0.66in;
-          padding: 0.02in 0.06in 0.02in 0.12in;
+          padding: 0.04in 0.06in 0.02in 0.12in;
           page-break-after: always;
         }
 
@@ -320,7 +320,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         .part-number {
           font-weight: 900;
           font-family: 'Courier New', monospace;
-          font-size: 13px;
+          font-size: 11px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -334,7 +334,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
 
         .tag-count {
           color: #666;
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 500;
           flex-shrink: 0;
         }

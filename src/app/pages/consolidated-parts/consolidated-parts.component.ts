@@ -155,12 +155,17 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
         <button type="button" class="btn-close" (click)="copyMessage = ''"></button>
       </div>
 
+      <!-- Error Message -->
+      <div *ngIf="error" class="alert alert-danger" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+      </div>
+
       <!-- Parts List -->
       <div *ngIf="loading" class="card">
         <div class="card-body text-center py-5 text-muted">Loading parts...</div>
       </div>
 
-      <div *ngIf="!loading && filteredParts.length === 0" class="card">
+      <div *ngIf="!loading && !error && filteredParts.length === 0" class="card">
         <div class="card-body text-center py-5 text-muted">
           {{ searchQuery || filter !== 'all' ? 'No parts match your filters' : 'No parts found' }}
         </div>
@@ -251,6 +256,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
 export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   parts: ConsolidatedPart[] = [];
   loading = true;
+  error: string | null = null;
   searchQuery = '';
   filter: FilterType = 'all';
   copyMessage = '';
@@ -303,6 +309,9 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
       }),
       this.partsService.loading$.subscribe(loading => {
         this.loading = loading;
+      }),
+      this.partsService.error$.subscribe(error => {
+        this.error = error;
       })
     );
   }

@@ -236,8 +236,7 @@ body {
   .nav-link,
   .list-group-item-action,
   .form-control,
-  .form-select,
-  .form-check-input {
+  .form-select {
     min-height: 48px;
     min-width: 48px;
   }
@@ -249,14 +248,22 @@ body {
   }
 
   /* Larger checkboxes for touch */
+  .form-check {
+    display: flex;
+    align-items: center;
+  }
+
   .form-check-input {
     width: 1.5rem;
     height: 1.5rem;
+    margin-top: 0;
+    flex-shrink: 0;
   }
 
   .form-check-label {
     padding-left: 0.5rem;
     line-height: 1.5rem;
+    cursor: pointer;
   }
 
   /* Increase spacing between interactive elements */

@@ -44,12 +44,14 @@ export class ConsolidatedPartsService implements OnDestroy {
     try {
       this.loadingSubject.next(true);
       this.errorSubject.next(null);
+      console.log('[ConsolidatedParts] Starting fetch...');
 
       // Fetch active orders
       const { data: ordersData, error: ordersError } = await this.supabase.from('orders')
         .select('id, so_number, order_date, tool_model')
         .eq('status', 'active');
 
+      console.log('[ConsolidatedParts] Orders query result:', { count: ordersData?.length, error: ordersError });
       if (ordersError) throw ordersError;
 
       const activeOrderIds = (ordersData || []).map(o => o.id);
@@ -58,7 +60,9 @@ export class ConsolidatedPartsService implements OnDestroy {
         orderMap.set(order.id, { so_number: order.so_number, order_date: order.order_date, tool_model: order.tool_model });
       }
 
+      console.log('[ConsolidatedParts] Active order IDs:', activeOrderIds.length);
       if (activeOrderIds.length === 0) {
+        console.log('[ConsolidatedParts] No active orders found');
         this.partsSubject.next([]);
         return;
       }
@@ -88,35 +92,35 @@ export class ConsolidatedPartsService implements OnDestroy {
         }
       }
 
-      // Fetch active (non-undone) picks for these line items with pagination
+      // Fetch picks for these line items in batches (to avoid URL length limits)
       const lineItemIds = (lineItemsData || []).map(item => item.id);
       let picksData: any[] = [];
 
       if (lineItemIds.length > 0) {
-        const pageSize = 1000;
-        let offset = 0;
-        let hasMore = true;
+        const BATCH_SIZE = 50; // Supabase URL length limit workaround
+        const batches: string[][] = [];
 
-        while (hasMore) {
-          const { data, error: picksError } = await this.supabase.from('picks')
-            .select('line_item_id, qty_picked')
-            .in('line_item_id', lineItemIds)
-            .is('undone_at', null)
-            .range(offset, offset + pageSize - 1);
+        for (let i = 0; i < lineItemIds.length; i += BATCH_SIZE) {
+          batches.push(lineItemIds.slice(i, i + BATCH_SIZE));
+        }
 
-          if (picksError) throw picksError;
+        const batchResults = await Promise.all(
+          batches.map(batch =>
+            this.supabase.from('picks')
+              .select('line_item_id, qty_picked')
+              .in('line_item_id', batch)
+          )
+        );
 
-          if (data && data.length > 0) {
-            picksData.push(...data);
-            offset += pageSize;
-            hasMore = data.length === pageSize;
-          } else {
-            hasMore = false;
+        for (const result of batchResults) {
+          if (result.error) throw result.error;
+          if (result.data) {
+            picksData.push(...result.data);
           }
         }
       }
 
-      // Calculate picks by line item (only active picks)
+      // Calculate picks by line item
       const picksByLineItem = new Map<string, number>();
       for (const pick of picksData) {
         const current = picksByLineItem.get(pick.line_item_id) || 0;
@@ -189,7 +193,9 @@ export class ConsolidatedPartsService implements OnDestroy {
         .sort((a, b) => a.part_number.localeCompare(b.part_number));
 
       this.partsSubject.next(parts);
+      console.log('[ConsolidatedParts] Successfully loaded', parts.length, 'parts');
     } catch (err) {
+      console.error('[ConsolidatedParts] Error:', err);
       this.errorSubject.next(err instanceof Error ? err.message : 'Failed to fetch parts');
     } finally {
       this.loadingSubject.next(false);
@@ -235,12 +241,14 @@ export class ItemsToOrderService implements OnDestroy {
     try {
       this.loadingSubject.next(true);
       this.errorSubject.next(null);
+      console.log('[ItemsToOrder] Starting fetch...');
 
       // Fetch active orders
       const { data: ordersData, error: ordersError } = await this.supabase.from('orders')
         .select('id, so_number, tool_model')
         .eq('status', 'active');
 
+      console.log('[ItemsToOrder] Orders query result:', { count: ordersData?.length, error: ordersError });
       if (ordersError) throw ordersError;
 
       const activeOrderIds = (ordersData || []).map(o => o.id);
@@ -280,35 +288,35 @@ export class ItemsToOrderService implements OnDestroy {
         }
       }
 
-      // Fetch active (non-undone) picks for these line items with pagination
+      // Fetch picks for these line items in batches (to avoid URL length limits)
       const lineItemIds = (lineItemsData || []).map(item => item.id);
       let picksData: any[] = [];
 
       if (lineItemIds.length > 0) {
-        const pageSize = 1000;
-        let offset = 0;
-        let hasMore = true;
+        const BATCH_SIZE = 50; // Supabase URL length limit workaround
+        const batches: string[][] = [];
 
-        while (hasMore) {
-          const { data, error: picksError } = await this.supabase.from('picks')
-            .select('line_item_id, qty_picked')
-            .in('line_item_id', lineItemIds)
-            .is('undone_at', null)
-            .range(offset, offset + pageSize - 1);
+        for (let i = 0; i < lineItemIds.length; i += BATCH_SIZE) {
+          batches.push(lineItemIds.slice(i, i + BATCH_SIZE));
+        }
 
-          if (picksError) throw picksError;
+        const batchResults = await Promise.all(
+          batches.map(batch =>
+            this.supabase.from('picks')
+              .select('line_item_id, qty_picked')
+              .in('line_item_id', batch)
+          )
+        );
 
-          if (data && data.length > 0) {
-            picksData.push(...data);
-            offset += pageSize;
-            hasMore = data.length === pageSize;
-          } else {
-            hasMore = false;
+        for (const result of batchResults) {
+          if (result.error) throw result.error;
+          if (result.data) {
+            picksData.push(...result.data);
           }
         }
       }
 
-      // Calculate picks by line item (only active picks)
+      // Calculate picks by line item
       const picksByLineItem = new Map<string, number>();
       for (const pick of picksData) {
         const current = picksByLineItem.get(pick.line_item_id) || 0;
@@ -382,7 +390,9 @@ export class ItemsToOrderService implements OnDestroy {
 
       this.itemsSubject.next(needToOrder);
       this.onOrderItemsSubject.next(onOrder);
+      console.log('[ItemsToOrder] Successfully loaded', needToOrder.length, 'items to order,', onOrder.length, 'on order');
     } catch (err) {
+      console.error('[ItemsToOrder] Error:', err);
       this.errorSubject.next(err instanceof Error ? err.message : 'Failed to fetch items to order');
     } finally {
       this.loadingSubject.next(false);

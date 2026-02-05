@@ -154,6 +154,12 @@ Components use Angular standalone component pattern:
 - Use Bootstrap Icons with appropriate sizing
 - Use `overflow-auto` for scrollable areas
 
+### Checkbox styling (styles.css)
+In the `@media (pointer: coarse)` block for touch devices:
+- `.form-check` uses flexbox with `align-items: center` to properly align checkbox and label
+- `.form-check-input` has `margin-top: 0` to prevent Bootstrap's default offset
+- Checkboxes are NOT included in the 48px minimum touch target rule (unlike buttons/inputs) because the oversized invisible hit area causes click alignment issues. The label provides adequate touch target.
+
 ## Key Page Logic
 
 ### Items to Order Page (`/items-to-order`)

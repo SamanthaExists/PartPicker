@@ -1,32 +1,30 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, AlertCircle, CheckCircle2, Truck, Filter, Package } from 'lucide-react';
+import { ShoppingCart, ChevronDown, ChevronRight, MapPin, X, Download, AlertCircle, CheckCircle2, Truck, Filter, Package, Wrench } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SearchInput } from '@/components/common/SearchInput';
-import { OrderFilterPopover } from '@/components/common/OrderFilterPopover';
-import { AssemblyFilterPopover } from '@/components/common/AssemblyFilterPopover';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { useItemsToOrder } from '@/hooks/useItemsToOrder';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { exportItemsToOrderToExcel } from '@/lib/excelExport';
 import { alphanumericCompare } from '@/lib/utils';
 import { EmptyState } from '@/components/common/EmptyState';
+import {
+  UnifiedFilterBar,
+  type SortOption,
+} from '@/components/filters';
 
 type SortMode = 'part_number' | 'remaining' | 'location';
 
 const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
+
+const SORT_OPTIONS: SortOption<SortMode>[] = [
+  { value: 'remaining', label: 'Sort by Qty Needed (High to Low)' },
+  { value: 'part_number', label: 'Sort by Part Number' },
+  { value: 'location', label: 'Sort by Location' },
+];
 
 export function ItemsToOrder() {
   const { items, onOrderItems, loading } = useItemsToOrder();
@@ -51,53 +49,39 @@ export function ItemsToOrder() {
   const currentItems = activeTab === 'need-to-order' ? items : onOrderItems;
 
   // Compute unique orders for filter dropdown
-  const uniqueOrders = useMemo(() => {
+  const orderOptions = useMemo(() => {
     const ordersMap = new Map<string, string>(); // order_id -> so_number
     currentItems.forEach(item => {
       item.orders.forEach(o => ordersMap.set(o.order_id, o.so_number));
     });
     return Array.from(ordersMap.entries())
-      .map(([id, so_number]) => ({ id, so_number }))
-      .sort((a, b) => a.so_number.localeCompare(b.so_number, undefined, { numeric: true }));
+      .map(([id, so_number]) => ({ value: id, label: `SO-${so_number}` }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
   }, [currentItems]);
 
   // Compute unique locations for filter dropdown
-  const uniqueLocations = useMemo(() => {
+  const locationOptions = useMemo(() => {
     const locs = new Set<string>();
     currentItems.forEach(item => {
       if (item.location) locs.add(item.location);
     });
-    return Array.from(locs).sort((a, b) => alphanumericCompare(a, b));
+    return Array.from(locs)
+      .sort((a, b) => alphanumericCompare(a, b))
+      .map(loc => ({ value: loc, label: loc }));
   }, [currentItems]);
 
   // Compute unique assemblies for filter dropdown
-  const uniqueAssemblies = useMemo(() => {
+  const assemblyOptions = useMemo(() => {
     const models = new Set<string>();
     currentItems.forEach(item => {
       item.orders.forEach(o => {
         if (o.tool_model) models.add(o.tool_model);
       });
     });
-    return Array.from(models).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    return Array.from(models)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map(model => ({ value: model, label: model }));
   }, [currentItems]);
-
-  const toggleAssembly = (model: string) => {
-    const newSelected = new Set(selectedAssemblies);
-    if (newSelected.has(model)) {
-      newSelected.delete(model);
-    } else {
-      newSelected.add(model);
-    }
-    setSelectedAssemblies(newSelected);
-  };
-
-  const selectAllAssemblies = () => {
-    setSelectedAssemblies(new Set(uniqueAssemblies));
-  };
-
-  const deselectAllAssemblies = () => {
-    setSelectedAssemblies(new Set());
-  };
 
   const hasActiveFilters = selectedOrders.size > 0 || selectedLocations.size > 0 || selectedAssemblies.size > 0;
 
@@ -105,42 +89,6 @@ export function ItemsToOrder() {
     setSelectedOrders(new Set());
     setSelectedLocations(new Set());
     setSelectedAssemblies(new Set());
-  };
-
-  const toggleOrder = (orderId: string) => {
-    const newSelected = new Set(selectedOrders);
-    if (newSelected.has(orderId)) {
-      newSelected.delete(orderId);
-    } else {
-      newSelected.add(orderId);
-    }
-    setSelectedOrders(newSelected);
-  };
-
-  const selectAllOrders = () => {
-    setSelectedOrders(new Set(uniqueOrders.map(o => o.id)));
-  };
-
-  const deselectAllOrders = () => {
-    setSelectedOrders(new Set());
-  };
-
-  const toggleLocation = (location: string) => {
-    const newSelected = new Set(selectedLocations);
-    if (newSelected.has(location)) {
-      newSelected.delete(location);
-    } else {
-      newSelected.add(location);
-    }
-    setSelectedLocations(newSelected);
-  };
-
-  const selectAllLocations = () => {
-    setSelectedLocations(new Set(uniqueLocations));
-  };
-
-  const deselectAllLocations = () => {
-    setSelectedLocations(new Set());
   };
 
   const filteredItems = currentItems.filter((item) => {
@@ -326,116 +274,49 @@ export function ItemsToOrder() {
         </div>
 
         {/* Search and Filters */}
-        <Card className="border-2 border-orange-200 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-950/20 mt-4">
-          <CardContent className="pt-6">
-            <div className="flex flex-col gap-4">
-              {/* Search Bar */}
-              <SearchInput
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Search by part number, description, or location..."
-                large
-              />
-              {/* Filter Options Row */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                  <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-                    <SelectTrigger className="w-52">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="remaining">Sort by Qty Needed (High to Low)</SelectItem>
-                      <SelectItem value="part_number">Sort by Part Number</SelectItem>
-                      <SelectItem value="location">Sort by Location</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <OrderFilterPopover
-                    orders={uniqueOrders}
-                    selectedOrders={selectedOrders}
-                    onToggleOrder={toggleOrder}
-                    onSelectAll={selectAllOrders}
-                    onDeselectAll={deselectAllOrders}
-                  />
-
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-48 justify-between">
-                        <span className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          {selectedLocations.size === 0
-                            ? 'All Locations'
-                            : `${selectedLocations.size} Location${selectedLocations.size !== 1 ? 's' : ''}`}
-                        </span>
-                        <ChevronDown className="h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-56 p-0" align="start">
-                      <div className="p-2 border-b flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="flex-1 h-8"
-                          onClick={selectAllLocations}
-                        >
-                          Select All
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="flex-1 h-8"
-                          onClick={deselectAllLocations}
-                        >
-                          Clear
-                        </Button>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto p-2">
-                        {uniqueLocations.map((loc) => (
-                          <label
-                            key={loc}
-                            className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted rounded cursor-pointer"
-                          >
-                            <Checkbox
-                              checked={selectedLocations.has(loc)}
-                              onCheckedChange={() => toggleLocation(loc)}
-                            />
-                            <span className="text-sm">{loc}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-
-                  <AssemblyFilterPopover
-                    assemblies={uniqueAssemblies}
-                    selectedAssemblies={selectedAssemblies}
-                    onToggleAssembly={toggleAssembly}
-                    onSelectAll={selectAllAssemblies}
-                    onDeselectAll={deselectAllAssemblies}
-                  />
-
-                  {hasActiveFilters && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearFilters}
-                      className="h-9 px-2 text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Clear
-                    </Button>
-                  )}
-                </div>
-                {(debouncedSearch || hasActiveFilters) && (
-                  <span className="text-sm text-muted-foreground">
-                    {filteredItems.length} result{filteredItems.length !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <UnifiedFilterBar
+          variant="warning"
+          className="mt-4"
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search by part number, description, or location..."
+          searchLarge
+          sort={{
+            options: SORT_OPTIONS,
+            value: sortMode,
+            onChange: setSortMode,
+            width: 'w-52',
+          }}
+          dropdowns={[
+            {
+              label: 'Order',
+              icon: Filter,
+              options: orderOptions,
+              selected: selectedOrders,
+              onChange: setSelectedOrders,
+              allLabel: 'All Orders',
+            },
+            {
+              label: 'Location',
+              icon: MapPin,
+              options: locationOptions,
+              selected: selectedLocations,
+              onChange: setSelectedLocations,
+              allLabel: 'All Locations',
+            },
+            {
+              label: 'Assembly',
+              icon: Wrench,
+              options: assemblyOptions,
+              selected: selectedAssemblies,
+              onChange: setSelectedAssemblies,
+              allLabel: 'All Assemblies',
+            },
+          ]}
+          showClearAll={hasActiveFilters}
+          onClearAll={clearFilters}
+          resultCount={(debouncedSearch || hasActiveFilters) ? filteredItems.length : undefined}
+        />
 
         {/* Need to Order Tab Content */}
         <TabsContent value="need-to-order">

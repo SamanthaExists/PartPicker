@@ -1,29 +1,36 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Package, ChevronDown, ChevronRight, MapPin, ArrowUpDown, X, Download, ClipboardList, CheckCircle2, Clock, Layers, List, Copy, FileSpreadsheet, Truck } from 'lucide-react';
+import { Package, ChevronDown, ChevronRight, MapPin, X, Download, ClipboardList, CheckCircle2, Clock, Layers, List, Copy, FileSpreadsheet, Truck, Filter, Wrench } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { SearchInput } from '@/components/common/SearchInput';
-import { OrderFilterPopover } from '@/components/common/OrderFilterPopover';
-import { AssemblyFilterPopover } from '@/components/common/AssemblyFilterPopover';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useConsolidatedParts, type OrderStatusFilter } from '@/hooks/useConsolidatedParts';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { cn, getLocationPrefix, alphanumericCompare } from '@/lib/utils';
 import { exportConsolidatedPartsToExcel, exportPartNumbersToExcel } from '@/lib/excelExport';
 import { MultiOrderPickDialog } from '@/components/picking/MultiOrderPickDialog';
 import type { ConsolidatedPart } from '@/types';
+import {
+  UnifiedFilterBar,
+  type StatusButtonOption,
+  type SortOption,
+} from '@/components/filters';
 
 type SortMode = 'part_number' | 'location' | 'assembly';
+
+const ORDER_STATUS_OPTIONS: StatusButtonOption<OrderStatusFilter>[] = [
+  { value: 'all', label: 'All', shortLabel: 'All', icon: List, title: 'Show parts from all orders' },
+  { value: 'active', label: 'Active', shortLabel: 'Active', icon: Clock, title: 'Show parts from active orders only' },
+  { value: 'complete', label: 'Complete', shortLabel: 'Done', icon: CheckCircle2, title: 'Show parts from completed orders only' },
+];
+
+const SORT_OPTIONS: SortOption<SortMode>[] = [
+  { value: 'part_number', label: 'Sort by Part Number' },
+  { value: 'location', label: 'Sort by Location' },
+  { value: 'assembly', label: 'Sort by Assembly' },
+];
 
 // Shared PartCard component to avoid code duplication
 interface PartCardProps {
@@ -346,68 +353,34 @@ export function ConsolidatedParts() {
   }, [sortMode]);
 
   // Compute unique orders for filter dropdown
-  const uniqueOrders = useMemo(() => {
+  const orderOptions = useMemo(() => {
     const ordersMap = new Map<string, string>(); // order_id -> so_number
     parts.forEach(part => {
       part.orders.forEach(o => ordersMap.set(o.order_id, o.so_number));
     });
     return Array.from(ordersMap.entries())
-      .map(([id, so_number]) => ({ id, so_number }))
-      .sort((a, b) => a.so_number.localeCompare(b.so_number, undefined, { numeric: true }));
+      .map(([id, so_number]) => ({ value: id, label: `SO-${so_number}` }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
   }, [parts]);
 
   // Compute unique assemblies for filter dropdown
-  const uniqueAssemblies = useMemo(() => {
+  const assemblyOptions = useMemo(() => {
     const models = new Set<string>();
     parts.forEach(p => {
       p.orders.forEach(o => {
         if (o.tool_model) models.add(o.tool_model);
       });
     });
-    return Array.from(models).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    return Array.from(models)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map(model => ({ value: model, label: model }));
   }, [parts]);
-
-  const toggleAssembly = (model: string) => {
-    const newSelected = new Set(selectedAssemblies);
-    if (newSelected.has(model)) {
-      newSelected.delete(model);
-    } else {
-      newSelected.add(model);
-    }
-    setSelectedAssemblies(newSelected);
-  };
-
-  const selectAllAssemblies = () => {
-    setSelectedAssemblies(new Set(uniqueAssemblies));
-  };
-
-  const deselectAllAssemblies = () => {
-    setSelectedAssemblies(new Set());
-  };
 
   const hasActiveFilters = selectedOrders.size > 0 || selectedAssemblies.size > 0;
 
   const clearFilters = () => {
     setSelectedOrders(new Set());
     setSelectedAssemblies(new Set());
-  };
-
-  const toggleOrder = (orderId: string) => {
-    const newSelected = new Set(selectedOrders);
-    if (newSelected.has(orderId)) {
-      newSelected.delete(orderId);
-    } else {
-      newSelected.add(orderId);
-    }
-    setSelectedOrders(newSelected);
-  };
-
-  const selectAllOrders = () => {
-    setSelectedOrders(new Set(uniqueOrders.map(o => o.id)));
-  };
-
-  const deselectAllOrders = () => {
-    setSelectedOrders(new Set());
   };
 
   const filteredParts = parts.filter((part) => {
@@ -605,133 +578,72 @@ export function ConsolidatedParts() {
       </div>
 
       {/* Enhanced Search Section */}
-      <Card className="border-2 border-primary/20 bg-primary/5">
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4">
-            {/* Prominent Search Bar */}
-            <SearchInput
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search by part number, description, or location..."
-              large
-            />
-            {/* Filter Options Row */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              {/* Order Status Filter Buttons */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <Layers className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground mr-1">Orders:</span>
-                {[
-                  { key: 'all' as const, label: 'All', shortLabel: 'All', icon: List, title: 'Show parts from all orders' },
-                  { key: 'active' as const, label: 'Active', shortLabel: 'Active', icon: Clock, title: 'Show parts from active orders only' },
-                  { key: 'complete' as const, label: 'Complete', shortLabel: 'Done', icon: CheckCircle2, title: 'Show parts from completed orders only' },
-                ].map(({ key, label, shortLabel, icon: Icon, title }) => (
-                  <Button
-                    key={key}
-                    variant={statusFilter === key ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setStatusFilter(key)}
-                    className="flex items-center gap-1.5"
-                    title={title}
-                    aria-label={title}
-                    aria-pressed={statusFilter === key}
-                  >
-                    <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="hidden sm:inline">{label}</span>
-                    <span className="sm:hidden">{shortLabel}</span>
-                  </Button>
-                ))}
-              </div>
-
-              {/* Sort and filter dropdowns */}
-              <div className="flex flex-wrap items-center gap-2">
-                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="part_number">Sort by Part Number</SelectItem>
-                    <SelectItem value="location">Sort by Location</SelectItem>
-                    <SelectItem value="assembly">Sort by Assembly</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <OrderFilterPopover
-                  orders={uniqueOrders}
-                  selectedOrders={selectedOrders}
-                  onToggleOrder={toggleOrder}
-                  onSelectAll={selectAllOrders}
-                  onDeselectAll={deselectAllOrders}
-                />
-
-                <AssemblyFilterPopover
-                  assemblies={uniqueAssemblies}
-                  selectedAssemblies={selectedAssemblies}
-                  onToggleAssembly={toggleAssembly}
-                  onSelectAll={selectAllAssemblies}
-                  onDeselectAll={deselectAllAssemblies}
-                />
-
-                {hasActiveFilters && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearFilters}
-                    className="h-9 px-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Clear
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Additional Filters Row */}
-            <div className="flex items-center gap-4 justify-between">
-              <div className="flex items-center gap-4 flex-wrap">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <Checkbox
-                    checked={showCompleted}
-                    onCheckedChange={(checked) => setShowCompleted(checked === true)}
-                  />
-                  <span className="text-sm font-medium">Show completed parts</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <Checkbox
-                    checked={hideOutOfStock}
-                    onCheckedChange={(checked) => {
-                      setHideOutOfStock(checked === true);
-                      if (checked) setShowOutOfStockOnly(false);
-                    }}
-                  />
-                  <span className="text-sm font-medium">Hide out of stock</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <Checkbox
-                    checked={showOutOfStockOnly}
-                    onCheckedChange={(checked) => {
-                      setShowOutOfStockOnly(checked === true);
-                      if (checked) setHideOutOfStock(false);
-                    }}
-                  />
-                  <span className="text-sm font-medium">Out of stock only</span>
-                  {outOfStockCount > 0 && (
-                    <Badge variant="secondary" className="text-xs">
-                      {outOfStockCount}
-                    </Badge>
-                  )}
-                </label>
-              </div>
-              {(debouncedSearch || hasActiveFilters) && (
-                <span className="text-sm text-muted-foreground">
-                  {filteredParts.length} result{filteredParts.length !== 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <UnifiedFilterBar
+        variant="primary"
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search by part number, description, or location..."
+        searchLarge
+        statusButtons={ORDER_STATUS_OPTIONS}
+        statusValue={statusFilter}
+        onStatusChange={setStatusFilter}
+        statusLabel={
+          <>
+            <Layers className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground mr-1">Orders:</span>
+          </>
+        }
+        sort={{
+          options: SORT_OPTIONS,
+          value: sortMode,
+          onChange: setSortMode,
+        }}
+        dropdowns={[
+          {
+            label: 'Order',
+            icon: Filter,
+            options: orderOptions,
+            selected: selectedOrders,
+            onChange: setSelectedOrders,
+            allLabel: 'All Orders',
+          },
+          {
+            label: 'Assembly',
+            icon: Wrench,
+            options: assemblyOptions,
+            selected: selectedAssemblies,
+            onChange: setSelectedAssemblies,
+            allLabel: 'All Assemblies',
+          },
+        ]}
+        toggles={[
+          {
+            label: 'Show completed parts',
+            checked: showCompleted,
+            onChange: setShowCompleted,
+          },
+          {
+            label: 'Hide out of stock',
+            checked: hideOutOfStock,
+            onChange: (checked) => {
+              setHideOutOfStock(checked);
+              if (checked) setShowOutOfStockOnly(false);
+            },
+          },
+          {
+            label: 'Out of stock only',
+            checked: showOutOfStockOnly,
+            onChange: (checked) => {
+              setShowOutOfStockOnly(checked);
+              if (checked) setHideOutOfStock(false);
+            },
+            badgeCount: outOfStockCount,
+          },
+        ]}
+        showClearAll={hasActiveFilters}
+        onClearAll={clearFilters}
+        resultCount={(debouncedSearch || hasActiveFilters) ? filteredParts.length : undefined}
+      />
 
       {/* Parts List */}
       {loading ? (

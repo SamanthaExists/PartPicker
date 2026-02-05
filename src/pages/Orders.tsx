@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Upload, Trash2, ArrowUpDown, AlertCircle, Clock, CheckCircle2, Ban, Eye, EyeOff, Download, List, Wrench, AlertTriangle } from 'lucide-react';
+import { Plus, Upload, Trash2, AlertCircle, Clock, CheckCircle2, Ban, Download, List, Wrench, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,17 +18,34 @@ import { Label } from '@/components/ui/label';
 import { useOrders } from '@/hooks/useOrders';
 import { formatDate, getStatusColor, getDueDateStatus, getDueDateColors, cn } from '@/lib/utils';
 import { exportOrdersSummaryToExcel } from '@/lib/excelExport';
-import { AssemblyFilterPopover } from '@/components/common/AssemblyFilterPopover';
 import { parseISO } from 'date-fns';
+import {
+  UnifiedFilterBar,
+  type StatusButtonOption,
+  type SortOption,
+} from '@/components/filters';
 
-type SortOption = 'created' | 'due-date' | 'so-number';
+type OrderSortOption = 'created' | 'due-date' | 'so-number';
+
+const STATUS_OPTIONS: StatusButtonOption<string>[] = [
+  { value: 'all', label: 'All', shortLabel: 'All', icon: List, title: 'Show all orders' },
+  { value: 'active', label: 'Active', shortLabel: 'Active', icon: Clock, title: 'Show orders in progress' },
+  { value: 'complete', label: 'Complete', shortLabel: 'Done', icon: CheckCircle2, title: 'Show completed orders' },
+  { value: 'cancelled', label: 'Cancelled', shortLabel: 'Canc.', icon: Ban, title: 'Show cancelled orders' },
+];
+
+const SORT_OPTIONS: SortOption<OrderSortOption>[] = [
+  { value: 'due-date', label: 'Due Date' },
+  { value: 'created', label: 'Created' },
+  { value: 'so-number', label: 'SO#' },
+];
 
 export function Orders() {
   const { orders, loading, createOrder, deleteOrder } = useOrders();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [hideCompleted, setHideCompleted] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>('due-date');
+  const [sortBy, setSortBy] = useState<OrderSortOption>('due-date');
   const [selectedAssemblies, setSelectedAssemblies] = useState<Set<string>>(new Set());
   const [showNewOrderDialog, setShowNewOrderDialog] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; soNumber: string } | null>(null);
@@ -134,31 +151,15 @@ export function Orders() {
     exportOrdersSummaryToExcel(orders);
   };
 
-  const uniqueAssemblies = useMemo(() => {
+  const assemblyOptions = useMemo(() => {
     const models = new Set<string>();
     orders.forEach(o => {
       if (o.tool_model) models.add(o.tool_model);
     });
-    return Array.from(models).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    return Array.from(models)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map(model => ({ value: model, label: model }));
   }, [orders]);
-
-  const toggleAssembly = (model: string) => {
-    const newSelected = new Set(selectedAssemblies);
-    if (newSelected.has(model)) {
-      newSelected.delete(model);
-    } else {
-      newSelected.add(model);
-    }
-    setSelectedAssemblies(newSelected);
-  };
-
-  const selectAllAssemblies = () => {
-    setSelectedAssemblies(new Set(uniqueAssemblies));
-  };
-
-  const deselectAllAssemblies = () => {
-    setSelectedAssemblies(new Set());
-  };
 
   return (
     <div className="space-y-6">
@@ -188,84 +189,39 @@ export function Orders() {
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4">
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search by SO#, PO#, or customer..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-
-            {/* Status Filter Buttons */}
-            <div className="flex flex-wrap gap-2">
-              {[
-                { key: 'all', label: 'All', shortLabel: 'All', icon: List, title: 'Show all orders' },
-                { key: 'active', label: 'Active', shortLabel: 'Active', icon: Clock, title: 'Show orders in progress' },
-                { key: 'complete', label: 'Complete', shortLabel: 'Done', icon: CheckCircle2, title: 'Show completed orders' },
-                { key: 'cancelled', label: 'Cancelled', shortLabel: 'Canc.', icon: Ban, title: 'Show cancelled orders' },
-              ].map(({ key, label, shortLabel, icon: Icon, title }) => (
-                <Button
-                  key={key}
-                  variant={statusFilter === key ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter(key)}
-                  className="flex items-center gap-1.5"
-                  title={title}
-                  aria-label={title}
-                  aria-pressed={statusFilter === key}
-                >
-                  <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span className="hidden sm:inline">{label}</span>
-                  <span className="sm:hidden">{shortLabel}</span>
-                </Button>
-              ))}
-
-              {/* Sort and filter controls */}
-              <div className="border-l ml-1 pl-1 sm:ml-2 sm:pl-2 flex flex-wrap gap-2">
-                {/* Hide/Show Completed Toggle (only visible when 'all' filter is active) */}
-                {statusFilter === 'all' && (
-                  <Button
-                    variant={hideCompleted ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setHideCompleted(!hideCompleted)}
-                    className="flex items-center gap-1"
-                    title={hideCompleted ? 'Show completed orders' : 'Hide completed orders'}
-                  >
-                    {hideCompleted ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    <span className="hidden sm:inline">{hideCompleted ? 'Hidden' : 'Completed'}</span>
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const options: SortOption[] = ['due-date', 'created', 'so-number'];
-                    const currentIndex = options.indexOf(sortBy);
-                    setSortBy(options[(currentIndex + 1) % options.length]);
-                  }}
-                  className="flex items-center gap-1"
-                >
-                  <ArrowUpDown className="h-4 w-4" />
-                  <span className="hidden sm:inline">{sortBy === 'due-date' ? 'Due Date' : sortBy === 'created' ? 'Created' : 'SO#'}</span>
-                </Button>
-                <AssemblyFilterPopover
-                  assemblies={uniqueAssemblies}
-                  selectedAssemblies={selectedAssemblies}
-                  onToggleAssembly={toggleAssembly}
-                  onSelectAll={selectAllAssemblies}
-                  onDeselectAll={deselectAllAssemblies}
-                />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <UnifiedFilterBar
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search by SO#, PO#, or customer..."
+        statusButtons={STATUS_OPTIONS}
+        statusValue={statusFilter}
+        onStatusChange={setStatusFilter}
+        sort={{
+          options: SORT_OPTIONS,
+          value: sortBy,
+          onChange: setSortBy,
+        }}
+        dropdowns={[
+          {
+            label: 'Assembly',
+            icon: Wrench,
+            options: assemblyOptions,
+            selected: selectedAssemblies,
+            onChange: setSelectedAssemblies,
+            allLabel: 'All Assemblies',
+          },
+        ]}
+        toggles={statusFilter === 'all' ? [
+          {
+            label: 'Hide completed',
+            checked: hideCompleted,
+            onChange: setHideCompleted,
+          },
+        ] : undefined}
+        showClearAll={selectedAssemblies.size > 0}
+        onClearAll={() => setSelectedAssemblies(new Set())}
+        resultCount={filteredAndSortedOrders.length}
+      />
 
       {/* Orders List */}
       {loading ? (

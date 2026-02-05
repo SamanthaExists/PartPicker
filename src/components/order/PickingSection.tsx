@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { CheckCircle2, Package, Plus, Settings, Filter } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { CheckCircle2, Package, Plus, Settings } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SearchInput } from '@/components/common/SearchInput';
+import { FilterMultiSelect } from '@/components/filters';
 import { PickingInterface } from '@/components/picking/PickingInterface';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import type { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '@/types';
@@ -62,26 +63,97 @@ export function PickingSection({
   onDeleteLineItem,
 }: PickingSectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedAssemblies, setSelectedAssemblies] = useState<Set<string>>(new Set());
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
 
-  // Filter items based on search query
+  // Compute unique assemblies from tools AND line items (subassemblies) for filter dropdown
+  const assemblyOptions = useMemo(() => {
+    const assemblies = new Set<string>();
+
+    // Add tool assemblies (tool_model)
+    tools.forEach(tool => {
+      if (tool.tool_model) assemblies.add(tool.tool_model);
+    });
+
+    // Add part subassemblies (assembly_group)
+    lineItems.forEach(item => {
+      if (item.assembly_group) assemblies.add(item.assembly_group);
+    });
+
+    return Array.from(assemblies)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map(asm => ({ value: asm, label: asm }));
+  }, [tools, lineItems]);
+
+  // Get tool IDs that match selected assemblies (for tool_model filtering)
+  const toolIdsForSelectedAssemblies = useMemo(() => {
+    if (selectedAssemblies.size === 0) return null; // null means no filter
+    return new Set(
+      tools
+        .filter(tool => tool.tool_model && selectedAssemblies.has(tool.tool_model))
+        .map(tool => tool.id)
+    );
+  }, [tools, selectedAssemblies]);
+
+  // Filter items based on search query and assembly filter
   const filteredLineItems = lineItems.filter(item => {
+    // Assembly filter: check both tool assembly AND part's assembly_group
+    if (selectedAssemblies.size > 0) {
+      // Check if part's own assembly_group matches
+      const partAssemblyMatches = item.assembly_group && selectedAssemblies.has(item.assembly_group);
+
+      // Check if part belongs to a tool with matching assembly
+      let toolAssemblyMatches = false;
+      if (toolIdsForSelectedAssemblies && toolIdsForSelectedAssemblies.size > 0) {
+        if (!item.tool_ids || item.tool_ids.length === 0) {
+          // Part applies to all tools, matches if any tool has selected assembly
+          toolAssemblyMatches = true;
+        } else {
+          // Part is assigned to specific tools - check if any match
+          toolAssemblyMatches = item.tool_ids.some(tid => toolIdsForSelectedAssemblies.has(tid));
+        }
+      }
+
+      // Part passes filter if either its assembly_group matches OR it belongs to a matching tool
+      if (!partAssemblyMatches && !toolAssemblyMatches) return false;
+    }
+
+    // Search filter
     if (!debouncedSearch) return true;
     const query = debouncedSearch.toLowerCase();
     return (
       item.part_number.toLowerCase().includes(query) ||
       item.description?.toLowerCase().includes(query) ||
-      item.location?.toLowerCase().includes(query)
+      item.location?.toLowerCase().includes(query) ||
+      item.assembly_group?.toLowerCase().includes(query)
     );
   });
 
   const filteredLineItemsWithPicks = lineItemsWithPicks.filter(item => {
+    // Assembly filter: check both tool assembly AND part's assembly_group
+    if (selectedAssemblies.size > 0) {
+      const partAssemblyMatches = item.assembly_group && selectedAssemblies.has(item.assembly_group);
+
+      let toolAssemblyMatches = false;
+      if (toolIdsForSelectedAssemblies && toolIdsForSelectedAssemblies.size > 0) {
+        if (!item.tool_ids || item.tool_ids.length === 0) {
+          toolAssemblyMatches = true;
+        } else {
+          toolAssemblyMatches = item.tool_ids.some(tid => toolIdsForSelectedAssemblies.has(tid));
+        }
+      }
+
+      if (!partAssemblyMatches && !toolAssemblyMatches) return false;
+    }
+
+    // Search filter
     if (!debouncedSearch) return true;
     const query = debouncedSearch.toLowerCase();
     return (
       item.part_number.toLowerCase().includes(query) ||
       item.description?.toLowerCase().includes(query) ||
-      item.location?.toLowerCase().includes(query)
+      item.location?.toLowerCase().includes(query) ||
+      item.assembly_group?.toLowerCase().includes(query)
     );
   });
 
@@ -179,22 +251,31 @@ export function PickingSection({
 
           {/* Filter by Tool Dropdown */}
           {tools.length > 1 && (
-            <div className="flex items-center gap-1">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={toolFilter} onValueChange={onToolFilterChange}>
-                <SelectTrigger className="h-8 w-32 sm:w-40">
-                  <SelectValue placeholder="Filter" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Tools</SelectItem>
-                  {tools.map((tool) => (
-                    <SelectItem key={tool.id} value={tool.id}>
-                      {tool.tool_number}{tool.tool_model ? ` [${tool.tool_model}]` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={toolFilter} onValueChange={onToolFilterChange}>
+              <SelectTrigger className="h-9 w-40 sm:w-44">
+                <SelectValue placeholder="All Tools" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tools</SelectItem>
+                {tools.map((tool) => (
+                  <SelectItem key={tool.id} value={tool.id}>
+                    {tool.tool_number}{tool.tool_model ? ` [${tool.tool_model}]` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Filter by Assembly Dropdown */}
+          {assemblyOptions.length > 0 && (
+            <FilterMultiSelect
+              label="Assembly"
+              options={assemblyOptions}
+              selected={selectedAssemblies}
+              onChange={setSelectedAssemblies}
+              allLabel="All Assemblies"
+              width="w-40 sm:w-44"
+            />
           )}
 
           {/* Manage Tools Button */}
@@ -210,10 +291,12 @@ export function PickingSection({
         </div>
       </div>
 
-      {/* Search results indicator */}
-      {debouncedSearch && (
+      {/* Search/filter results indicator */}
+      {(debouncedSearch || selectedAssemblies.size > 0) && (
         <div className="text-sm text-muted-foreground">
-          {filteredLineItems.length} of {lineItems.length} parts match "{debouncedSearch}"
+          {filteredLineItems.length} of {lineItems.length} parts
+          {debouncedSearch && ` match "${debouncedSearch}"`}
+          {selectedAssemblies.size > 0 && ` (filtered by ${selectedAssemblies.size} assembl${selectedAssemblies.size === 1 ? 'y' : 'ies'})`}
         </div>
       )}
 

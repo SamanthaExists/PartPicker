@@ -187,6 +187,17 @@ UI components use shadcn/ui patterns:
 3. Use Tailwind responsive prefixes (sm:, md:, lg:)
 4. Touch-friendly sizes available: `touch`, `touch-lg`, `touch-xl`
 
+### Base UI Components (`src/components/ui/`)
+
+- **Checkbox** (`checkbox.tsx`): Custom button-based checkbox component. Inner elements use `pointer-events-none` to ensure clicks on the checkmark icon pass through to the button's onClick handler. Without this, clicking a checked checkbox wouldn't toggle it off.
+
+### Filter Components (`src/components/filters/`)
+
+- **FilterToggle**: Checkbox toggle for filter options. Uses a `<div>` container with `role="checkbox"` that handles all clicks - the visual checkbox inside is non-interactive (`aria-hidden`). This avoids button-in-button nesting issues that cause unpredictable click behavior in browsers.
+- **FilterMultiSelect**: Multi-select dropdown with checkboxes
+- **FilterSort**: Sort direction toggle
+- **UnifiedFilterBar**: Composable filter bar that accepts status buttons, dropdowns, toggles, and sort options
+
 ### Mobile-responsive patterns
 - Use `flex-col sm:flex-row` for stacking on mobile
 - Use `hidden sm:inline` for text that hides on mobile (icon-only)

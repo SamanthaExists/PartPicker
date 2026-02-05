@@ -138,7 +138,14 @@ export function PickingInterface({
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [deleteConfirmPick, setDeleteConfirmPick] = useState<Pick | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deletePasswordError, setDeletePasswordError] = useState<string | null>(null);
   const [overPickWarning, setOverPickWarning] = useState<string | null>(null);
+  // Undo password confirmation state
+  const [undoPasswordItem, setUndoPasswordItem] = useState<LineItem | null>(null);
+  const [undoPassword, setUndoPassword] = useState('');
+  const [undoPasswordError, setUndoPasswordError] = useState<string | null>(null);
+  const [isUndoing, setIsUndoing] = useState(false);
   const [deleteConfirmLineItem, setDeleteConfirmLineItem] = useState<LineItem | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     const saved = localStorage.getItem(SORT_PREFERENCE_KEY);
@@ -557,25 +564,70 @@ export function PickingInterface({
     });
   };
 
-  // Undo the most recent pick for a line item
+  // Open password dialog for undo confirmation
   const handleUndoLastPick = async (item: LineItem) => {
-    const history = getPickHistory(item.id, tool.id);
-    if (history.length === 0) return;
+    // Check if there are any picks for this item across all tools
+    const itemWithPicks = lineItemsWithPicks.find(li => li.id === item.id);
+    if (!itemWithPicks || itemWithPicks.picks.length === 0) return;
 
-    const lastPick = history[0];
-    setIsSubmitting(item.id);
-    await onUndoPick(lastPick.id, getUserName());
-    setIsSubmitting(null);
+    // Open password dialog
+    setUndoPasswordItem(item);
+    setUndoPassword('');
+    setUndoPasswordError(null);
   };
 
-  // Delete a specific pick record
+  // Handle password confirmation and bulk undo all picks for this part
+  const handleConfirmUndo = async () => {
+    if (!undoPasswordItem) return;
+
+    // Verify password
+    if (undoPassword !== '1977') {
+      setUndoPasswordError('Incorrect password');
+      return;
+    }
+
+    // Get all picks for this line item (across ALL tools)
+    const itemWithPicks = lineItemsWithPicks.find(li => li.id === undoPasswordItem.id);
+    if (!itemWithPicks || itemWithPicks.picks.length === 0) {
+      setUndoPasswordItem(null);
+      return;
+    }
+
+    setIsUndoing(true);
+    setUndoPasswordError(null);
+
+    try {
+      const userName = getUserName();
+      // Undo ALL picks for this part number (line item) across all tools
+      for (const pick of itemWithPicks.picks) {
+        await onUndoPick(pick.id, userName);
+      }
+      // Close dialog on success
+      setUndoPasswordItem(null);
+      setUndoPassword('');
+    } catch (err) {
+      setUndoPasswordError('Failed to undo picks. Please try again.');
+    } finally {
+      setIsUndoing(false);
+    }
+  };
+
+  // Delete a specific pick record (with password verification)
   const handleDeletePick = async () => {
     if (!deleteConfirmPick) return;
 
+    // Verify password
+    if (deletePassword !== '1977') {
+      setDeletePasswordError('Incorrect password');
+      return;
+    }
+
     setIsDeleting(true);
+    setDeletePasswordError(null);
     await onUndoPick(deleteConfirmPick.id, getUserName());
     setIsDeleting(false);
     setDeleteConfirmPick(null);
+    setDeletePassword('');
   };
 
   // Render desktop line item row with expandable pick history
@@ -651,7 +703,7 @@ export function PickingInterface({
           </div>
 
           {/* Description */}
-          <div className="col-span-2 text-sm text-muted-foreground min-w-0">
+          <div className="col-span-3 text-sm text-muted-foreground min-w-0">
             <div className="truncate">{item.description || '-'}</div>
             {item.assembly_group && (
               <div className="text-xs text-muted-foreground/70 truncate font-mono">
@@ -735,7 +787,7 @@ export function PickingInterface({
           )}
 
           {/* Actions */}
-          <div className={cn("flex justify-end gap-1", "col-span-3")}>
+          <div className={cn("flex justify-end gap-1", "col-span-2")}>
             {/* Undo last pick button - show when there are picks */}
             {hasHistory && (
               <Button
@@ -1310,11 +1362,11 @@ export function PickingInterface({
         hasMultipleTools ? "grid-cols-12" : "grid-cols-12"
       )}>
         <div className="col-span-2">Part Number</div>
-        <div className="col-span-2">Description</div>
+        <div className="col-span-3">Description</div>
         <div className="col-span-2">Location</div>
         <div className="col-span-1 text-center">Stock</div>
         <div className="col-span-2 text-center">{hasMultipleTools ? 'Total' : 'Qty'}</div>
-        <div className="col-span-3 text-center">Actions</div>
+        <div className="col-span-2 text-center">Actions</div>
       </div>
 
       {/* Line Items */}
@@ -1531,18 +1583,24 @@ export function PickingInterface({
       {/* Delete Pick Confirmation Dialog */}
       <Dialog
         open={deleteConfirmPick !== null}
-        onOpenChange={(open) => !open && setDeleteConfirmPick(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteConfirmPick(null);
+            setDeletePassword('');
+            setDeletePasswordError(null);
+          }
+        }}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Pick Record</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this pick record? This action cannot be undone.
+              Enter the password to delete this pick record. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
 
           {deleteConfirmPick && (
-            <div className="py-4">
+            <div className="space-y-4 py-4">
               <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-2">
                 <div className="flex items-center gap-2">
                   <Badge>{deleteConfirmPick.qty_picked}x picked</Badge>
@@ -1559,19 +1617,129 @@ export function PickingInterface({
                   </div>
                 )}
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="deletePassword">Password</Label>
+                <Input
+                  id="deletePassword"
+                  type="password"
+                  placeholder="Enter password to confirm"
+                  value={deletePassword}
+                  onChange={(e) => {
+                    setDeletePassword(e.target.value);
+                    setDeletePasswordError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleDeletePick();
+                    }
+                  }}
+                  autoFocus
+                />
+                {deletePasswordError && (
+                  <p className="text-sm text-red-600 dark:text-red-400">{deletePasswordError}</p>
+                )}
+              </div>
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirmPick(null)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteConfirmPick(null);
+                setDeletePassword('');
+                setDeletePasswordError(null);
+              }}
+              disabled={isDeleting}
+            >
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeletePick}
-              disabled={isDeleting}
+              disabled={isDeleting || !deletePassword}
             >
               {isDeleting ? 'Deleting...' : 'Delete Pick'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Undo Password Confirmation Dialog */}
+      <Dialog
+        open={undoPasswordItem !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setUndoPasswordItem(null);
+            setUndoPassword('');
+            setUndoPasswordError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Undo All Picks</DialogTitle>
+            <DialogDescription>
+              Enter the password to undo all picks for this part. This will remove all pick records across all tools for this order.
+            </DialogDescription>
+          </DialogHeader>
+
+          {undoPasswordItem && (
+            <div className="space-y-4 py-4">
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                <div className="font-medium font-mono text-lg">{undoPasswordItem.part_number}</div>
+                {undoPasswordItem.description && (
+                  <div className="text-sm text-muted-foreground mt-1">{undoPasswordItem.description}</div>
+                )}
+                <div className="text-sm text-amber-700 dark:text-amber-300 mt-2">
+                  <strong>Warning:</strong> This will undo {lineItemsWithPicks.find(li => li.id === undoPasswordItem.id)?.picks.length || 0} pick record(s) totaling {lineItemsWithPicks.find(li => li.id === undoPasswordItem.id)?.total_picked || 0} units.
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="undoPassword">Password</Label>
+                <Input
+                  id="undoPassword"
+                  type="password"
+                  placeholder="Enter password to confirm"
+                  value={undoPassword}
+                  onChange={(e) => {
+                    setUndoPassword(e.target.value);
+                    setUndoPasswordError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleConfirmUndo();
+                    }
+                  }}
+                  autoFocus
+                />
+                {undoPasswordError && (
+                  <p className="text-sm text-red-600 dark:text-red-400">{undoPasswordError}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setUndoPasswordItem(null);
+                setUndoPassword('');
+                setUndoPasswordError(null);
+              }}
+              disabled={isUndoing}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmUndo}
+              disabled={isUndoing || !undoPassword}
+            >
+              {isUndoing ? 'Undoing...' : 'Undo All Picks'}
             </Button>
           </DialogFooter>
         </DialogContent>

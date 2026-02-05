@@ -1,25 +1,19 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  Filter,
   RefreshCw,
   ExternalLink,
   User,
   RotateCcw,
+  List,
+  Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -32,9 +26,28 @@ import { useAllIssues, getIssueTypeLabel, getIssueTypeColor } from '@/hooks/useI
 import { useSettings } from '@/hooks/useSettings';
 import type { IssueWithDetails, IssueType } from '@/types';
 import { cn } from '@/lib/utils';
+import {
+  UnifiedFilterBar,
+  type StatusButtonOption,
+  type SortOption,
+} from '@/components/filters';
 
 type FilterStatus = 'all' | 'open' | 'resolved';
 type FilterType = 'all' | IssueType;
+
+const STATUS_OPTIONS: StatusButtonOption<FilterStatus>[] = [
+  { value: 'all', label: 'All', icon: List, title: 'Show all issues' },
+  { value: 'open', label: 'Open', icon: AlertTriangle, title: 'Show open issues' },
+  { value: 'resolved', label: 'Resolved', icon: CheckCircle, title: 'Show resolved issues' },
+];
+
+const TYPE_OPTIONS: SortOption<FilterType>[] = [
+  { value: 'all', label: 'All Types' },
+  { value: 'out_of_stock', label: 'Out of Stock' },
+  { value: 'wrong_part', label: 'Wrong Part' },
+  { value: 'damaged', label: 'Damaged' },
+  { value: 'other', label: 'Other' },
+];
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -52,14 +65,47 @@ export function Issues() {
   const { getUserName } = useSettings();
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('open');
   const [typeFilter, setTypeFilter] = useState<FilterType>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedAssemblies, setSelectedAssemblies] = useState<Set<string>>(new Set());
   const [resolveConfirm, setResolveConfirm] = useState<IssueWithDetails | null>(null);
   const [reopenConfirm, setReopenConfirm] = useState<IssueWithDetails | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Compute unique assemblies for filter dropdown
+  const assemblyOptions = useMemo(() => {
+    const models = new Set<string>();
+    issues.forEach(issue => {
+      if (issue.order?.tool_model) models.add(issue.order.tool_model);
+    });
+    return Array.from(models)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map(model => ({ value: model, label: model }));
+  }, [issues]);
+
+  const hasActiveFilters = selectedAssemblies.size > 0;
+
+  const clearFilters = () => {
+    setSelectedAssemblies(new Set());
+  };
 
   // Filter issues
   const filteredIssues = issues.filter((issue) => {
     if (statusFilter !== 'all' && issue.status !== statusFilter) return false;
     if (typeFilter !== 'all' && issue.issue_type !== typeFilter) return false;
+    if (selectedAssemblies.size > 0) {
+      if (!issue.order?.tool_model || !selectedAssemblies.has(issue.order.tool_model)) return false;
+    }
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        issue.line_item?.part_number?.toLowerCase().includes(query) ||
+        issue.line_item?.description?.toLowerCase().includes(query) ||
+        issue.description?.toLowerCase().includes(query) ||
+        issue.reported_by?.toLowerCase().includes(query) ||
+        issue.order?.so_number?.toLowerCase().includes(query) ||
+        issue.order?.tool_model?.toLowerCase().includes(query);
+      if (!matchesSearch) return false;
+    }
     return true;
   });
 
@@ -148,34 +194,34 @@ export function Issues() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Filters:</span>
-        </div>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as FilterStatus)}>
-          <SelectTrigger className="w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="open">Open</SelectItem>
-            <SelectItem value="resolved">Resolved</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as FilterType)}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="out_of_stock">Out of Stock</SelectItem>
-            <SelectItem value="wrong_part">Wrong Part</SelectItem>
-            <SelectItem value="damaged">Damaged</SelectItem>
-            <SelectItem value="other">Other</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <UnifiedFilterBar
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search by part number, description, user, assembly..."
+        statusButtons={STATUS_OPTIONS}
+        statusValue={statusFilter}
+        onStatusChange={setStatusFilter}
+        sort={{
+          options: TYPE_OPTIONS,
+          value: typeFilter,
+          onChange: setTypeFilter,
+          showIcon: false,
+          width: 'w-40',
+        }}
+        dropdowns={[
+          {
+            label: 'Assembly',
+            icon: Wrench,
+            options: assemblyOptions,
+            selected: selectedAssemblies,
+            onChange: setSelectedAssemblies,
+            allLabel: 'All Assemblies',
+          },
+        ]}
+        showClearAll={hasActiveFilters}
+        onClearAll={clearFilters}
+        resultCount={filteredIssues.length}
+      />
 
       {/* Issues List */}
       {filteredIssues.length === 0 ? (

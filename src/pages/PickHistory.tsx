@@ -2,22 +2,16 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/lib/supabase';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { exportPickHistoryToExcel, type PickHistoryItem, type PickUndoHistoryItem, type ActivityLogExportItem } from '@/lib/excelExport';
 import { format, parseISO, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import {
-  Clock,
   RefreshCw,
   Search,
   User,
-  Package,
   Download,
-  Calendar,
   Filter,
   ChevronLeft,
   ChevronRight,
@@ -30,6 +24,12 @@ import {
   Minus,
   Upload,
 } from 'lucide-react';
+import { SearchInput } from '@/components/common/SearchInput';
+import {
+  FilterDateRange,
+  FilterToggle,
+  type DatePreset,
+} from '@/components/filters';
 
 interface PickRecord {
   id: string;
@@ -89,7 +89,7 @@ type ActivityRecord = PickRecord | IssueRecord | UndoRecord | ActivityLogRecord;
 const PAGE_SIZE = 50;
 
 // Quick date range presets
-const datePresets = [
+const DATE_PRESETS: DatePreset[] = [
   { label: 'Today', getValue: () => ({ start: startOfDay(new Date()), end: endOfDay(new Date()) }) },
   { label: 'Yesterday', getValue: () => ({ start: startOfDay(subDays(new Date(), 1)), end: endOfDay(subDays(new Date(), 1)) }) },
   { label: 'This Week', getValue: () => ({ start: startOfWeek(new Date(), { weekStartsOn: 1 }), end: endOfWeek(new Date(), { weekStartsOn: 1 }) }) },
@@ -571,7 +571,7 @@ export function PickHistory() {
   }, [showPicks, showIssues, showUndos, showPartChanges, showImports, totalPickCount, totalQtyPicked, allUniqueParts, allUniqueUsers, totalIssueCount, totalUndoCount, activityLogs]);
 
   // Handle preset selection - also triggers search
-  const handlePreset = useCallback((preset: typeof datePresets[0]) => {
+  const handlePreset = useCallback((preset: typeof DATE_PRESETS[0]) => {
     const { start, end } = preset.getValue();
     const newStartDate = format(start, "yyyy-MM-dd'T'HH:mm");
     const newEndDate = format(end, "yyyy-MM-dd'T'HH:mm");
@@ -989,104 +989,34 @@ export function PickHistory() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Quick Presets */}
-          <div className="flex flex-wrap gap-2">
-            {datePresets.map((preset) => (
-              <Button
-                key={preset.label}
-                variant="outline"
-                size="sm"
-                onClick={() => handlePreset(preset)}
-                className="text-xs"
-              >
-                {preset.label}
-              </Button>
-            ))}
-          </div>
-
-          {/* Custom Date/Time Range */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start-date" className="flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                Start Date & Time
-              </Label>
-              <Input
-                id="start-date"
-                type="datetime-local"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="end-date" className="flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                End Date & Time
-              </Label>
-              <Input
-                id="end-date"
-                type="datetime-local"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full"
-              />
-            </div>
-          </div>
+          <FilterDateRange
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+            onSearch={() => fetchData()}
+            presets={DATE_PRESETS}
+            onPresetSelect={handlePreset}
+            loading={loading}
+          />
 
           {/* Activity Type Filters */}
           <div className="flex flex-wrap items-center gap-4">
             <span className="text-sm font-medium">Show:</span>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <Checkbox
-                checked={showPicks}
-                onCheckedChange={(checked) => setShowPicks(checked === true)}
-              />
-              <span className="text-sm">Picks</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <Checkbox
-                checked={showIssues}
-                onCheckedChange={(checked) => setShowIssues(checked === true)}
-              />
-              <span className="text-sm">Issues</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <Checkbox
-                checked={showUndos}
-                onCheckedChange={(checked) => setShowUndos(checked === true)}
-              />
-              <span className="text-sm">Undos</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <Checkbox
-                checked={showPartChanges}
-                onCheckedChange={(checked) => setShowPartChanges(checked === true)}
-              />
-              <span className="text-sm">Part Changes</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <Checkbox
-                checked={showImports}
-                onCheckedChange={(checked) => setShowImports(checked === true)}
-              />
-              <span className="text-sm">Imports</span>
-            </label>
+            <FilterToggle label="Picks" checked={showPicks} onChange={setShowPicks} />
+            <FilterToggle label="Issues" checked={showIssues} onChange={setShowIssues} />
+            <FilterToggle label="Undos" checked={showUndos} onChange={setShowUndos} />
+            <FilterToggle label="Part Changes" checked={showPartChanges} onChange={setShowPartChanges} />
+            <FilterToggle label="Imports" checked={showImports} onChange={setShowImports} />
           </div>
 
-          {/* Search Button */}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button onClick={() => fetchData()} disabled={loading} className="flex-1 sm:flex-none">
-              <Search className={`h-4 w-4 mr-2 ${loading ? 'animate-pulse' : ''}`} />
-              {loading ? 'Searching...' : 'Search'}
+          {/* Export Button */}
+          {hasSearched && filteredActivities.length > 0 && (
+            <Button onClick={handleExport} variant="outline" disabled={exporting}>
+              <Download className={`h-4 w-4 mr-2 ${exporting ? 'animate-pulse' : ''}`} />
+              {exporting ? 'Exporting...' : 'Export Picks to Excel'}
             </Button>
-            {hasSearched && filteredActivities.length > 0 && (
-              <Button onClick={handleExport} variant="outline" className="flex-1 sm:flex-none" disabled={exporting}>
-                <Download className={`h-4 w-4 mr-2 ${exporting ? 'animate-pulse' : ''}`} />
-                {exporting ? 'Exporting...' : 'Export Picks to Excel'}
-              </Button>
-            )}
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1148,15 +1078,11 @@ export function PickHistory() {
           {/* Search Within Results */}
           <Card>
             <CardContent className="pt-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search all picks by name, part number, SO number, tool number..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+              <SearchInput
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search all picks by name, part number, SO number, tool number..."
+              />
             </CardContent>
           </Card>
 

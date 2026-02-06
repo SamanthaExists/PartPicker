@@ -48,24 +48,7 @@ export function PrintTagDialog({
 
     try {
       const printContent = generateTagsHTML(tagsArray);
-
-      // Use a Blob URL so the page loads as a real document with reliable onload
-      const blob = new Blob([printContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const printWindow = window.open(url, '_blank', 'width=600,height=400');
-      if (!printWindow) {
-        URL.revokeObjectURL(url);
-        alert('Please allow popups to print tags');
-        setIsPrinting(false);
-        return;
-      }
-
-      // Don't revoke the blob URL until after printing — Chrome's print
-      // preview can lose access to the content if it's revoked too early.
-      printWindow.onafterprint = () => {
-        URL.revokeObjectURL(url);
-        printWindow.close();
-      };
+      printViaIframe(printContent, `Part Tags - ${firstTag.partNumber}`);
     } finally {
       setIsPrinting(false);
       onOpenChange(false);
@@ -106,7 +89,7 @@ export function PrintTagDialog({
                 width: '340px',
                 height: '66px',
                 border: '1px solid #ddd',
-                padding: '3px 6px 3px 12px',
+                padding: '3px 12px 3px 12px',
                 fontSize: '10px',
                 fontFamily: 'Arial, sans-serif',
               }}
@@ -269,7 +252,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         .tag {
           width: 3.4in;
           height: 0.66in;
-          padding: 0.04in 0.06in 0.03in 0.12in;
+          padding: 0.04in 0.12in 0.03in 0.12in;
           page-break-after: always;
           display: flex;
           flex-direction: column;
@@ -377,22 +360,70 @@ function generateTagsHTML(tagsArray: TagData[]): string {
     </head>
     <body>
       ${tags.join('')}
-      <script>
-        // Delay print() until Chrome has fully painted the content.
-        // Without this, Chrome's print preview shows a loading spinner
-        // forever because print() fires before the first paint completes.
-        // setTimeout is used instead of requestAnimationFrame because rAF
-        // can be throttled/paused in newly opened unfocused windows.
-        window.onload = function() {
-          setTimeout(function() {
-            window.focus();
-            window.print();
-          }, 500);
-        };
-      </script>
     </body>
     </html>
   `;
+}
+
+/**
+ * Print HTML content using a hidden iframe instead of a popup window.
+ * This avoids Chrome's print preview infinite spinner caused by blob URL
+ * pages not completing their first composite pass before window.print() fires.
+ * The iframe renders in the parent page's compositor, so timing is reliable.
+ */
+function printViaIframe(htmlContent: string, title?: string) {
+  // Strip any embedded <script> tags — we control print timing from here
+  const cleanHTML = htmlContent.replace(/<script[\s\S]*?<\/script>/gi, '');
+
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  document.body.appendChild(iframe);
+
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!iframeDoc || !iframe.contentWindow) {
+    document.body.removeChild(iframe);
+    return;
+  }
+
+  // Temporarily set the parent document's title so the print dialog shows it
+  const originalTitle = document.title;
+  if (title) {
+    document.title = title;
+  }
+
+  const cleanup = () => {
+    if (iframe.parentNode) {
+      document.body.removeChild(iframe);
+    }
+    if (title) {
+      document.title = originalTitle;
+    }
+  };
+
+  // Set up onafterprint BEFORE writing content to avoid any race
+  iframe.contentWindow.onafterprint = cleanup;
+
+  // document.write() is synchronous — DOM is ready immediately after close().
+  // No onload handler needed (and it can race with close()).
+  iframeDoc.open();
+  iframeDoc.write(cleanHTML);
+  iframeDoc.close();
+
+  // Delay for Chrome to complete the composite pass, then print.
+  setTimeout(() => {
+    if (iframe.contentWindow) {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    }
+  }, 300);
+
+  // Safety net: clean up after 60s if onafterprint never fires
+  setTimeout(cleanup, 60000);
 }
 
 function escapeHtml(text: string): string {

@@ -159,6 +159,10 @@ export function PickingInterface({
     const saved = localStorage.getItem(STORAGE_KEYS.SHOW_OUT_OF_STOCK);
     return saved === 'true';
   });
+  const [hideIssues, setHideIssues] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.HIDE_ISSUES);
+    return saved === 'true';
+  });
 
   // Persist sort preference
   useEffect(() => {
@@ -175,6 +179,11 @@ export function PickingInterface({
     localStorage.setItem(STORAGE_KEYS.SHOW_OUT_OF_STOCK, String(showOutOfStockOnly));
   }, [showOutOfStockOnly]);
 
+  // Persist hide issues preference
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.HIDE_ISSUES, String(hideIssues));
+  }, [hideIssues]);
+
   const toolPicks = getPicksForTool(tool.id);
   const allToolsPicksMap = useMemo(() => getPicksForAllTools(), [getPicksForAllTools]);
 
@@ -189,7 +198,7 @@ export function PickingInterface({
   }).length;
 
   // Sort and group items
-  const { sortedItems, locationGroups, assemblyGroups, hiddenCount, outOfStockCount } = useMemo(() => {
+  const { sortedItems, locationGroups, assemblyGroups, hiddenCount, outOfStockCount, issueCount } = useMemo(() => {
     // Filter out completed items if hideCompleted is true
     let items = [...filteredLineItems];
     let hiddenItemsCount = 0;
@@ -197,6 +206,9 @@ export function PickingInterface({
 
     // Count items with zero stock
     outOfStockItemsCount = items.filter(item => item.qty_available === 0).length;
+
+    // Count items with open issues
+    const issueItemsCount = hasOpenIssue ? items.filter(item => hasOpenIssue(item.id)).length : 0;
 
     if (hideCompleted) {
       const before = items.length;
@@ -210,6 +222,11 @@ export function PickingInterface({
     // Filter to show only out of stock items if enabled
     if (showOutOfStockOnly) {
       items = items.filter(item => item.qty_available === 0);
+    }
+
+    // Filter out items with open issues if hideIssues is enabled
+    if (hideIssues && hasOpenIssue) {
+      items = items.filter(item => !hasOpenIssue(item.id));
     }
 
     if (sortMode === 'location') {
@@ -241,7 +258,7 @@ export function PickingInterface({
         }
       });
 
-      return { sortedItems: items, locationGroups: groups, assemblyGroups: null, hiddenCount: hiddenItemsCount, outOfStockCount: outOfStockItemsCount };
+      return { sortedItems: items, locationGroups: groups, assemblyGroups: null, hiddenCount: hiddenItemsCount, outOfStockCount: outOfStockItemsCount, issueCount: issueItemsCount };
     } else if (sortMode === 'assembly') {
       // Sort by top-level assembly, then full path, then part number
       items.sort((a, b) => {
@@ -273,13 +290,13 @@ export function PickingInterface({
         }
       });
 
-      return { sortedItems: items, locationGroups: null, assemblyGroups: groups, hiddenCount: hiddenItemsCount, outOfStockCount: outOfStockItemsCount };
+      return { sortedItems: items, locationGroups: null, assemblyGroups: groups, hiddenCount: hiddenItemsCount, outOfStockCount: outOfStockItemsCount, issueCount: issueItemsCount };
     } else {
       // Sort by part number (alphanumeric)
       items.sort((a, b) => alphanumericCompare(a.part_number, b.part_number));
-      return { sortedItems: items, locationGroups: null, assemblyGroups: null, hiddenCount: hiddenItemsCount, outOfStockCount: outOfStockItemsCount };
+      return { sortedItems: items, locationGroups: null, assemblyGroups: null, hiddenCount: hiddenItemsCount, outOfStockCount: outOfStockItemsCount, issueCount: issueItemsCount };
     }
-  }, [filteredLineItems, sortMode, hideCompleted, showOutOfStockOnly, toolPicks]);
+  }, [filteredLineItems, sortMode, hideCompleted, showOutOfStockOnly, hideIssues, hasOpenIssue, toolPicks]);
 
   // Scroll to item after data refresh (e.g., after distribute dialog save)
   useEffect(() => {
@@ -1359,6 +1376,22 @@ export function PickingInterface({
               )}
             </span>
           </label>
+          {hasOpenIssue && (
+            <label className="flex items-center gap-2 cursor-pointer select-none flex-shrink-0 px-2">
+              <Checkbox
+                checked={hideIssues}
+                onCheckedChange={(checked) => setHideIssues(checked === true)}
+              />
+              <span className="text-sm whitespace-nowrap">
+                Hide issues
+                {issueCount > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-xs">
+                    {issueCount}
+                  </Badge>
+                )}
+              </span>
+            </label>
+          )}
         </div>
         {hiddenCount > 0 && (
           <div className="text-xs text-muted-foreground pb-2">
@@ -1393,6 +1426,20 @@ export function PickingInterface({
             </Badge>
           )}
         </label>
+        {hasOpenIssue && (
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <Checkbox
+              checked={hideIssues}
+              onCheckedChange={(checked) => setHideIssues(checked === true)}
+            />
+            <span className="text-sm font-medium">Hide issues</span>
+            {issueCount > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {issueCount}
+              </Badge>
+            )}
+          </label>
+        )}
         <div className="flex items-center gap-2">
           <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
           <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>

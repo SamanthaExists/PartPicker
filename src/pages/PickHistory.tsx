@@ -1237,7 +1237,7 @@ export function PickHistory() {
                       Previous
                     </Button>
                     <span className="text-sm text-muted-foreground">
-                      Page {page + 1} of {Math.ceil(totalPickCount / PAGE_SIZE) || 1}
+                      Page {page + 1} of {Math.max(Math.ceil(totalPickCount / PAGE_SIZE) || 1, hasMore ? page + 2 : page + 1)}
                     </span>
                     <Button
                       variant="outline"

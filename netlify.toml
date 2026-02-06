@@ -1,0 +1,3 @@
+[build]
+  command = "tsc && vite build"
+  publish = "dist"

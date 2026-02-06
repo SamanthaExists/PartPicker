@@ -10,6 +10,7 @@ import {
   RotateCcw,
   List,
   Wrench,
+  Package,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,9 +23,9 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { useAllIssues, getIssueTypeLabel, getIssueTypeColor } from '@/hooks/useIssues';
+import { useUnifiedIssues, getUnifiedIssueTypeLabel, getUnifiedIssueTypeColor } from '@/hooks/useUnifiedIssues';
 import { useSettings } from '@/hooks/useSettings';
-import type { IssueWithDetails, IssueType } from '@/types';
+import type { UnifiedIssue, AnyIssueType, IssueSource } from '@/types';
 import { cn } from '@/lib/utils';
 import {
   UnifiedFilterBar,
@@ -33,7 +34,8 @@ import {
 } from '@/components/filters';
 
 type FilterStatus = 'all' | 'open' | 'resolved';
-type FilterType = 'all' | IssueType;
+type FilterType = 'all' | AnyIssueType;
+type FilterSource = 'all' | IssueSource;
 
 const STATUS_OPTIONS: StatusButtonOption<FilterStatus>[] = [
   { value: 'all', label: 'All', icon: List, title: 'Show all issues' },
@@ -46,7 +48,15 @@ const TYPE_OPTIONS: SortOption<FilterType>[] = [
   { value: 'out_of_stock', label: 'Out of Stock' },
   { value: 'wrong_part', label: 'Wrong Part' },
   { value: 'damaged', label: 'Damaged' },
+  { value: 'inventory_discrepancy', label: 'Inventory Discrepancy' },
+  { value: 'wrong_location', label: 'Wrong Location' },
   { value: 'other', label: 'Other' },
+];
+
+const SOURCE_OPTIONS: SortOption<FilterSource>[] = [
+  { value: 'all', label: 'All Sources' },
+  { value: 'order', label: 'Order Issues' },
+  { value: 'part', label: 'Part Issues' },
 ];
 
 function formatDate(dateString: string): string {
@@ -61,49 +71,52 @@ function formatDate(dateString: string): string {
 }
 
 export function Issues() {
-  const { issues, loading, error, refresh, resolveIssue, reopenIssue } = useAllIssues();
+  const { issues, loading, error, refresh, resolveIssue, reopenIssue } = useUnifiedIssues();
   const { getUserName } = useSettings();
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('open');
   const [typeFilter, setTypeFilter] = useState<FilterType>('all');
+  const [sourceFilter, setSourceFilter] = useState<FilterSource>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAssemblies, setSelectedAssemblies] = useState<Set<string>>(new Set());
-  const [resolveConfirm, setResolveConfirm] = useState<IssueWithDetails | null>(null);
-  const [reopenConfirm, setReopenConfirm] = useState<IssueWithDetails | null>(null);
+  const [resolveConfirm, setResolveConfirm] = useState<UnifiedIssue | null>(null);
+  const [reopenConfirm, setReopenConfirm] = useState<UnifiedIssue | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Compute unique assemblies for filter dropdown
   const assemblyOptions = useMemo(() => {
     const models = new Set<string>();
     issues.forEach(issue => {
-      if (issue.order?.tool_model) models.add(issue.order.tool_model);
+      if (issue.tool_model) models.add(issue.tool_model);
     });
     return Array.from(models)
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
       .map(model => ({ value: model, label: model }));
   }, [issues]);
 
-  const hasActiveFilters = selectedAssemblies.size > 0;
+  const hasActiveFilters = selectedAssemblies.size > 0 || sourceFilter !== 'all';
 
   const clearFilters = () => {
     setSelectedAssemblies(new Set());
+    setSourceFilter('all');
   };
 
   // Filter issues
   const filteredIssues = issues.filter((issue) => {
     if (statusFilter !== 'all' && issue.status !== statusFilter) return false;
     if (typeFilter !== 'all' && issue.issue_type !== typeFilter) return false;
+    if (sourceFilter !== 'all' && issue.source !== sourceFilter) return false;
     if (selectedAssemblies.size > 0) {
-      if (!issue.order?.tool_model || !selectedAssemblies.has(issue.order.tool_model)) return false;
+      if (!issue.tool_model || !selectedAssemblies.has(issue.tool_model)) return false;
     }
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const matchesSearch =
-        issue.line_item?.part_number?.toLowerCase().includes(query) ||
-        issue.line_item?.description?.toLowerCase().includes(query) ||
+        issue.part_number?.toLowerCase().includes(query) ||
+        issue.part_description?.toLowerCase().includes(query) ||
         issue.description?.toLowerCase().includes(query) ||
         issue.reported_by?.toLowerCase().includes(query) ||
-        issue.order?.so_number?.toLowerCase().includes(query) ||
-        issue.order?.tool_model?.toLowerCase().includes(query);
+        issue.so_number?.toLowerCase().includes(query) ||
+        issue.tool_model?.toLowerCase().includes(query);
       if (!matchesSearch) return false;
     }
     return true;
@@ -116,7 +129,7 @@ export function Issues() {
   const handleResolve = async () => {
     if (!resolveConfirm) return;
     setIsProcessing(true);
-    await resolveIssue(resolveConfirm.id, getUserName());
+    await resolveIssue(resolveConfirm, getUserName());
     setResolveConfirm(null);
     setIsProcessing(false);
   };
@@ -124,7 +137,7 @@ export function Issues() {
   const handleReopen = async () => {
     if (!reopenConfirm) return;
     setIsProcessing(true);
-    await reopenIssue(reopenConfirm.id);
+    await reopenIssue(reopenConfirm);
     setReopenConfirm(null);
     setIsProcessing(false);
   };
@@ -206,9 +219,23 @@ export function Issues() {
           value: typeFilter,
           onChange: setTypeFilter,
           showIcon: false,
-          width: 'w-40',
+          width: 'w-48',
         }}
         dropdowns={[
+          {
+            label: 'Source',
+            icon: Package,
+            options: SOURCE_OPTIONS.filter(o => o.value !== 'all').map(o => ({ value: o.value, label: o.label })),
+            selected: sourceFilter === 'all' ? new Set<string>() : new Set([sourceFilter]),
+            onChange: (selected) => {
+              if (selected.size === 0 || selected.size === 2) {
+                setSourceFilter('all');
+              } else {
+                setSourceFilter(Array.from(selected)[0] as FilterSource);
+              }
+            },
+            allLabel: 'All Sources',
+          },
           {
             label: 'Assembly',
             icon: Wrench,
@@ -240,7 +267,7 @@ export function Issues() {
         <div className="space-y-3">
           {filteredIssues.map((issue) => (
             <Card
-              key={issue.id}
+              key={`${issue.source}-${issue.id}`}
               className={cn(
                 issue.status === 'resolved' && 'opacity-60'
               )}
@@ -251,20 +278,23 @@ export function Issues() {
                     {/* Part and Order Info */}
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className="font-mono font-medium text-lg">
-                        {issue.line_item?.part_number || 'Unknown Part'}
+                        {issue.part_number || 'Unknown Part'}
                       </span>
-                      <Badge className={cn(getIssueTypeColor(issue.issue_type))}>
-                        {getIssueTypeLabel(issue.issue_type)}
+                      <Badge className={cn(getUnifiedIssueTypeColor(issue.issue_type))}>
+                        {getUnifiedIssueTypeLabel(issue.issue_type)}
                       </Badge>
                       <Badge variant={issue.status === 'open' ? 'destructive' : 'success'}>
                         {issue.status === 'open' ? 'Open' : 'Resolved'}
                       </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {issue.source === 'order' ? 'Order' : 'Part'}
+                      </Badge>
                     </div>
 
-                    {/* Description */}
-                    {issue.line_item?.description && (
+                    {/* Part description */}
+                    {issue.part_description && (
                       <p className="text-sm text-muted-foreground">
-                        {issue.line_item.description}
+                        {issue.part_description}
                       </p>
                     )}
 
@@ -277,13 +307,13 @@ export function Issues() {
 
                     {/* Meta info */}
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      {issue.order && (
+                      {issue.source === 'order' && issue.so_number && (
                         <Link
                           to={`/orders/${issue.order_id}`}
                           className="flex items-center gap-1 hover:text-foreground"
                         >
                           <ExternalLink className="h-3 w-3" />
-                          SO# {issue.order.so_number}
+                          SO# {issue.so_number}
                         </Link>
                       )}
                       {issue.reported_by && (
@@ -346,9 +376,9 @@ export function Issues() {
           </DialogHeader>
           {resolveConfirm && (
             <div className="py-4">
-              <p className="font-mono font-medium">{resolveConfirm.line_item?.part_number}</p>
+              <p className="font-mono font-medium">{resolveConfirm.part_number}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {getIssueTypeLabel(resolveConfirm.issue_type)}
+                {getUnifiedIssueTypeLabel(resolveConfirm.issue_type)}
               </p>
               {resolveConfirm.description && (
                 <p className="text-sm bg-muted rounded px-3 py-2 mt-2">
@@ -379,9 +409,9 @@ export function Issues() {
           </DialogHeader>
           {reopenConfirm && (
             <div className="py-4">
-              <p className="font-mono font-medium">{reopenConfirm.line_item?.part_number}</p>
+              <p className="font-mono font-medium">{reopenConfirm.part_number}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {getIssueTypeLabel(reopenConfirm.issue_type)}
+                {getUnifiedIssueTypeLabel(reopenConfirm.issue_type)}
               </p>
             </div>
           )}

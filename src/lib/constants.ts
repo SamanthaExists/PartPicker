@@ -8,6 +8,7 @@ export const STORAGE_KEYS = {
   SORT_PREFERENCE: 'picking-sort-preference',
   HIDE_COMPLETED: 'picking-hide-completed',
   SHOW_OUT_OF_STOCK: 'picking-show-out-of-stock',
+  HIDE_ISSUES: 'picking-hide-issues',
 } as const;
 
 // Limits

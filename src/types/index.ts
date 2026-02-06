@@ -76,6 +76,28 @@ export interface IssueWithDetails extends Issue {
   order?: Order;
 }
 
+// Unified issue types for the Issues page (combines both issue systems)
+export type AnyIssueType = IssueType | PartIssueType;
+export type IssueSource = 'order' | 'part';
+
+export interface UnifiedIssue {
+  id: string;
+  source: IssueSource;
+  issue_type: AnyIssueType;
+  description: string | null;
+  reported_by: string | null;
+  status: 'open' | 'resolved';
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  // Flattened fields from joins
+  part_number: string | null;
+  part_description: string | null;
+  so_number: string | null;
+  order_id: string | null;
+  tool_model: string | null;
+}
+
 // Part-level issue (for inventory discrepancies, etc.)
 export interface PartIssue {
   id: string;

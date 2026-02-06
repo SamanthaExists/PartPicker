@@ -366,10 +366,10 @@ function generateTagsHTML(tagsArray: TagData[]): string {
 }
 
 /**
- * Print HTML content using a hidden iframe instead of a popup window.
- * This avoids Chrome's print preview infinite spinner caused by blob URL
- * pages not completing their first composite pass before window.print() fires.
- * The iframe renders in the parent page's compositor, so timing is reliable.
+ * Print HTML content using a hidden iframe with srcdoc.
+ * Uses srcdoc + onload + double requestAnimationFrame to guarantee
+ * Chrome's compositor has fully painted before window.print() fires.
+ * This prevents the "Loading preview..." hang in the print dialog.
  */
 function printViaIframe(htmlContent: string, title?: string) {
   // Strip any embedded <script> tags — we control print timing from here
@@ -377,7 +377,6 @@ function printViaIframe(htmlContent: string, title?: string) {
 
   // Use full viewport dimensions positioned off-screen. Chrome skips
   // layout/paint for zero-size iframes, causing print preview to hang.
-  // This matches react-to-print's approach.
   const vw = document.documentElement.clientWidth;
   const vh = document.documentElement.clientHeight;
   const iframe = document.createElement('iframe');
@@ -387,13 +386,6 @@ function printViaIframe(htmlContent: string, title?: string) {
   iframe.style.width = `${vw}px`;
   iframe.style.height = `${vh}px`;
   iframe.style.border = 'none';
-  document.body.appendChild(iframe);
-
-  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-  if (!iframeDoc || !iframe.contentWindow) {
-    document.body.removeChild(iframe);
-    return;
-  }
 
   // Temporarily set the parent document's title so the print dialog shows it
   const originalTitle = document.title;
@@ -410,21 +402,35 @@ function printViaIframe(htmlContent: string, title?: string) {
     }
   };
 
-  // Set up onafterprint BEFORE writing content to avoid any race
-  iframe.contentWindow.onafterprint = cleanup;
-
-  // document.write() is synchronous — DOM is ready immediately after close().
-  iframeDoc.open();
-  iframeDoc.write(cleanHTML);
-  iframeDoc.close();
-
-  // Wait for Chrome to complete layout + composite pass, then print.
-  setTimeout(() => {
-    if (iframe.contentWindow) {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
+  // onload fires after srcdoc content is fully parsed and rendered
+  iframe.onload = () => {
+    const win = iframe.contentWindow;
+    if (!win) {
+      cleanup();
+      return;
     }
-  }, 500);
+
+    win.onafterprint = cleanup;
+
+    // Force synchronous layout so the compositor has geometry to work with
+    const body = win.document.body;
+    if (body) {
+      void body.offsetHeight;
+    }
+
+    // Double rAF guarantees at least one full composite pass is complete
+    win.requestAnimationFrame(() => {
+      win.requestAnimationFrame(() => {
+        win.focus();
+        win.print();
+      });
+    });
+  };
+
+  // srcdoc triggers a proper document load cycle (unlike document.write),
+  // so onload fires reliably after content is rendered
+  iframe.srcdoc = cleanHTML;
+  document.body.appendChild(iframe);
 
   // Safety net: clean up after 60s if onafterprint never fires
   setTimeout(cleanup, 60000);

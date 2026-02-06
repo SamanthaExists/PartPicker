@@ -16,5 +16,4 @@ declare module 'virtual:pwa-register' {
 // Extend Window interface for custom events
 interface WindowEventMap {
   'sw-update': CustomEvent<{ update: () => void }>;
-  'offline-queue-ready-to-sync': CustomEvent<{ count: number }>;
 }

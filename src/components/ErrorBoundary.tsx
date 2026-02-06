@@ -4,6 +4,11 @@ interface Props {
   children: ReactNode;
 }
 
+interface PageErrorBoundaryProps {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
 interface State {
   hasError: boolean;
   error: Error | null;
@@ -48,6 +53,53 @@ export class ErrorBoundary extends Component<Props, State> {
             >
               Reload Page
             </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export class PageErrorBoundary extends Component<PageErrorBoundaryProps, State> {
+  constructor(props: PageErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 px-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 max-w-lg w-full text-center">
+            <h2 className="text-xl font-bold text-red-600 dark:text-red-400 mb-2">Page Error</h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Something went wrong loading this page.
+            </p>
+            {import.meta.env.DEV && this.state.error && (
+              <pre className="text-xs text-left text-red-800 dark:text-red-300 bg-gray-100 dark:bg-gray-800 rounded p-3 mb-4 overflow-auto whitespace-pre-wrap">
+                {this.state.error.message}
+              </pre>
+            )}
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => this.setState({ hasError: false, error: null })}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
+              >
+                Try Again
+              </button>
+              <a
+                href="/"
+                className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+              >
+                Go to Dashboard
+              </a>
+            </div>
           </div>
         </div>
       );

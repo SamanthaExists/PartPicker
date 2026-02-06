@@ -16,7 +16,7 @@ const updateSW = registerSW({
     );
   },
   onOfflineReady() {
-    console.log('App is ready to work offline');
+    // App is ready to work offline
   },
   onRegistered(registration) {
     if (registration) {
@@ -27,7 +27,9 @@ const updateSW = registerSW({
     }
   },
   onRegisterError(error) {
-    console.error('Service worker registration failed:', error);
+    if (import.meta.env.DEV) {
+      console.error('Service worker registration failed:', error);
+    }
   },
 });
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { SUPABASE_PAGE_SIZE, SUPABASE_BATCH_SIZE } from '@/lib/constants';
 import type { ConsolidatedPart } from '@/types';
 
 export type OrderStatusFilter = 'all' | 'active' | 'complete';
@@ -15,8 +16,24 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
       setError(null);
 
       // Fetch all line items with pagination to avoid Supabase's 1000 row default limit
-      const PAGE_SIZE = 1000;
-      let allLineItems: any[] = [];
+      interface LineItemWithOrder {
+        id: string;
+        part_number: string;
+        description: string | null;
+        location: string | null;
+        qty_available: number | null;
+        qty_on_order: number | null;
+        total_qty_needed: number;
+        order_id: string;
+        orders: {
+          id: string;
+          so_number: string;
+          order_date: string | null;
+          tool_model: string | null;
+          status: string;
+        };
+      }
+      let allLineItems: LineItemWithOrder[] = [];
       let page = 0;
       let hasMore = true;
 
@@ -42,7 +59,7 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
             )
           `)
           .neq('orders.status', 'cancelled') // Always exclude cancelled orders
-          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+          .range(page * SUPABASE_PAGE_SIZE, (page + 1) * SUPABASE_PAGE_SIZE - 1);
 
         // Apply additional status filter if not 'all'
         if (statusFilter === 'active') {
@@ -56,8 +73,8 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
         if (pageError) throw pageError;
 
         if (pageData && pageData.length > 0) {
-          allLineItems = allLineItems.concat(pageData);
-          hasMore = pageData.length === PAGE_SIZE;
+          allLineItems = allLineItems.concat(pageData as unknown as LineItemWithOrder[]);
+          hasMore = pageData.length === SUPABASE_PAGE_SIZE;
           page++;
         } else {
           hasMore = false;
@@ -73,11 +90,10 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
       // Batch the requests to avoid URL length limits
       let picksData: { line_item_id: string; qty_picked: number }[] = [];
       if (lineItemIds.length > 0) {
-        const BATCH_SIZE = 50; // Supabase URL length limit workaround
         const batches: string[][] = [];
 
-        for (let i = 0; i < lineItemIds.length; i += BATCH_SIZE) {
-          batches.push(lineItemIds.slice(i, i + BATCH_SIZE));
+        for (let i = 0; i < lineItemIds.length; i += SUPABASE_BATCH_SIZE) {
+          batches.push(lineItemIds.slice(i, i + SUPABASE_BATCH_SIZE));
         }
 
         const batchResults = await Promise.all(
@@ -108,7 +124,7 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
       const partsMap = new Map<string, ConsolidatedPart>();
 
       for (const item of lineItemsData || []) {
-        const orderInfo = item.orders as any;
+        const orderInfo = item.orders;
         const picked = picksByLineItem.get(item.id) || 0;
 
         const existing = partsMap.get(item.part_number);
@@ -189,27 +205,35 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
   useEffect(() => {
     fetchParts();
 
+    // Debounce refetches from real-time events to avoid rapid re-queries
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedFetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchParts(), 1000);
+    };
+
     // Subscribe to real-time updates
     const subscription = supabase
       .channel('consolidated-parts')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'picks' },
-        () => fetchParts()
+        debouncedFetch
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'line_items' },
-        () => fetchParts()
+        debouncedFetch
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
-        () => fetchParts()
+        debouncedFetch
       )
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       subscription.unsubscribe();
     };
   }, [fetchParts]);

@@ -54,17 +54,13 @@ export function useOrders() {
   useEffect(() => {
     fetchOrders();
 
-    // Subscribe to real-time updates
+    // Subscribe to real-time updates on orders table only
+    // Pick changes are handled by useOrder/usePicks at the order detail level
     const ordersSubscription = supabase
       .channel('orders-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
-        () => fetchOrders()
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'picks' },
         () => fetchOrders()
       )
       .subscribe();

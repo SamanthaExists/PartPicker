@@ -60,16 +60,12 @@ export function useConsolidatedPartsPicking() {
         throw new Error('No line item IDs found. Try refreshing the page.');
       }
 
-      console.log('Fetching picking data for line items:', lineItemIds);
-      console.log('Part orders:', part.orders);
-
       // Fetch line items with their qty_per_unit
       const { data: lineItemsData, error: lineItemsError } = await supabase
         .from('line_items')
         .select('id, order_id, qty_per_unit')
         .in('id', lineItemIds);
 
-      console.log('Line items result:', lineItemsData, lineItemsError);
       if (lineItemsError) throw lineItemsError;
 
       // Create map of line item data
@@ -80,7 +76,6 @@ export function useConsolidatedPartsPicking() {
 
       // Fetch all tools for the orders involved
       const orderIds = part.orders.map(o => o.order_id);
-      console.log('Fetching tools for orders:', orderIds);
 
       const { data: toolsData, error: toolsError } = await supabase
         .from('tools')
@@ -88,7 +83,6 @@ export function useConsolidatedPartsPicking() {
         .in('order_id', orderIds)
         .order('tool_number');
 
-      console.log('Tools result:', toolsData, toolsError);
       if (toolsError) throw toolsError;
 
       // Group tools by order

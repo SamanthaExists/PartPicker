@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { SUPABASE_PAGE_SIZE } from './constants';
 
 /**
  * Supabase has a default limit of 1000 rows per query.
@@ -11,8 +12,6 @@ import { supabase } from './supabase';
  * - Any table that could grow large
  */
 
-const PAGE_SIZE = 1000;
-
 /**
  * Helper to fetch all rows from a table with a simple select.
  * Handles pagination automatically.
@@ -20,6 +19,7 @@ const PAGE_SIZE = 1000;
  * @example
  * const lineItems = await fetchAllFromTable('line_items', 'id, part_number, order_id');
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchAllFromTable<T = any>(
   table: string,
   select: string = '*',
@@ -34,8 +34,7 @@ export async function fetchAllFromTable<T = any>(
   let hasMore = true;
 
   while (hasMore) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let query: any = supabase.from(table).select(select);
+    let query = supabase.from(table).select(select);
 
     if (options?.filter) {
       query = options.filter(query);
@@ -48,15 +47,15 @@ export async function fetchAllFromTable<T = any>(
     }
 
     const { data, error } = await query.range(
-      page * PAGE_SIZE,
-      (page + 1) * PAGE_SIZE - 1
+      page * SUPABASE_PAGE_SIZE,
+      (page + 1) * SUPABASE_PAGE_SIZE - 1
     );
 
     if (error) throw error;
 
     if (data && data.length > 0) {
       allData = allData.concat(data as T[]);
-      hasMore = data.length === PAGE_SIZE;
+      hasMore = data.length === SUPABASE_PAGE_SIZE;
       page++;
     } else {
       hasMore = false;

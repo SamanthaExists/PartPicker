@@ -301,13 +301,38 @@ export async function parseExcelFile(file: File): Promise<ParseResult> {
       };
     }
 
+    // Validate line items
+    const seenParts = new Map<string, number>();
+    for (const item of lineItems) {
+      if (item.qty_per_unit <= 0 && item.total_qty_needed <= 0) {
+        warnings.push(`Part "${item.part_number}" has zero quantity and will be skipped`);
+      }
+      const count = (seenParts.get(item.part_number) || 0) + 1;
+      seenParts.set(item.part_number, count);
+    }
+    for (const [partNum, count] of seenParts) {
+      if (count > 1) {
+        warnings.push(`Part "${partNum}" appears ${count} times - quantities may need review`);
+      }
+    }
+
+    // Filter out zero-qty items
+    const validLineItems = lineItems.filter(item => item.qty_per_unit > 0 || item.total_qty_needed > 0);
+    if (validLineItems.length === 0) {
+      return {
+        success: false,
+        errors: ['All line items had zero quantity'],
+        warnings
+      };
+    }
+
     // Create default tool if none detected
     const finalTools = tools.length > 0 ? tools : [{ tool_number: `${soNumber}-1` }];
 
     const order: ImportedOrder = {
       so_number: soNumber,
       tools: finalTools,
-      line_items: lineItems,
+      line_items: validLineItems,
     };
 
     return { success: true, order, errors, warnings };

@@ -31,9 +31,9 @@ import { DistributeInventoryDialog } from './DistributeInventoryDialog';
 import { PrintTagDialog, type TagData } from './PrintTagDialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-type SortMode = 'part_number' | 'location' | 'assembly';
+import { STORAGE_KEYS } from '@/lib/constants';
 
-const SORT_PREFERENCE_KEY = 'picking-sort-preference';
+type SortMode = 'part_number' | 'location' | 'assembly';
 
 interface PickingInterfaceProps {
   tool: Tool;
@@ -148,31 +148,31 @@ export function PickingInterface({
   const [isUndoing, setIsUndoing] = useState(false);
   const [deleteConfirmLineItem, setDeleteConfirmLineItem] = useState<LineItem | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>(() => {
-    const saved = localStorage.getItem(SORT_PREFERENCE_KEY);
+    const saved = localStorage.getItem(STORAGE_KEYS.SORT_PREFERENCE);
     return (saved as SortMode) || 'part_number';
   });
   const [hideCompleted, setHideCompleted] = useState(() => {
-    const saved = localStorage.getItem('picking-hide-completed');
+    const saved = localStorage.getItem(STORAGE_KEYS.HIDE_COMPLETED);
     return saved === 'true';
   });
   const [showOutOfStockOnly, setShowOutOfStockOnly] = useState(() => {
-    const saved = localStorage.getItem('picking-show-out-of-stock');
+    const saved = localStorage.getItem(STORAGE_KEYS.SHOW_OUT_OF_STOCK);
     return saved === 'true';
   });
 
   // Persist sort preference
   useEffect(() => {
-    localStorage.setItem(SORT_PREFERENCE_KEY, sortMode);
+    localStorage.setItem(STORAGE_KEYS.SORT_PREFERENCE, sortMode);
   }, [sortMode]);
 
   // Persist hide completed preference
   useEffect(() => {
-    localStorage.setItem('picking-hide-completed', String(hideCompleted));
+    localStorage.setItem(STORAGE_KEYS.HIDE_COMPLETED, String(hideCompleted));
   }, [hideCompleted]);
 
   // Persist out of stock filter preference
   useEffect(() => {
-    localStorage.setItem('picking-show-out-of-stock', String(showOutOfStockOnly));
+    localStorage.setItem(STORAGE_KEYS.SHOW_OUT_OF_STOCK, String(showOutOfStockOnly));
   }, [showOutOfStockOnly]);
 
   const toolPicks = getPicksForTool(tool.id);
@@ -1705,7 +1705,7 @@ export function PickingInterface({
                   autoFocus
                 />
                 {deletePasswordError && (
-                  <p className="text-sm text-red-600 dark:text-red-400">{deletePasswordError}</p>
+                  <p className="text-sm text-red-600 dark:text-red-400" role="alert">{deletePasswordError}</p>
                 )}
               </div>
             </div>
@@ -1784,7 +1784,7 @@ export function PickingInterface({
                   autoFocus
                 />
                 {undoPasswordError && (
-                  <p className="text-sm text-red-600 dark:text-red-400">{undoPasswordError}</p>
+                  <p className="text-sm text-red-600 dark:text-red-400" role="alert">{undoPasswordError}</p>
                 )}
               </div>
             </div>

@@ -133,13 +133,35 @@ export function usePicks(orderId: string | undefined) {
       const newTotal = currentTotal + qtyPicked;
       const needed = lineItem?.total_qty_needed || 0;
 
+      // Block over-picking: clamp quantity to what's actually needed
+      let actualQtyPicked = qtyPicked;
+      let overPickWarning: string | undefined;
+      if (newTotal > needed && needed > 0) {
+        const maxCanPick = needed - currentTotal;
+        if (maxCanPick <= 0) {
+          // Already fully picked - warn but don't record
+          return {
+            id: '',
+            line_item_id: lineItemId,
+            tool_id: toolId,
+            qty_picked: 0,
+            picked_by: pickedBy || null,
+            notes: notes || null,
+            picked_at: new Date().toISOString(),
+            overPickWarning: `Already fully picked (${currentTotal}/${needed}). Another user may have picked this item at the same time.`,
+          };
+        }
+        actualQtyPicked = maxCanPick;
+        overPickWarning = `Quantity clamped from ${qtyPicked} to ${actualQtyPicked} to avoid over-picking (${needed} total needed).`;
+      }
+
       // Record the pick
       const { data, error } = await supabase
         .from('picks')
         .insert({
           line_item_id: lineItemId,
           tool_id: toolId,
-          qty_picked: qtyPicked,
+          qty_picked: actualQtyPicked,
           picked_by: pickedBy || null,
           notes: notes || null,
         })
@@ -148,12 +170,8 @@ export function usePicks(orderId: string | undefined) {
 
       if (error) throw error;
 
-      // Add warning if this pick causes over-picking
-      if (newTotal > needed) {
-        return {
-          ...data,
-          overPickWarning: `Over-picked! ${newTotal} picked but only ${needed} needed. Someone may have picked this item at the same time.`,
-        };
+      if (overPickWarning) {
+        return { ...data, overPickWarning };
       }
 
       return data;
@@ -288,7 +306,7 @@ export function usePicks(orderId: string | undefined) {
         .from('tools')
         .select('id, tool_number')
         .in('id', toolIds);
-      const toolNumberMap = new Map((toolsData || []).map((t: any) => [t.id, t.tool_number as string]));
+      const toolNumberMap = new Map((toolsData || []).map((t) => [t.id, t.tool_number]));
 
       // Process each tool's allocation change
       for (const [toolId, targetQty] of newAllocations) {
@@ -469,7 +487,18 @@ export function useRecentActivity() {
         console.error('Error fetching activity:', picksError);
       }
 
-      const pickActivities: RecentActivity[] = (picksData || []).map((pick: any) => ({
+      interface PickWithRelations {
+        id: string;
+        qty_picked: number;
+        picked_by: string | null;
+        picked_at: string;
+        line_items: {
+          part_number: string;
+          order_id: string;
+          orders: { so_number: string };
+        };
+      }
+      const pickActivities: RecentActivity[] = ((picksData ?? []) as unknown as PickWithRelations[]).map((pick) => ({
         id: pick.id,
         type: 'pick' as const,
         message: `Picked ${pick.qty_picked}x ${pick.line_items.part_number}`,
@@ -490,7 +519,7 @@ export function useRecentActivity() {
         console.error('Error fetching undo activity:', undoError);
       }
 
-      const undoActivities: RecentActivity[] = (undoData || []).map((undo: any) => ({
+      const undoActivities: RecentActivity[] = (undoData || []).map((undo) => ({
         id: undo.id,
         type: 'pick_undo' as const,
         message: `Undid ${undo.qty_picked}x ${undo.part_number}`,

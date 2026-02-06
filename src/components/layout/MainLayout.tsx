@@ -8,8 +8,6 @@ import {
   Settings,
   Menu,
   X,
-  Wifi,
-  WifiOff,
   AlertTriangle,
   History,
   User,
@@ -26,7 +24,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { GlobalSearch } from '@/components/layout/GlobalSearch';
-import { useOnlineStatus } from '@/hooks/useOffline';
 import { useSettings } from '@/hooks/useSettings';
 import { useTheme } from '@/hooks/useTheme';
 import { InstallButton } from '@/components/pwa/InstallPrompt';
@@ -46,34 +43,6 @@ const navItems = [
   { path: '/import', label: 'Import', icon: Upload },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
-
-function OnlineStatusBadge({ className }: { className?: string }) {
-  const isOnline = useOnlineStatus();
-
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium',
-        isOnline
-          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-        className
-      )}
-    >
-      {isOnline ? (
-        <>
-          <Wifi className="h-3 w-3" />
-          <span className="hidden sm:inline">Online</span>
-        </>
-      ) : (
-        <>
-          <WifiOff className="h-3 w-3" />
-          <span className="hidden sm:inline">Offline</span>
-        </>
-      )}
-    </div>
-  );
-}
 
 function UserBadge({ className }: { className?: string }) {
   const { settings, updateSettings } = useSettings();
@@ -135,7 +104,7 @@ function UserBadge({ className }: { className?: string }) {
               placeholder="Enter your name"
               autoFocus
             />
-            <Button size="sm" onClick={handleSave} disabled={!newName.trim()}>
+            <Button size="sm" onClick={handleSave} disabled={!newName.trim()} aria-label="Save name">
               <Check className="h-4 w-4" />
             </Button>
           </div>
@@ -162,6 +131,7 @@ function ThemeToggle({ className }: { className?: string }) {
         className
       )}
       title={`Theme: ${theme} (click to cycle)`}
+      aria-label={`Current theme: ${theme}. Click to change.`}
     >
       {theme === 'light' && <Sun className="h-3 w-3" />}
       {theme === 'dark' && <Moon className="h-3 w-3" />}
@@ -177,19 +147,27 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Skip to main content link for keyboard users */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-md focus:top-2 focus:left-2"
+      >
+        Skip to main content
+      </a>
+
       {/* Mobile header */}
       <header className="sticky top-0 z-40 flex h-14 items-center border-b bg-background px-4 lg:hidden">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
         >
           {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
         <h1 className="ml-3 text-lg font-semibold flex-1 truncate">Tool Pick List</h1>
         <ThemeToggle className="mr-2" />
         <UserBadge className="mr-2" />
-        <OnlineStatusBadge className="mr-2" />
         <GlobalSearch />
       </header>
 
@@ -252,12 +230,11 @@ export function MainLayout({ children }: MainLayoutProps) {
           <header className="sticky top-0 z-30 hidden lg:flex h-14 items-center justify-end gap-4 border-b bg-background px-6 shrink-0">
             <ThemeToggle />
             <UserBadge />
-            <OnlineStatusBadge />
             <GlobalSearch />
           </header>
 
           {/* Main content */}
-          <main className="flex-1 overflow-auto">
+          <main id="main-content" className="flex-1 overflow-auto">
             <div className="container mx-auto p-4 lg:p-6">{children}</div>
           </main>
         </div>

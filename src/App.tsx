@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { OfflineIndicator, InstallPrompt, UpdatePrompt } from '@/components/pwa';
+import { PageErrorBoundary } from '@/components/ErrorBoundary';
+import { InstallPrompt, UpdatePrompt } from '@/components/pwa';
 import { NamePrompt } from '@/components/NamePrompt';
 import { PasswordGate } from '@/components/PasswordGate';
 import { useTheme } from '@/hooks/useTheme';
@@ -34,16 +35,16 @@ function App() {
       <MainLayout>
         <Suspense fallback={<PageSpinner />}>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/orders/:id" element={<OrderDetail />} />
-            <Route path="/parts" element={<ConsolidatedParts />} />
-            <Route path="/items-to-order" element={<ItemsToOrder />} />
-            <Route path="/issues" element={<Issues />} />
-            <Route path="/activity" element={<PickHistory />} />
-            <Route path="/templates" element={<Templates />} />
-            <Route path="/import" element={<Import />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/" element={<PageErrorBoundary><Dashboard /></PageErrorBoundary>} />
+            <Route path="/orders" element={<PageErrorBoundary><Orders /></PageErrorBoundary>} />
+            <Route path="/orders/:id" element={<PageErrorBoundary><OrderDetail /></PageErrorBoundary>} />
+            <Route path="/parts" element={<PageErrorBoundary><ConsolidatedParts /></PageErrorBoundary>} />
+            <Route path="/items-to-order" element={<PageErrorBoundary><ItemsToOrder /></PageErrorBoundary>} />
+            <Route path="/issues" element={<PageErrorBoundary><Issues /></PageErrorBoundary>} />
+            <Route path="/activity" element={<PageErrorBoundary><PickHistory /></PageErrorBoundary>} />
+            <Route path="/templates" element={<PageErrorBoundary><Templates /></PageErrorBoundary>} />
+            <Route path="/import" element={<PageErrorBoundary><Import /></PageErrorBoundary>} />
+            <Route path="/settings" element={<PageErrorBoundary><Settings /></PageErrorBoundary>} />
           </Routes>
         </Suspense>
       </MainLayout>
@@ -55,7 +56,6 @@ function App() {
       <NamePrompt />
 
       {/* PWA Components */}
-      <OfflineIndicator />
       <InstallPrompt />
       <UpdatePrompt />
     </BrowserRouter>

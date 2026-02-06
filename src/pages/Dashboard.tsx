@@ -28,8 +28,8 @@ export function Dashboard() {
   const { parts } = useConsolidatedParts();
   const { items: itemsToOrder, loading: itemsToOrderLoading } = useItemsToOrder();
 
-  const activeOrders = orders.filter((o) => o.status === 'active');
-  const completedOrders = orders.filter((o) => o.status === 'complete');
+  const activeOrders = useMemo(() => orders.filter((o) => o.status === 'active'), [orders]);
+  const completedOrders = useMemo(() => orders.filter((o) => o.status === 'complete'), [orders]);
 
   // Get orders that are due soon or overdue (within 3 days)
   const dueSoonOrders = useMemo(() => {
@@ -43,11 +43,16 @@ export function Dashboard() {
       });
   }, [activeOrders]);
 
-  const overdueCount = dueSoonOrders.filter(o => getDueDateStatus(o.due_date).status === 'overdue').length;
+  const overdueCount = useMemo(() =>
+    dueSoonOrders.filter(o => getDueDateStatus(o.due_date).status === 'overdue').length,
+    [dueSoonOrders]
+  );
 
-  const totalParts = parts.reduce((sum, p) => sum + p.total_needed, 0);
-  const pickedParts = parts.reduce((sum, p) => sum + p.total_picked, 0);
-  const remainingParts = totalParts - pickedParts;
+  const { totalParts, pickedParts, remainingParts } = useMemo(() => {
+    const total = parts.reduce((sum, p) => sum + p.total_needed, 0);
+    const picked = parts.reduce((sum, p) => sum + p.total_picked, 0);
+    return { totalParts: total, pickedParts: picked, remainingParts: total - picked };
+  }, [parts]);
 
   const stats = [
     {

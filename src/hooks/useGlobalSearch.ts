@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { SEARCH_RESULT_LIMIT, PICKS_QUERY_LIMIT } from '@/lib/constants';
 
 export interface SearchResult {
   id: string;
@@ -47,7 +48,7 @@ export function useGlobalSearch() {
         `)
         .eq('orders.status', 'active')
         .or(`part_number.ilike.${searchTerm},description.ilike.${searchTerm},location.ilike.${searchTerm}`)
-        .limit(20);
+        .limit(SEARCH_RESULT_LIMIT);
 
       if (lineItemsError) throw lineItemsError;
 
@@ -62,7 +63,7 @@ export function useGlobalSearch() {
           .from('picks')
           .select('line_item_id, qty_picked')
           .in('line_item_id', lineItemIds)
-          .limit(50000);
+          .limit(PICKS_QUERY_LIMIT);
 
         if (picksError) throw picksError;
 
@@ -74,7 +75,7 @@ export function useGlobalSearch() {
 
       // Transform results
       const searchResults: SearchResult[] = (lineItemsData || []).map(item => {
-        const orderInfo = item.orders as any;
+        const orderInfo = item.orders as unknown as { id: string; so_number: string; status: string };
         return {
           id: item.id,
           part_number: item.part_number,

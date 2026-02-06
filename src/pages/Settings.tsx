@@ -7,11 +7,10 @@ import { useSettings } from '@/hooks/useSettings';
 import { SCHEMA_SQL, MIGRATION_QTY_ON_ORDER_SQL } from '@/lib/supabase';
 import { useState, useRef } from 'react';
 import { usePWA, useServiceWorker } from '@/hooks/usePWA';
-import { useOnlineStatus, useOfflineQueue } from '@/hooks/useOffline';
 import { usePartListSync } from '@/hooks/usePartListSync';
 import { useApiSync } from '@/hooks/useApiSync';
 import { useBackupExport } from '@/hooks/useBackupExport';
-import { Download, RefreshCw, Wifi, WifiOff, Trash2, CloudOff, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Database, HardDrive, ListChecks, Globe, Lock, Printer } from 'lucide-react';
+import { Download, RefreshCw, Upload, CheckCircle, AlertCircle, Database, HardDrive, ListChecks, Globe, Lock, Printer } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 
 export function Settings() {
@@ -23,8 +22,6 @@ export function Settings() {
   // PWA hooks
   const { isInstallable, isInstalled, install } = usePWA();
   const { needsRefresh, refresh } = useServiceWorker();
-  const isOnline = useOnlineStatus();
-  const { queueCount, clearQueue } = useOfflineQueue();
 
   // Part List sync
   const { syncPartList, syncing, lastSyncResult } = usePartListSync();
@@ -74,12 +71,6 @@ export function Settings() {
       if (partListFileRef.current) {
         partListFileRef.current.value = '';
       }
-    }
-  };
-
-  const handleClearQueue = () => {
-    if (window.confirm(`Are you sure you want to clear ${queueCount} pending pick(s)? This action cannot be undone.`)) {
-      clearQueue();
     }
   };
 
@@ -498,65 +489,15 @@ export function Settings() {
         </CardContent>
       </Card>
 
-      {/* PWA / Offline Settings */}
+      {/* PWA / App Installation */}
       <Card>
         <CardHeader>
-          <CardTitle>App Installation & Offline</CardTitle>
+          <CardTitle>App Installation</CardTitle>
           <CardDescription>
-            Install the app for offline access and better performance
+            Install the app for quick access and better performance
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Connection Status */}
-          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-            <div className="flex items-center gap-3">
-              {isOnline ? (
-                <Wifi className="h-5 w-5 text-green-500" />
-              ) : (
-                <WifiOff className="h-5 w-5 text-amber-500" />
-              )}
-              <div>
-                <p className="font-medium">Connection Status</p>
-                <p className="text-sm text-muted-foreground">
-                  {isOnline ? 'You are online' : 'You are offline - picks will be queued'}
-                </p>
-              </div>
-            </div>
-            <span
-              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                isOnline
-                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-              }`}
-            >
-              {isOnline ? 'Online' : 'Offline'}
-            </span>
-          </div>
-
-          {/* Offline Queue */}
-          {queueCount > 0 && (
-            <div className="flex items-center justify-between p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
-              <div className="flex items-center gap-3">
-                <CloudOff className="h-5 w-5 text-amber-500" />
-                <div>
-                  <p className="font-medium">Pending Picks</p>
-                  <p className="text-sm text-muted-foreground">
-                    {queueCount} pick(s) waiting to sync
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleClearQueue}
-                className="text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Clear
-              </Button>
-            </div>
-          )}
-
           {/* Install App */}
           <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
             <div className="flex items-center gap-3">
@@ -567,7 +508,7 @@ export function Settings() {
                   {isInstalled
                     ? 'App is installed on this device'
                     : isInstallable
-                      ? 'Install for offline access and quick launch'
+                      ? 'Install for quick launch from your home screen'
                       : 'Installation not available in this browser'}
                 </p>
               </div>
@@ -603,16 +544,6 @@ export function Settings() {
               </Button>
             </div>
           )}
-
-          {/* Offline Features Info */}
-          <div className="text-sm text-muted-foreground space-y-2">
-            <p className="font-medium text-foreground">Offline Features:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>View previously loaded orders and parts</li>
-              <li>Record picks while offline (syncs when back online)</li>
-              <li>Full app functionality without internet</li>
-            </ul>
-          </div>
         </CardContent>
       </Card>
 
@@ -681,7 +612,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key`}
             all sales orders.
           </p>
           <p className="mt-2">
-            This app works offline and can be installed as a Progressive Web App (PWA)
+            This app can be installed as a Progressive Web App (PWA)
             for quick access from your home screen.
           </p>
         </CardContent>

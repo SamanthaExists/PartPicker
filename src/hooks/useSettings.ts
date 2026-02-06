@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { UserSettings } from '@/types';
-
-const SETTINGS_KEY = 'tool-pick-list-settings';
+import { STORAGE_KEYS } from '@/lib/constants';
 
 const defaultSettings: UserSettings = {
   user_name: '',
@@ -15,7 +14,7 @@ export function useSettings() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(SETTINGS_KEY);
+    const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
@@ -30,7 +29,7 @@ export function useSettings() {
   const updateSettings = (updates: Partial<UserSettings>) => {
     const newSettings = { ...settings, ...updates };
     setSettings(newSettings);
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(newSettings));
   };
 
   const getUserName = (): string => {

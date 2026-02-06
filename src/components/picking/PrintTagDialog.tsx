@@ -10,6 +10,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import JsBarcode from 'jsbarcode';
 
 export interface TagData {
   partNumber: string;
@@ -184,14 +185,31 @@ export function PrintTagDialog({
   );
 }
 
+function generateBarcodeSVG(value: string): string {
+  // Create a temporary SVG element, render the barcode, and return the SVG string
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  try {
+    JsBarcode(svg, value, {
+      format: 'CODE128',
+      width: 1.5,
+      height: 35,
+      displayValue: false,
+      margin: 0,
+    });
+  } catch (e) {
+    console.error('Barcode generation failed:', e);
+  }
+  return svg.outerHTML;
+}
+
 function generateTagsHTML(tagsArray: TagData[]): string {
-  // Generate HTML for each tag (1 tag per entry)
-  const tags = tagsArray.map((tag, index) => {
+  // Pre-render barcodes in the parent window so the print page has no external dependencies
+  const tags = tagsArray.map((tag) => {
     const { partNumber, description, location, soNumber, toolNumber, qtyPicked, pickedBy, pickedAt } = tag;
 
-    // Format date as M/D
     const date = new Date(pickedAt);
     const shortDate = `${date.getMonth() + 1}/${date.getDate()}`;
+    const barcodeSVG = generateBarcodeSVG(partNumber);
 
     return `
       <div class="tag">
@@ -213,22 +231,18 @@ function generateTagsHTML(tagsArray: TagData[]): string {
             </div>
           </div>
           <div class="barcode-container">
-            <svg class="barcode" id="barcode-${index}"></svg>
+            ${barcodeSVG}
           </div>
         </div>
       </div>
     `;
   });
 
-  // Get first tag's part number for barcode generation
-  const partNumbers = tagsArray.map(t => t.partNumber);
-
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <title>Part Tags - ${tagsArray[0].partNumber}</title>
-      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
       <style>
         @page {
           size: 3.4in 0.66in;
@@ -250,7 +264,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         .tag {
           width: 3.4in;
           height: 0.66in;
-          padding: 0.03in 0.06in 0.03in 0.12in;
+          padding: 0.04in 0.06in 0.03in 0.12in;
           page-break-after: always;
         }
 
@@ -280,7 +294,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
           justify-content: center;
         }
 
-        .barcode {
+        .barcode-container svg {
           height: 0.5in;
           width: auto;
         }
@@ -359,31 +373,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
     </head>
     <body>
       ${tags.join('')}
-      <script>
-        // Generate barcodes after page loads, then print
-        document.addEventListener('DOMContentLoaded', function() {
-          const partNumbers = ${JSON.stringify(partNumbers)};
-          partNumbers.forEach(function(partNumber, index) {
-            try {
-              JsBarcode("#barcode-" + index, partNumber, {
-                format: "CODE128",
-                width: 1.5,
-                height: 35,
-                displayValue: false,
-                margin: 0
-              });
-            } catch (e) {
-              console.error('Barcode generation failed:', e);
-            }
-          });
-          // Wait for barcodes to be painted before printing
-          requestAnimationFrame(function() {
-            requestAnimationFrame(function() {
-              window.print();
-            });
-          });
-        });
-      </script>
+      <script>window.print();</script>
     </body>
     </html>
   `;

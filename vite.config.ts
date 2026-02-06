@@ -13,7 +13,7 @@ export default defineConfig({
       brotliSize: true,
     }),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'pwa-192x192.svg', 'pwa-512x512.svg'],
       manifest: {
         name: 'Tool Pick List Tracker',

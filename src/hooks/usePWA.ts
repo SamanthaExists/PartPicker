@@ -73,36 +73,3 @@ export function usePWA() {
     install,
   };
 }
-
-// Hook to check for service worker updates
-export function useServiceWorker() {
-  const [needsRefresh, setNeedsRefresh] = useState(false);
-  const [updateServiceWorker, setUpdateServiceWorker] = useState<(() => void) | null>(null);
-
-  useEffect(() => {
-    // Listen for service worker updates from vite-plugin-pwa
-    const handleSWUpdate = (event: CustomEvent<{ update: () => void }>) => {
-      setNeedsRefresh(true);
-      setUpdateServiceWorker(() => event.detail.update);
-    };
-
-    window.addEventListener('sw-update', handleSWUpdate as EventListener);
-
-    return () => {
-      window.removeEventListener('sw-update', handleSWUpdate as EventListener);
-    };
-  }, []);
-
-  const refresh = useCallback(() => {
-    if (updateServiceWorker) {
-      updateServiceWorker();
-    } else {
-      window.location.reload();
-    }
-  }, [updateServiceWorker]);
-
-  return {
-    needsRefresh,
-    refresh,
-  };
-}

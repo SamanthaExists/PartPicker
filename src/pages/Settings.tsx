@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { useSettings } from '@/hooks/useSettings';
 import { SCHEMA_SQL, MIGRATION_QTY_ON_ORDER_SQL } from '@/lib/supabase';
 import { useState, useRef } from 'react';
-import { usePWA, useServiceWorker } from '@/hooks/usePWA';
+import { usePWA } from '@/hooks/usePWA';
 import { usePartListSync } from '@/hooks/usePartListSync';
 import { useApiSync } from '@/hooks/useApiSync';
 import { useBackupExport } from '@/hooks/useBackupExport';
@@ -21,7 +21,6 @@ export function Settings() {
 
   // PWA hooks
   const { isInstallable, isInstalled, install } = usePWA();
-  const { needsRefresh, refresh } = useServiceWorker();
 
   // Part List sync
   const { syncPartList, syncing, lastSyncResult } = usePartListSync();
@@ -526,24 +525,6 @@ export function Settings() {
             )}
           </div>
 
-          {/* Update Available */}
-          {needsRefresh && (
-            <div className="flex items-center justify-between p-3 rounded-lg border border-primary bg-primary/5">
-              <div className="flex items-center gap-3">
-                <RefreshCw className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="font-medium">Update Available</p>
-                  <p className="text-sm text-muted-foreground">
-                    A new version of the app is ready
-                  </p>
-                </div>
-              </div>
-              <Button onClick={refresh} size="sm">
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Update Now
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
 

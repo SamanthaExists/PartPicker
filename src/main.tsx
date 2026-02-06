@@ -5,30 +5,14 @@ import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 
-// Register service worker with update handling
-const updateSW = registerSW({
-  onNeedRefresh() {
-    // Dispatch custom event for components to handle
-    window.dispatchEvent(
-      new CustomEvent('sw-update', {
-        detail: { update: updateSW },
-      })
-    );
-  },
-  onOfflineReady() {
-    // App is ready to work offline
-  },
+// Register service worker with auto-update
+registerSW({
   onRegistered(registration) {
     if (registration) {
       // Check for updates every hour
       setInterval(() => {
         registration.update();
       }, 60 * 60 * 1000);
-    }
-  },
-  onRegisterError(error) {
-    if (import.meta.env.DEV) {
-      console.error('Service worker registration failed:', error);
     }
   },
 });

@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageErrorBoundary } from '@/components/ErrorBoundary';
-import { InstallPrompt, UpdatePrompt } from '@/components/pwa';
+import { InstallPrompt } from '@/components/pwa';
 import { NamePrompt } from '@/components/NamePrompt';
 import { PasswordGate } from '@/components/PasswordGate';
 import { useTheme } from '@/hooks/useTheme';
@@ -57,7 +57,6 @@ function App() {
 
       {/* PWA Components */}
       <InstallPrompt />
-      <UpdatePrompt />
     </BrowserRouter>
   );
 }

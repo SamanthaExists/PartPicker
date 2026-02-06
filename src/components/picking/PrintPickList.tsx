@@ -78,13 +78,10 @@ export function PrintPickList({
       return;
     }
 
-    printWindow.onload = () => {
-      URL.revokeObjectURL(url);
-      printWindow.focus();
-      printWindow.print();
-    };
-
+    // Don't revoke the blob URL until after printing — Chrome's print
+    // preview can lose access to the content if it's revoked too early.
     printWindow.onafterprint = () => {
+      URL.revokeObjectURL(url);
       printWindow.close();
     };
 
@@ -464,6 +461,19 @@ function generatePrintHTML(order: Order, toolsData: PrintableToolData[]): string
         <span>Generated: ${new Date().toLocaleString()}</span>
         <span>Tool Pick List Tracker</span>
       </div>
+      <script>
+        // Delay print() until Chrome has fully painted the content.
+        // Without this, Chrome's print preview shows a loading spinner
+        // forever because print() fires before the first paint completes.
+        // setTimeout is used instead of requestAnimationFrame because rAF
+        // can be throttled/paused in newly opened unfocused windows.
+        window.onload = function() {
+          setTimeout(function() {
+            window.focus();
+            window.print();
+          }, 500);
+        };
+      </script>
     </body>
     </html>
   `;

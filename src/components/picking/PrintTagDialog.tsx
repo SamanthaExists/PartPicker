@@ -58,12 +58,9 @@ export function PrintTagDialog({
       printWindow.document.write(printContent);
       printWindow.document.close();
 
-      // Wait for content to load then print
-      printWindow.onload = () => {
-        printWindow.print();
-        printWindow.onafterprint = () => {
-          printWindow.close();
-        };
+      // Close the print window after printing completes
+      printWindow.onafterprint = () => {
+        printWindow.close();
       };
     } finally {
       setIsPrinting(false);
@@ -112,18 +109,18 @@ export function PrintTagDialog({
             >
               <div className="flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
                 <div className="flex justify-between items-baseline gap-1">
-                  <span className="font-black font-mono truncate min-w-0 flex-1" style={{ fontSize: '11px' }}>
+                  <span className="font-black font-mono truncate min-w-0 flex-1" style={{ fontSize: '12px' }}>
                     {firstTag.partNumber}
                   </span>
-                  <span className="text-gray-500 font-medium flex-shrink-0" style={{ fontSize: '9px' }}>Qty: {firstTag.qtyPicked}</span>
+                  <span className="text-gray-500 font-medium flex-shrink-0" style={{ fontSize: '10px' }}>Qty: {firstTag.qtyPicked}</span>
                 </div>
-                <div className="truncate text-gray-600" style={{ fontSize: '8px' }}>
+                <div className="truncate text-gray-600" style={{ fontSize: '9px' }}>
                   {firstTag.location || 'N/A'}
                 </div>
-                <div className="truncate text-gray-700" style={{ fontSize: '8px' }}>
+                <div className="truncate text-gray-700" style={{ fontSize: '9px' }}>
                   {firstTag.description || '-'}
                 </div>
-                <div className="flex justify-between items-end" style={{ fontSize: '7px' }}>
+                <div className="flex justify-between items-end" style={{ fontSize: '9px' }}>
                   <span className="text-gray-600">
                     {firstTag.soNumber} / {firstTag.toolNumber}
                   </span>
@@ -247,13 +244,13 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         body {
           font-family: Arial, sans-serif;
           font-size: 10px;
-          line-height: 1.1;
+          line-height: 1;
         }
 
         .tag {
           width: 3.4in;
           height: 0.66in;
-          padding: 0.04in 0.06in 0.04in 0.12in;
+          padding: 0.03in 0.06in 0.03in 0.12in;
           page-break-after: always;
         }
 
@@ -264,7 +261,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         .tag-content {
           display: flex;
           height: 100%;
-          gap: 0.08in;
+          gap: 0.05in;
         }
 
         .tag-text {
@@ -296,14 +293,14 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         }
 
         .tag-row-location {
-          font-size: 8px;
+          font-size: 9px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
 
         .tag-row-middle {
-          font-size: 8px;
+          font-size: 9px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -314,13 +311,13 @@ function generateTagsHTML(tagsArray: TagData[]): string {
           display: flex;
           justify-content: space-between;
           align-items: flex-end;
-          font-size: 7px;
+          font-size: 9px;
         }
 
         .part-number {
           font-weight: 900;
           font-family: 'Courier New', monospace;
-          font-size: 11px;
+          font-size: 12px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -334,7 +331,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
 
         .tag-count {
           color: #666;
-          font-size: 9px;
+          font-size: 10px;
           font-weight: 500;
           flex-shrink: 0;
         }
@@ -363,7 +360,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
     <body>
       ${tags.join('')}
       <script>
-        // Generate barcodes after page loads
+        // Generate barcodes after page loads, then print
         document.addEventListener('DOMContentLoaded', function() {
           const partNumbers = ${JSON.stringify(partNumbers)};
           partNumbers.forEach(function(partNumber, index) {
@@ -378,6 +375,12 @@ function generateTagsHTML(tagsArray: TagData[]): string {
             } catch (e) {
               console.error('Barcode generation failed:', e);
             }
+          });
+          // Wait for barcodes to be painted before printing
+          requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+              window.print();
+            });
           });
         });
       </script>

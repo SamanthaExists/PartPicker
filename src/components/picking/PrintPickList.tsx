@@ -77,13 +77,9 @@ export function PrintPickList({
     printWindow.document.write(printContent);
     printWindow.document.close();
 
-    // Wait for content to load then print
-    printWindow.onload = () => {
-      printWindow.print();
-      // Close after printing (or after user cancels)
-      printWindow.onafterprint = () => {
-        printWindow.close();
-      };
+    // Close after printing (or after user cancels)
+    printWindow.onafterprint = () => {
+      printWindow.close();
     };
 
     setShowDialog(false);
@@ -462,6 +458,14 @@ function generatePrintHTML(order: Order, toolsData: PrintableToolData[]): string
         <span>Generated: ${new Date().toLocaleString()}</span>
         <span>Tool Pick List Tracker</span>
       </div>
+      <script>
+        // Print once content is fully rendered
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            window.print();
+          });
+        });
+      </script>
     </body>
     </html>
   `;

@@ -354,6 +354,7 @@ export function ConsolidatedParts() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [hideOutOfStock, setHideOutOfStock] = useState(false);
   const [showOutOfStockOnly, setShowOutOfStockOnly] = useState(false);
+  const [hideIssues, setHideIssues] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     const saved = localStorage.getItem(CONSOLIDATED_SORT_PREFERENCE_KEY);
     return (saved as SortMode) || 'part_number';
@@ -490,7 +491,9 @@ export function ConsolidatedParts() {
     const matchesAssembly = selectedAssemblies.size === 0
       || part.orders.some(o => !!o.tool_model && selectedAssemblies.has(o.tool_model));
 
-    return matchesSearch && matchesCompleted && matchesOrder && matchesStock && matchesOutOfStockOnly && matchesAssembly;
+    const matchesIssues = !hideIssues || !hasOpenIssue(part.part_number);
+
+    return matchesSearch && matchesCompleted && matchesOrder && matchesStock && matchesOutOfStockOnly && matchesAssembly && matchesIssues;
   });
 
   // Count out of stock parts for badge display (apply all other active filters except out-of-stock itself)
@@ -514,6 +517,11 @@ export function ConsolidatedParts() {
       return matchesSearch && matchesCompleted && matchesOrder && matchesAssembly;
     }).length;
   }, [parts, debouncedSearch, showCompleted, selectedOrders, selectedAssemblies]);
+
+  // Count parts with issues for badge display
+  const issueCount = useMemo(() => {
+    return parts.filter(part => hasOpenIssue(part.part_number)).length;
+  }, [parts, hasOpenIssue]);
 
   // Sort and group filtered parts
   const { sortedParts, locationGroups, assemblyGroups } = useMemo(() => {
@@ -744,6 +752,12 @@ export function ConsolidatedParts() {
               if (checked) setHideOutOfStock(false);
             },
             badgeCount: outOfStockCount,
+          },
+          {
+            label: 'Hide issues',
+            checked: hideIssues,
+            onChange: setHideIssues,
+            badgeCount: issueCount,
           },
         ]}
         showClearAll={hasActiveFilters}

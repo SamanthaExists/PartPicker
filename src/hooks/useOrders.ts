@@ -335,6 +335,8 @@ export function useOrder(orderId: string | undefined) {
         .single();
 
       if (insertError) throw insertError;
+      // Recalculate total_qty_needed on line items to reflect the new tool count
+      await supabase.rpc('recalculate_line_item_totals', { target_order_id: orderId });
       await fetchOrder();
       return data;
     } catch (err) {
@@ -352,6 +354,8 @@ export function useOrder(orderId: string | undefined) {
         .eq('id', toolId);
 
       if (deleteError) throw deleteError;
+      // Recalculate total_qty_needed on line items to reflect the reduced tool count
+      await supabase.rpc('recalculate_line_item_totals', { target_order_id: orderId! });
       await fetchOrder();
       return true;
     } catch (err) {

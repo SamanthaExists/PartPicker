@@ -60,18 +60,18 @@ export function useConsolidatedPartsPicking() {
         throw new Error('No line item IDs found. Try refreshing the page.');
       }
 
-      // Fetch line items with their qty_per_unit
+      // Fetch line items with their qty_per_unit and tool_ids
       const { data: lineItemsData, error: lineItemsError } = await supabase
         .from('line_items')
-        .select('id, order_id, qty_per_unit')
+        .select('id, order_id, qty_per_unit, tool_ids')
         .in('id', lineItemIds);
 
       if (lineItemsError) throw lineItemsError;
 
       // Create map of line item data
-      const lineItemMap = new Map<string, { qty_per_unit: number }>();
+      const lineItemMap = new Map<string, { qty_per_unit: number; tool_ids: string[] | null }>();
       for (const li of lineItemsData || []) {
-        lineItemMap.set(li.id, { qty_per_unit: li.qty_per_unit });
+        lineItemMap.set(li.id, { qty_per_unit: li.qty_per_unit, tool_ids: li.tool_ids });
       }
 
       // Fetch all tools for the orders involved
@@ -122,10 +122,16 @@ export function useConsolidatedPartsPicking() {
         const orderTools = toolsByOrder.get(orderInfo.order_id) || [];
         const lineItemData = lineItemMap.get(orderInfo.line_item_id);
         const qtyPerUnit = lineItemData?.qty_per_unit || 1;
+        const toolIds = lineItemData?.tool_ids;
+
+        // Filter tools by tool_ids — only show tools this line item applies to
+        const applicableTools = (!toolIds || toolIds.length === 0)
+          ? orderTools
+          : orderTools.filter(t => toolIds.includes(t.id));
 
         const toolPicksMap = picksByLineItemAndTool.get(orderInfo.line_item_id) || new Map();
 
-        const tools: ToolPickingInfo[] = orderTools.map(tool => ({
+        const tools: ToolPickingInfo[] = applicableTools.map(tool => ({
           tool_id: tool.id,
           tool_number: tool.tool_number,
           serial_number: tool.serial_number,

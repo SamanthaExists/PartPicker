@@ -314,6 +314,11 @@ export function PickingInterface({
   }, [scrollToItemId, sortedItems]);
 
   const handleQuickPick = useCallback(async (item: LineItem) => {
+    // Respect tool_ids: don't allow picking for a tool not in the line item's tool_ids
+    if (item.tool_ids && item.tool_ids.length > 0 && !item.tool_ids.includes(tool.id)) {
+      return;
+    }
+
     const pickedForTool = toolPicks.get(item.id) || 0;
     const remaining = item.qty_per_unit - pickedForTool;
 
@@ -412,6 +417,10 @@ export function PickingInterface({
 
   const handlePickAllInLocation = useCallback(async (locationItems: LineItem[]) => {
     const itemsToPick = locationItems.filter(item => {
+      // Respect tool_ids: skip items this tool shouldn't pick
+      if (item.tool_ids && item.tool_ids.length > 0 && !item.tool_ids.includes(tool.id)) {
+        return false;
+      }
       const pickedForTool = toolPicks.get(item.id) || 0;
       return item.qty_per_unit - pickedForTool > 0;
     });

@@ -31,7 +31,7 @@ export interface MergedLineItem {
   description: string;
   assemblyGroup: string;
   qtyPerUnit: number;
-  toolModels: string[]; // Which tool models need this part at this qty
+  toolModels: string[]; // Which tool models need this part
   isShared: boolean; // true if all BOMs need this part at same qty
 }
 
@@ -255,29 +255,40 @@ export function mergeMultipleBOMs(
       }
     }
 
-    // Group by quantity
-    const qtyGroups = new Map<number, typeof perBOM>();
-    for (const entry of perBOM) {
-      const group = qtyGroups.get(entry.qty) || [];
-      group.push(entry);
-      qtyGroups.set(entry.qty, group);
-    }
-
-    // Use description and assemblyGroup from first occurrence
     const firstEntry = perBOM[0];
+    const uniqueQtys = new Set(perBOM.map(e => e.qty));
 
-    for (const [qty, group] of qtyGroups) {
-      const toolModels = group.map(g => g.toolModel);
-      const isShared = toolModels.length === parsedBOMs.length && qtyGroups.size === 1;
-
+    if (uniqueQtys.size === 1) {
+      // All BOMs have the same qty — single line item
+      const toolModels = perBOM.map(e => e.toolModel);
+      const isShared = toolModels.length === parsedBOMs.length;
       lineItems.push({
         partNumber,
         description: firstEntry.description,
         assemblyGroup: firstEntry.assemblyGroup,
-        qtyPerUnit: qty,
+        qtyPerUnit: perBOM[0].qty,
         toolModels,
         isShared,
       });
+    } else {
+      // Different qtys across BOMs — split into one line item per qty group
+      const qtyGroups = new Map<number, string[]>();
+      for (const entry of perBOM) {
+        const existing = qtyGroups.get(entry.qty) || [];
+        existing.push(entry.toolModel);
+        qtyGroups.set(entry.qty, existing);
+      }
+
+      for (const [qty, toolModels] of qtyGroups) {
+        lineItems.push({
+          partNumber,
+          description: firstEntry.description,
+          assemblyGroup: firstEntry.assemblyGroup,
+          qtyPerUnit: qty,
+          toolModels,
+          isShared: false, // tool-specific since different qtys
+        });
+      }
     }
   }
 
@@ -360,8 +371,7 @@ export function buildImportedOrder(
       if (toolIds.length === 0) toolIds = undefined;
     }
 
-    const numApplicableTools = toolIds ? toolIds.length : tools.length;
-    const totalQtyNeeded = item.qtyPerUnit * numApplicableTools;
+    const totalQtyNeeded = item.qtyPerUnit * (toolIds ? toolIds.length : tools.length);
 
     return {
       part_number: item.partNumber,

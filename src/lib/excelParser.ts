@@ -67,16 +67,25 @@ function applyHierarchy(
   const hasHierarchy = rawRows.some(r => r.level !== null);
 
   if (!hasHierarchy) {
-    // No Level column - return flat list as before
+    // No Level column - return flat list, multiplying by tool count
+    const effectiveToolCount = Math.max(toolCount, 1);
     return rawRows
       .filter(r => r.qtyPerUnit > 0 || r.totalQty > 0)
-      .map(r => ({
-        part_number: r.partNumber,
-        description: r.description || undefined,
-        location: r.location || undefined,
-        qty_per_unit: r.qtyPerUnit || 1,
-        total_qty_needed: r.totalQty || r.qtyPerUnit,
-      }));
+      .map(r => {
+        const qtyPerUnit = r.qtyPerUnit || 1;
+        // Trust pre-computed totalQty if it's already larger than qtyPerUnit
+        // (e.g. from tool columns that summed across tools), otherwise multiply
+        const totalQtyNeeded = (r.totalQty > qtyPerUnit)
+          ? r.totalQty
+          : qtyPerUnit * effectiveToolCount;
+        return {
+          part_number: r.partNumber,
+          description: r.description || undefined,
+          location: r.location || undefined,
+          qty_per_unit: qtyPerUnit,
+          total_qty_needed: totalQtyNeeded,
+        };
+      });
   }
 
   // Build hierarchy rows (skip rows with invalid/missing level)
@@ -100,16 +109,23 @@ function applyHierarchy(
   }
 
   if (hierarchyRows.length === 0) {
-    // All level values were invalid - fall back to flat
+    // All level values were invalid - fall back to flat, multiplying by tool count
+    const effectiveToolCount = Math.max(toolCount, 1);
     return rawRows
       .filter(r => r.qtyPerUnit > 0 || r.totalQty > 0)
-      .map(r => ({
-        part_number: r.partNumber,
-        description: r.description || undefined,
-        location: r.location || undefined,
-        qty_per_unit: r.qtyPerUnit || 1,
-        total_qty_needed: r.totalQty || r.qtyPerUnit,
-      }));
+      .map(r => {
+        const qtyPerUnit = r.qtyPerUnit || 1;
+        const totalQtyNeeded = (r.totalQty > qtyPerUnit)
+          ? r.totalQty
+          : qtyPerUnit * effectiveToolCount;
+        return {
+          part_number: r.partNumber,
+          description: r.description || undefined,
+          location: r.location || undefined,
+          qty_per_unit: qtyPerUnit,
+          total_qty_needed: totalQtyNeeded,
+        };
+      });
   }
 
   const resolvedLeaves = resolveHierarchyLeaves(hierarchyRows);

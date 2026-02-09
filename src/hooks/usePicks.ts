@@ -120,9 +120,15 @@ export function usePicks(orderId: string | undefined) {
       // Check current state before picking to detect concurrent picks
       const { data: lineItem } = await supabase
         .from('line_items')
-        .select('total_qty_needed')
+        .select('total_qty_needed, tool_ids')
         .eq('id', lineItemId)
         .single();
+
+      // Reject pick if this tool is not in the line item's tool_ids
+      if (lineItem?.tool_ids && lineItem.tool_ids.length > 0 && !lineItem.tool_ids.includes(toolId)) {
+        console.warn(`Pick rejected: tool ${toolId} is not in line item's tool_ids`);
+        return null;
+      }
 
       const { data: existingPicks } = await supabase
         .from('picks')

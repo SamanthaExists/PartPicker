@@ -21,6 +21,7 @@ import type { ConsolidatedPart } from '@/types';
 import {
   useConsolidatedPartsPicking,
   type OrderPickingData,
+  type ToolPickingInfo,
   type BatchAllocations,
 } from '@/hooks/useConsolidatedPartsPicking';
 import { useSettings } from '@/hooks/useSettings';
@@ -107,6 +108,51 @@ export function MultiOrderPickDialog({
   }, [pickingData, draftAllocations]);
 
   const progressPercent = totalNeeded > 0 ? Math.round((totalAllocated / totalNeeded) * 100) : 0;
+
+  // Group orders by order_id for rendering — merges split line items into one section
+  // Each tool carries its source line_item_id so allocations stay correct
+  interface GroupedTool extends ToolPickingInfo {
+    line_item_id: string;
+  }
+  interface GroupedOrder {
+    order_id: string;
+    so_number: string;
+    needed: number;
+    picked: number;
+    tools: GroupedTool[];
+  }
+
+  const groupedOrders = useMemo((): GroupedOrder[] => {
+    if (!pickingData) return [];
+
+    const groups = new Map<string, GroupedOrder>();
+
+    for (const order of pickingData.orders) {
+      const existing = groups.get(order.order_id);
+      const toolsWithLineItem = order.tools.map(t => ({ ...t, line_item_id: order.line_item_id }));
+
+      if (existing) {
+        existing.needed += order.needed;
+        existing.picked += order.picked;
+        existing.tools.push(...toolsWithLineItem);
+      } else {
+        groups.set(order.order_id, {
+          order_id: order.order_id,
+          so_number: order.so_number,
+          needed: order.needed,
+          picked: order.picked,
+          tools: [...toolsWithLineItem],
+        });
+      }
+    }
+
+    // Sort tools within each group by tool_number
+    for (const group of groups.values()) {
+      group.tools.sort((a, b) => a.tool_number.localeCompare(b.tool_number, undefined, { numeric: true }));
+    }
+
+    return Array.from(groups.values());
+  }, [pickingData]);
 
   // Update allocation for a single tool
   const updateAllocation = useCallback((lineItemId: string, toolId: string, qty: number) => {
@@ -274,21 +320,21 @@ export function MultiOrderPickDialog({
         {/* Orders List */}
         {pickingData && (
           <div className="space-y-3">
-            {pickingData.orders.map((order) => {
-              const isCollapsed = collapsedOrders.has(order.order_id);
+            {groupedOrders.map((group) => {
+              const isCollapsed = collapsedOrders.has(group.order_id);
 
               // Calculate order totals from draft allocations
               let orderAllocated = 0;
-              for (const tool of order.tools) {
-                orderAllocated += getDraftQty(order.line_item_id, tool.tool_id, tool.current_picked);
+              for (const tool of group.tools) {
+                orderAllocated += getDraftQty(tool.line_item_id, tool.tool_id, tool.current_picked);
               }
-              const orderComplete = orderAllocated >= order.needed;
+              const orderComplete = orderAllocated >= group.needed;
 
               return (
                 <Collapsible
-                  key={order.order_id}
+                  key={group.order_id}
                   open={!isCollapsed}
-                  onOpenChange={() => toggleOrderCollapse(order.order_id)}
+                  onOpenChange={() => toggleOrderCollapse(group.order_id)}
                 >
                   <div className={cn(
                     "border rounded-lg overflow-hidden",
@@ -303,7 +349,7 @@ export function MultiOrderPickDialog({
                           ) : (
                             <ChevronDown className="h-4 w-4" />
                           )}
-                          <span className="font-semibold">SO-{order.so_number}</span>
+                          <span className="font-semibold">SO-{group.so_number}</span>
                           {orderComplete && (
                             <Badge variant="default" className="bg-green-500">
                               <Check className="h-3 w-3 mr-1" />
@@ -316,10 +362,10 @@ export function MultiOrderPickDialog({
                             "font-mono text-sm",
                             orderComplete && "text-green-600 dark:text-green-400"
                           )}>
-                            {orderAllocated} / {order.needed}
+                            {orderAllocated} / {group.needed}
                           </span>
                           <Progress
-                            value={order.needed > 0 ? (orderAllocated / order.needed) * 100 : 0}
+                            value={group.needed > 0 ? (orderAllocated / group.needed) * 100 : 0}
                             className="w-20 h-2"
                           />
                         </div>
@@ -339,8 +385,8 @@ export function MultiOrderPickDialog({
 
                         {/* Tool Rows */}
                         <div className="divide-y">
-                          {order.tools.map(tool => {
-                            const allocated = getDraftQty(order.line_item_id, tool.tool_id, tool.current_picked);
+                          {group.tools.map(tool => {
+                            const allocated = getDraftQty(tool.line_item_id, tool.tool_id, tool.current_picked);
                             const needed = tool.qty_per_unit;
                             const isToolComplete = allocated >= needed;
                             const isToolPartial = allocated > 0 && allocated < needed;
@@ -381,7 +427,7 @@ export function MultiOrderPickDialog({
                                       size="icon"
                                       variant="outline"
                                       className="h-7 w-7"
-                                      onClick={() => updateAllocation(order.line_item_id, tool.tool_id, allocated - 1)}
+                                      onClick={() => updateAllocation(tool.line_item_id, tool.tool_id, allocated - 1)}
                                       disabled={allocated <= 0 || isSaving}
                                     >
                                       <Minus className="h-3 w-3" />
@@ -392,7 +438,7 @@ export function MultiOrderPickDialog({
                                       max={needed}
                                       value={allocated}
                                       onChange={(e) => updateAllocation(
-                                        order.line_item_id,
+                                        tool.line_item_id,
                                         tool.tool_id,
                                         parseInt(e.target.value) || 0
                                       )}
@@ -403,7 +449,7 @@ export function MultiOrderPickDialog({
                                       size="icon"
                                       variant="outline"
                                       className="h-7 w-7"
-                                      onClick={() => updateAllocation(order.line_item_id, tool.tool_id, allocated + 1)}
+                                      onClick={() => updateAllocation(tool.line_item_id, tool.tool_id, allocated + 1)}
                                       disabled={allocated >= needed || isSaving}
                                     >
                                       <Plus className="h-3 w-3" />

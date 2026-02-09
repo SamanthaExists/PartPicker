@@ -237,6 +237,10 @@ export function OrderDetail() {
     const userName = getUserName();
 
     const toolsToPick = tools.filter(t => {
+      // Respect tool_ids: if line item is limited to specific tools, skip others
+      if (lineItem.tool_ids && lineItem.tool_ids.length > 0 && !lineItem.tool_ids.includes(t.id)) {
+        return false;
+      }
       const toolPicks = allToolsPicksMap.get(t.id);
       const picked = toolPicks?.get(lineItemId) || 0;
       return picked < lineItem.qty_per_unit;

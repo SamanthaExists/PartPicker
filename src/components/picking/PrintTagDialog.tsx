@@ -62,7 +62,7 @@ export function PrintTagDialog({
 
   // Format date as M/D
   const formatShortDate = (date: Date) => {
-    return `${date.getMonth() + 1}/${date.getDate()}`;
+    return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
   };
 
   return (
@@ -205,7 +205,7 @@ function generateTagsHTML(tagsArray: TagData[]): string {
     const { partNumber, description, location, soNumber, toolNumber, qtyPicked, pickedBy, pickedAt, assembly } = tag;
 
     const date = new Date(pickedAt);
-    const shortDate = `${date.getMonth() + 1}/${date.getDate()}`;
+    const shortDate = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
     const barcodeSVG = generateBarcodeSVG(partNumber);
     const assemblyPath = formatAssemblyPath(assembly);
 

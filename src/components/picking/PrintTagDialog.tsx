@@ -106,10 +106,10 @@ export function PrintTagDialog({
                     </span>
                   )}
                 </span>
-                <span className="text-gray-500 font-medium flex-shrink-0" style={{ fontSize: '10px' }}>Qty: {firstTag.qtyPicked}</span>
               </div>
-              <div className="truncate text-gray-600" style={{ fontSize: '9px' }}>
-                {firstTag.location || 'N/A'}
+              <div className="flex justify-between items-baseline gap-1" style={{ fontSize: '9px' }}>
+                <span className="text-gray-600 truncate">{firstTag.location || 'N/A'}</span>
+                <span className="text-gray-500 font-medium flex-shrink-0" style={{ fontSize: '10px' }}>Qty: {firstTag.qtyPicked}</span>
               </div>
               <div className="truncate text-gray-700" style={{ fontSize: '9px' }}>
                 {firstTag.description || '-'}
@@ -213,10 +213,10 @@ function generateTagsHTML(tagsArray: TagData[]): string {
       <div class="tag">
         <div class="tag-row-top">
           <span class="tag-row-top-left"><span class="part-number">${escapeHtml(partNumber)}</span>${assemblyPath ? `<span class="assembly-path">${escapeHtml(assemblyPath)}</span>` : ''}</span>
-          <span class="tag-count">Qty: ${qtyPicked}</span>
         </div>
         <div class="tag-row-location">
           <span class="location">${escapeHtml(location || 'N/A')}</span>
+          <span class="tag-count">Qty: ${qtyPicked}</span>
         </div>
         <div class="tag-row-middle">
           <span class="description">${escapeHtml(description || '-')}</span>
@@ -303,10 +303,11 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         }
 
         .tag-row-location {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          gap: 0.05in;
           font-size: 9px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
         }
 
         .tag-row-middle {

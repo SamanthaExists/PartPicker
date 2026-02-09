@@ -108,39 +108,33 @@ export function PrintTagDialog({
                 </span>
                 <span className="text-gray-500 font-medium flex-shrink-0" style={{ fontSize: '10px' }}>Qty: {firstTag.qtyPicked}</span>
               </div>
-              <div className="flex-1 flex gap-2 min-h-0">
-                <div className="flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
-                  <div className="truncate text-gray-600" style={{ fontSize: '9px' }}>
-                    {firstTag.location || 'N/A'}
-                  </div>
-                  <div className="truncate text-gray-700" style={{ fontSize: '9px' }}>
-                    {firstTag.description || '-'}
-                  </div>
-                  <div className="flex justify-between items-end" style={{ fontSize: '9px' }}>
-                    <span className="text-gray-600">
-                      {firstTag.soNumber} / {firstTag.toolNumber}
-                    </span>
-                    <span className="text-gray-500 whitespace-nowrap">
-                      {firstTag.pickedBy} {formatShortDate(firstTag.pickedAt)}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex-shrink-0 flex items-center justify-center border-l pl-2">
-                  <div className="flex flex-col items-center">
-                    <div className="flex gap-px">
-                      {[...Array(12)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="bg-black"
-                          style={{
-                            width: i % 3 === 0 ? '2px' : '1px',
-                            height: '20px',
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-[6px] text-gray-400 mt-0.5">BARCODE</span>
-                  </div>
+              <div className="truncate text-gray-600" style={{ fontSize: '9px' }}>
+                {firstTag.location || 'N/A'}
+              </div>
+              <div className="truncate text-gray-700" style={{ fontSize: '9px' }}>
+                {firstTag.description || '-'}
+              </div>
+              <div className="flex justify-between" style={{ fontSize: '9px' }}>
+                <span className="text-gray-600">
+                  {firstTag.soNumber} / {firstTag.toolNumber}
+                </span>
+                <span className="text-gray-500 whitespace-nowrap">
+                  {firstTag.pickedBy} {formatShortDate(firstTag.pickedAt)}
+                </span>
+              </div>
+              <div className="flex-1 flex items-center justify-center min-h-0">
+                <div className="flex gap-px">
+                  {[...Array(20)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="bg-black"
+                      style={{
+                        width: i % 3 === 0 ? '2px' : '1px',
+                        height: '100%',
+                        minHeight: '8px',
+                      }}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
@@ -221,22 +215,18 @@ function generateTagsHTML(tagsArray: TagData[]): string {
           <span class="tag-row-top-left"><span class="part-number">${escapeHtml(partNumber)}</span>${assemblyPath ? `<span class="assembly-path">${escapeHtml(assemblyPath)}</span>` : ''}</span>
           <span class="tag-count">Qty: ${qtyPicked}</span>
         </div>
-        <div class="tag-bottom">
-          <div class="tag-text">
-            <div class="tag-row-location">
-              <span class="location">${escapeHtml(location || 'N/A')}</span>
-            </div>
-            <div class="tag-row-middle">
-              <span class="description">${escapeHtml(description || '-')}</span>
-            </div>
-            <div class="tag-row-bottom">
-              <span class="order-info">${escapeHtml(soNumber)} / ${escapeHtml(toolNumber)}</span>
-              <span class="picked-info">${escapeHtml(pickedBy)} ${shortDate}</span>
-            </div>
-          </div>
-          <div class="barcode-container">
-            ${barcodeSVG}
-          </div>
+        <div class="tag-row-location">
+          <span class="location">${escapeHtml(location || 'N/A')}</span>
+        </div>
+        <div class="tag-row-middle">
+          <span class="description">${escapeHtml(description || '-')}</span>
+        </div>
+        <div class="tag-row-bottom">
+          <span class="order-info">${escapeHtml(soNumber)} / ${escapeHtml(toolNumber)}</span>
+          <span class="picked-info">${escapeHtml(pickedBy)} ${shortDate}</span>
+        </div>
+        <div class="barcode-container">
+          ${barcodeSVG}
         </div>
       </div>
     `;
@@ -298,32 +288,16 @@ function generateTagsHTML(tagsArray: TagData[]): string {
           color: #444;
         }
 
-        .tag-bottom {
-          flex: 1;
-          display: flex;
-          gap: 0.05in;
-          min-height: 0;
-        }
-
-        .tag-text {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          min-width: 0;
-          overflow: hidden;
-        }
-
         .barcode-container {
-          flex-shrink: 0;
+          flex: 1;
           display: flex;
           align-items: center;
           justify-content: center;
-          max-width: 1.1in;
+          min-height: 0;
         }
 
         .barcode-container svg {
-          height: 0.35in;
+          height: 100%;
           width: auto;
           max-width: 100%;
         }

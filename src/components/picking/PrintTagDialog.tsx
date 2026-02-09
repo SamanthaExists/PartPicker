@@ -21,6 +21,7 @@ export interface TagData {
   qtyPicked: number;
   pickedBy: string;
   pickedAt: Date;
+  assembly: string | null;
 }
 
 interface PrintTagDialogProps {
@@ -95,8 +96,15 @@ export function PrintTagDialog({
               }}
             >
               <div className="flex justify-between items-baseline gap-1">
-                <span className="font-black font-mono" style={{ fontSize: '12px' }}>
-                  {firstTag.partNumber}
+                <span className="min-w-0 truncate">
+                  <span className="font-black font-mono" style={{ fontSize: '12px' }}>
+                    {firstTag.partNumber}
+                  </span>
+                  {firstTag.assembly && (
+                    <span className="text-gray-500" style={{ fontSize: '10px' }}>
+                      {formatAssemblyPath(firstTag.assembly)}
+                    </span>
+                  )}
                 </span>
                 <span className="text-gray-500 font-medium flex-shrink-0" style={{ fontSize: '10px' }}>Qty: {firstTag.qtyPicked}</span>
               </div>
@@ -173,6 +181,13 @@ export function PrintTagDialog({
   );
 }
 
+function formatAssemblyPath(assembly: string | null): string {
+  if (!assembly) return '';
+  const parts = assembly.split(' > ');
+  parts.reverse();
+  return ' < ' + parts.join(' < ');
+}
+
 function generateBarcodeSVG(value: string): string {
   // Create a temporary SVG element, render the barcode, and return the SVG string
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -193,16 +208,17 @@ function generateBarcodeSVG(value: string): string {
 function generateTagsHTML(tagsArray: TagData[]): string {
   // Pre-render barcodes in the parent window so the print page has no external dependencies
   const tags = tagsArray.map((tag) => {
-    const { partNumber, description, location, soNumber, toolNumber, qtyPicked, pickedBy, pickedAt } = tag;
+    const { partNumber, description, location, soNumber, toolNumber, qtyPicked, pickedBy, pickedAt, assembly } = tag;
 
     const date = new Date(pickedAt);
     const shortDate = `${date.getMonth() + 1}/${date.getDate()}`;
     const barcodeSVG = generateBarcodeSVG(partNumber);
+    const assemblyPath = formatAssemblyPath(assembly);
 
     return `
       <div class="tag">
         <div class="tag-row-top">
-          <span class="part-number">${escapeHtml(partNumber)}</span>
+          <span class="tag-row-top-left"><span class="part-number">${escapeHtml(partNumber)}</span>${assemblyPath ? `<span class="assembly-path">${escapeHtml(assemblyPath)}</span>` : ''}</span>
           <span class="tag-count">Qty: ${qtyPicked}</span>
         </div>
         <div class="tag-bottom">
@@ -267,6 +283,19 @@ function generateTagsHTML(tagsArray: TagData[]): string {
           justify-content: space-between;
           align-items: baseline;
           gap: 0.05in;
+        }
+
+        .tag-row-top-left {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .assembly-path {
+          font-weight: normal;
+          font-size: 10px;
+          color: #444;
         }
 
         .tag-bottom {

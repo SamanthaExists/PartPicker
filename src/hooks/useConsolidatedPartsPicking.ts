@@ -32,6 +32,7 @@ export interface OrderPickingData {
   needed: number;
   picked: number;
   tools: ToolPickingInfo[];
+  assembly_group: string | null;
 }
 
 export interface PickingDataResult {
@@ -63,15 +64,15 @@ export function useConsolidatedPartsPicking() {
       // Fetch line items with their qty_per_unit and tool_ids
       const { data: lineItemsData, error: lineItemsError } = await supabase
         .from('line_items')
-        .select('id, order_id, qty_per_unit, tool_ids')
+        .select('id, order_id, qty_per_unit, tool_ids, assembly_group')
         .in('id', lineItemIds);
 
       if (lineItemsError) throw lineItemsError;
 
       // Create map of line item data
-      const lineItemMap = new Map<string, { qty_per_unit: number; tool_ids: string[] | null }>();
+      const lineItemMap = new Map<string, { qty_per_unit: number; tool_ids: string[] | null; assembly_group: string | null }>();
       for (const li of lineItemsData || []) {
-        lineItemMap.set(li.id, { qty_per_unit: li.qty_per_unit, tool_ids: li.tool_ids });
+        lineItemMap.set(li.id, { qty_per_unit: li.qty_per_unit, tool_ids: li.tool_ids, assembly_group: li.assembly_group });
       }
 
       // Fetch all tools for the orders involved
@@ -149,6 +150,7 @@ export function useConsolidatedPartsPicking() {
           needed: orderNeeded,
           picked: orderPicked,
           tools,
+          assembly_group: lineItemData?.assembly_group ?? null,
         });
 
         totalNeeded += orderNeeded;

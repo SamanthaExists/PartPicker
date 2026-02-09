@@ -246,6 +246,7 @@ export function MultiOrderPickDialog({
                   qtyPicked: delta,
                   pickedBy,
                   pickedAt,
+                  assembly: order.assembly_group ?? null,
                 });
               }
             }

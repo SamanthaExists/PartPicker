@@ -351,6 +351,7 @@ export function PickingInterface({
         qtyPicked: qtyToPick,
         pickedBy: pickedBy,
         pickedAt: new Date(),
+        assembly: item.assembly_group,
       });
       setShowPrintDialog(true);
     }
@@ -405,6 +406,7 @@ export function PickingInterface({
           qtyPicked: qty,
           pickedBy,
           pickedAt,
+          assembly: item.assembly_group,
         }));
         setPrintTagData(tags);
         setShowPrintDialog(true);
@@ -465,6 +467,7 @@ export function PickingInterface({
           qtyPicked: qty,
           pickedBy,
           pickedAt,
+          assembly: item.assembly_group,
         }));
         setPrintTagData(tags);
         setShowPrintDialog(true);
@@ -558,6 +561,7 @@ export function PickingInterface({
             qtyPicked: qtyPicked,
             pickedBy: pickedBy,
             pickedAt: pickedAt,
+            assembly: distributeItem.assembly_group,
           };
         });
         setPrintTagData(tags);

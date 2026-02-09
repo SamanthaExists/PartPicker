@@ -145,6 +145,7 @@ export interface ConsolidatedPart {
   total_needed: number;
   total_picked: number;
   remaining: number;
+  assembly_groups: string[];
   orders: {
     order_id: string;
     so_number: string;
@@ -153,6 +154,7 @@ export interface ConsolidatedPart {
     needed: number;
     picked: number;
     line_item_id: string;
+    assembly_group: string | null;
   }[];
 }
 

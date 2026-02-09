@@ -34,6 +34,22 @@ const SORT_OPTIONS: SortOption<SortMode>[] = [
   { value: 'assembly', label: 'Sort by Assembly' },
 ];
 
+// Assembly breadcrumb component
+function AssemblyBreadcrumb({ path }: { path: string }) {
+  const segments = path.split(' > ');
+  return (
+    <div className="flex items-center gap-1 text-xs text-purple-700 dark:text-purple-300">
+      <Layers className="h-3 w-3 shrink-0 text-purple-500 dark:text-purple-400" />
+      {segments.map((segment, i) => (
+        <span key={i} className="flex items-center gap-1">
+          {i > 0 && <ChevronRight className="h-3 w-3 text-purple-400 dark:text-purple-500" />}
+          <span className="font-medium">{segment}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // Shared PartCard component to avoid code duplication
 interface PartCardProps {
   part: ConsolidatedPart;
@@ -89,6 +105,15 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
               )}
             </Button>
           </div>
+
+          {/* Assembly Breadcrumbs */}
+          {part.assembly_groups.length > 0 && (
+            <div className="flex flex-col gap-0.5">
+              {part.assembly_groups.map((path) => (
+                <AssemblyBreadcrumb key={path} path={path} />
+              ))}
+            </div>
+          )}
 
           {/* Row 2: Location */}
           {part.location && (
@@ -206,6 +231,13 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
               <p className="text-sm text-muted-foreground truncate">
                 {part.description}
               </p>
+            )}
+            {part.assembly_groups.length > 0 && (
+              <div className="flex flex-col gap-0.5 mt-1">
+                {part.assembly_groups.map((path) => (
+                  <AssemblyBreadcrumb key={path} path={path} />
+                ))}
+              </div>
             )}
           </div>
 
@@ -484,10 +516,12 @@ export function ConsolidatedParts() {
   };
 
   const filteredParts = parts.filter((part) => {
+    const searchLower = debouncedSearch.toLowerCase();
     const matchesSearch =
-      part.part_number.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      part.description?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      part.location?.toLowerCase().includes(debouncedSearch.toLowerCase());
+      part.part_number.toLowerCase().includes(searchLower) ||
+      part.description?.toLowerCase().includes(searchLower) ||
+      part.location?.toLowerCase().includes(searchLower) ||
+      part.assembly_groups.some(g => g.toLowerCase().includes(searchLower));
 
     const matchesCompleted = showCompleted || part.remaining > 0;
 
@@ -508,13 +542,15 @@ export function ConsolidatedParts() {
 
   // Count out of stock parts for badge display (apply all other active filters except out-of-stock itself)
   const outOfStockCount = useMemo(() => {
+    const searchLower = debouncedSearch.toLowerCase();
     return parts.filter(part => {
       if (part.qty_available !== 0) return false;
 
       const matchesSearch =
-        part.part_number.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        part.description?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        part.location?.toLowerCase().includes(debouncedSearch.toLowerCase());
+        part.part_number.toLowerCase().includes(searchLower) ||
+        part.description?.toLowerCase().includes(searchLower) ||
+        part.location?.toLowerCase().includes(searchLower) ||
+        part.assembly_groups.some(g => g.toLowerCase().includes(searchLower));
 
       const matchesCompleted = showCompleted || part.remaining > 0;
 
@@ -706,7 +742,7 @@ export function ConsolidatedParts() {
         variant="primary"
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search by part number, description, or location..."
+        searchPlaceholder="Search by part number, description, location, or assembly..."
         searchLarge
         statusButtons={ORDER_STATUS_OPTIONS}
         statusValue={statusFilter}

@@ -194,7 +194,7 @@ function generateBarcodeSVG(value: string): string {
   try {
     JsBarcode(svg, value, {
       format: 'CODE128',
-      width: 1.5,
+      width: 1,
       height: 25,
       displayValue: false,
       margin: 0,
@@ -319,11 +319,13 @@ function generateTagsHTML(tagsArray: TagData[]): string {
           display: flex;
           align-items: center;
           justify-content: center;
+          max-width: 1.1in;
         }
 
         .barcode-container svg {
           height: 0.35in;
           width: auto;
+          max-width: 100%;
         }
 
         .tag-row-location {

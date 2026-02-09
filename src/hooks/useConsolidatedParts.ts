@@ -24,6 +24,7 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
         qty_available: number | null;
         qty_on_order: number | null;
         total_qty_needed: number;
+        assembly_group: string | null;
         order_id: string;
         orders: {
           id: string;
@@ -49,6 +50,7 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
             qty_available,
             qty_on_order,
             total_qty_needed,
+            assembly_group,
             order_id,
             orders!inner (
               id,
@@ -149,6 +151,7 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
             needed: item.total_qty_needed,
             picked: picked,
             line_item_id: item.id,
+            assembly_group: item.assembly_group,
           });
         } else {
           partsMap.set(item.part_number, {
@@ -160,6 +163,7 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
             total_needed: item.total_qty_needed,
             total_picked: picked,
             remaining: item.total_qty_needed - picked,
+            assembly_groups: [],
             orders: [{
               order_id: item.order_id,
               so_number: orderInfo.so_number,
@@ -168,6 +172,7 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
               needed: item.total_qty_needed,
               picked: picked,
               line_item_id: item.id,
+              assembly_group: item.assembly_group,
             }],
           });
         }
@@ -188,6 +193,17 @@ export function useConsolidatedParts(statusFilter: OrderStatusFilter = 'all') {
           // Fallback: sort by SO number (lower/older SO numbers first)
           return a.so_number.localeCompare(b.so_number, undefined, { numeric: true });
         });
+      }
+
+      // Compute unique assembly_groups per part
+      for (const part of partsMap.values()) {
+        const uniquePaths = new Set<string>();
+        for (const order of part.orders) {
+          if (order.assembly_group && order.assembly_group !== part.part_number) {
+            uniquePaths.add(order.assembly_group);
+          }
+        }
+        part.assembly_groups = Array.from(uniquePaths).sort();
       }
 
       // Convert to array and sort by part number

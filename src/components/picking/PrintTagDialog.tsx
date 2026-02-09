@@ -188,14 +188,18 @@ function generateBarcodeSVG(value: string): string {
   try {
     JsBarcode(svg, value, {
       format: 'CODE128',
-      width: 1,
-      height: 25,
+      width: 2,
+      height: 30,
       displayValue: false,
       margin: 0,
     });
   } catch (e) {
     console.error('Barcode generation failed:', e);
   }
+  // Remove fixed dimensions so CSS can stretch the barcode to fill the container
+  svg.removeAttribute('width');
+  svg.removeAttribute('height');
+  svg.setAttribute('preserveAspectRatio', 'none');
   return svg.outerHTML;
 }
 
@@ -291,15 +295,14 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         .barcode-container {
           flex: 1;
           display: flex;
-          align-items: center;
-          justify-content: center;
+          align-items: stretch;
           min-height: 0;
+          overflow: hidden;
         }
 
         .barcode-container svg {
+          width: 100%;
           height: 100%;
-          width: auto;
-          max-width: 100%;
         }
 
         .tag-row-location {

@@ -36,7 +36,7 @@ export function OrderDetail() {
 
   const { updateOrder } = useOrders();
   const { lineItemsWithPicks, picks, recordPick, undoPick, getPicksForTool, getPickHistory, getPicksForAllTools, batchUpdateAllocations } = usePicks(id);
-  const { addLineItem, updateLineItem, deleteLineItem, updateQtyOverride, resetQtyOverride, loading: lineItemLoading } = useLineItems(id);
+  const { addLineItem, updateLineItem, deleteLineItem, updateQtyOverride, resetQtyOverride, updateQtyPerUnit, loading: lineItemLoading } = useLineItems(id);
   const { reportIssue, hasOpenIssue } = useIssues(id);
   const { getUserName } = useSettings();
   const { createTemplateFromOrder } = useBOMTemplates();
@@ -383,6 +383,11 @@ export function OrderDetail() {
         }}
         onResetQtyOverride={async (lineItemId, toolId, allToolIds) => {
           const result = await resetQtyOverride(lineItemId, toolId, allToolIds);
+          if (result) refresh();
+          return result;
+        }}
+        onUpdateQtyPerUnit={async (lineItemId, newQty, allToolIds) => {
+          const result = await updateQtyPerUnit(lineItemId, newQty, allToolIds);
           if (result) refresh();
           return result;
         }}

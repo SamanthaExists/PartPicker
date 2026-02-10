@@ -231,6 +231,57 @@ export function useLineItems(orderId: string | undefined) {
     }
   }, []);
 
+  const updateQtyPerUnit = useCallback(async (
+    lineItemId: string,
+    newQty: number,
+    allToolIds: string[]
+  ): Promise<LineItem | null> => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch current line item to get existing overrides and tool_ids
+      const { data: current, error: fetchError } = await supabase
+        .from('line_items')
+        .select('qty_overrides, tool_ids')
+        .eq('id', lineItemId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const overrides = current.qty_overrides || {};
+
+      // Determine applicable tools
+      const applicableToolIds = (current.tool_ids && current.tool_ids.length > 0)
+        ? current.tool_ids
+        : allToolIds;
+
+      // Recalculate total: for each tool, use override if exists, otherwise newQty
+      const newTotal = applicableToolIds.reduce((sum: number, tid: string) => {
+        return sum + (overrides[tid] ?? newQty);
+      }, 0);
+
+      const { data, error: updateError } = await supabase
+        .from('line_items')
+        .update({
+          qty_per_unit: newQty,
+          total_qty_needed: newTotal,
+        })
+        .eq('id', lineItemId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      return data;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update qty per unit';
+      setError(message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -243,6 +294,7 @@ export function useLineItems(orderId: string | undefined) {
     deleteLineItem,
     updateQtyOverride,
     resetQtyOverride,
+    updateQtyPerUnit,
     clearError,
   };
 }

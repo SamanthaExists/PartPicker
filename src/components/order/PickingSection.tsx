@@ -40,6 +40,7 @@ interface PickingSectionProps {
   onDeleteLineItem?: (lineItemId: string) => Promise<boolean>;
   onUpdateQtyOverride?: (lineItemId: string, toolId: string, qty: number, allToolIds: string[]) => Promise<unknown>;
   onResetQtyOverride?: (lineItemId: string, toolId: string, allToolIds: string[]) => Promise<unknown>;
+  onUpdateQtyPerUnit?: (lineItemId: string, newQty: number, allToolIds: string[]) => Promise<unknown>;
 }
 
 export function PickingSection({
@@ -65,6 +66,7 @@ export function PickingSection({
   onDeleteLineItem,
   onUpdateQtyOverride,
   onResetQtyOverride,
+  onUpdateQtyPerUnit,
 }: PickingSectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAssemblies, setSelectedAssemblies] = useState<Set<string>>(new Set());
@@ -330,6 +332,7 @@ export function PickingSection({
             onDeleteLineItem={onDeleteLineItem}
             onUpdateQtyOverride={onUpdateQtyOverride}
             onResetQtyOverride={onResetQtyOverride}
+            onUpdateQtyPerUnit={onUpdateQtyPerUnit}
             toolFilter={toolFilter}
           />
         </CardContent>

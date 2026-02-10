@@ -73,6 +73,7 @@ interface PickingInterfaceProps {
   onDeleteLineItem?: (lineItemId: string) => Promise<boolean>;
   onUpdateQtyOverride?: (lineItemId: string, toolId: string, qty: number, allToolIds: string[]) => Promise<unknown>;
   onResetQtyOverride?: (lineItemId: string, toolId: string, allToolIds: string[]) => Promise<unknown>;
+  onUpdateQtyPerUnit?: (lineItemId: string, newQty: number, allToolIds: string[]) => Promise<unknown>;
   toolFilter?: string; // 'all' or specific tool ID to filter by
 }
 
@@ -96,6 +97,7 @@ export function PickingInterface({
   onDeleteLineItem,
   onUpdateQtyOverride,
   onResetQtyOverride,
+  onUpdateQtyPerUnit,
   toolFilter = 'all',
 }: PickingInterfaceProps) {
   void _picks;
@@ -154,6 +156,7 @@ export function PickingInterface({
   const [deleteConfirmLineItem, setDeleteConfirmLineItem] = useState<LineItem | null>(null);
   // Qty override popover state
   const [qtyOverrideItem, setQtyOverrideItem] = useState<string | null>(null); // line item ID
+  const [qtyPerUnitValue, setQtyPerUnitValue] = useState('');
   const [qtyOverrideValue, setQtyOverrideValue] = useState('');
   const [isSavingOverride, setIsSavingOverride] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>(() => {
@@ -634,6 +637,20 @@ export function PickingInterface({
   };
 
   // Qty override handlers
+  const handleSaveQtyPerUnit = useCallback(async (lineItemId: string) => {
+    if (!onUpdateQtyPerUnit) return;
+    const qty = parseInt(qtyPerUnitValue, 10);
+    if (isNaN(qty) || qty < 0) return;
+
+    setIsSavingOverride(true);
+    const allToolIds = allTools.map(t => t.id);
+    await onUpdateQtyPerUnit(lineItemId, qty, allToolIds);
+    setIsSavingOverride(false);
+    setQtyOverrideItem(null);
+    setQtyPerUnitValue('');
+    setQtyOverrideValue('');
+  }, [onUpdateQtyPerUnit, qtyPerUnitValue, allTools]);
+
   const handleSaveQtyOverride = useCallback(async (lineItemId: string) => {
     if (!onUpdateQtyOverride) return;
     const qty = parseInt(qtyOverrideValue, 10);
@@ -644,6 +661,7 @@ export function PickingInterface({
     await onUpdateQtyOverride(lineItemId, tool.id, qty, allToolIds);
     setIsSavingOverride(false);
     setQtyOverrideItem(null);
+    setQtyPerUnitValue('');
     setQtyOverrideValue('');
   }, [onUpdateQtyOverride, qtyOverrideValue, tool.id, allTools]);
 
@@ -655,11 +673,13 @@ export function PickingInterface({
     await onResetQtyOverride(lineItemId, tool.id, allToolIds);
     setIsSavingOverride(false);
     setQtyOverrideItem(null);
+    setQtyPerUnitValue('');
     setQtyOverrideValue('');
   }, [onResetQtyOverride, tool.id, allTools]);
 
   const openQtyOverridePopover = useCallback((item: LineItem) => {
     setQtyOverrideItem(item.id);
+    setQtyPerUnitValue(String(item.qty_per_unit));
     setQtyOverrideValue(String(getQtyForTool(item, tool.id)));
   }, [tool.id]);
 
@@ -883,75 +903,130 @@ export function PickingInterface({
                 {item.qty_overrides && Object.keys(item.qty_overrides).length > 0 && (
                   <span className="text-[10px] text-blue-500" title="Has per-tool qty overrides">*</span>
                 )}
-                {onUpdateQtyOverride && (
+                {(onUpdateQtyPerUnit || onUpdateQtyOverride) && (
                   <Popover open={qtyOverrideItem === item.id} onOpenChange={(open) => {
                     if (open) openQtyOverridePopover(item);
-                    else { setQtyOverrideItem(null); setQtyOverrideValue(''); }
+                    else { setQtyOverrideItem(null); setQtyPerUnitValue(''); setQtyOverrideValue(''); }
                   }}>
                     <PopoverTrigger asChild>
                       <button
                         className="ml-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                        title={`Edit qty for ${tool.tool_number}`}
+                        title="Edit quantities"
                       >
                         <Pencil className="h-3 w-3 text-muted-foreground" />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-56 p-3" align="center">
+                    <PopoverContent className="w-64 p-3" align="center">
                       <div className="space-y-3">
-                        <div className="text-sm font-medium">Qty for {tool.tool_number}</div>
-                        <div className="text-xs text-muted-foreground">Default: {item.qty_per_unit}</div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-8 w-8"
-                            onClick={() => setQtyOverrideValue(String(Math.max(0, parseInt(qtyOverrideValue) - 1)))}
-                            disabled={isSavingOverride || parseInt(qtyOverrideValue) <= 0}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={qtyOverrideValue}
-                            onChange={(e) => setQtyOverrideValue(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveQtyOverride(item.id); }}
-                            className="w-16 h-8 text-center"
-                            disabled={isSavingOverride}
-                            autoFocus
-                          />
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-8 w-8"
-                            onClick={() => setQtyOverrideValue(String(parseInt(qtyOverrideValue) + 1))}
-                            disabled={isSavingOverride}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="flex gap-2">
-                          {hasOverride && (
+                        {/* Base Qty Per Unit section */}
+                        {onUpdateQtyPerUnit && (
+                          <>
+                            <div className="text-sm font-medium">Qty Per Unit (all tools)</div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8"
+                                onClick={() => setQtyPerUnitValue(String(Math.max(0, parseInt(qtyPerUnitValue) - 1)))}
+                                disabled={isSavingOverride || parseInt(qtyPerUnitValue) <= 0}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={qtyPerUnitValue}
+                                onChange={(e) => setQtyPerUnitValue(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveQtyPerUnit(item.id); }}
+                                className="w-16 h-8 text-center"
+                                disabled={isSavingOverride}
+                                autoFocus
+                              />
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8"
+                                onClick={() => setQtyPerUnitValue(String(parseInt(qtyPerUnitValue) + 1))}
+                                disabled={isSavingOverride}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
                             <Button
                               size="sm"
-                              variant="ghost"
-                              className="flex-1 text-xs"
-                              onClick={() => handleResetQtyOverride(item.id)}
-                              disabled={isSavingOverride}
+                              variant="default"
+                              className="w-full text-xs"
+                              onClick={() => handleSaveQtyPerUnit(item.id)}
+                              disabled={isSavingOverride || !qtyPerUnitValue}
                             >
-                              Reset
+                              {isSavingOverride ? 'Saving...' : 'Save Base Qty'}
                             </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="flex-1 text-xs"
-                            onClick={() => handleSaveQtyOverride(item.id)}
-                            disabled={isSavingOverride || !qtyOverrideValue}
-                          >
-                            {isSavingOverride ? 'Saving...' : 'Save'}
-                          </Button>
-                        </div>
+                          </>
+                        )}
+
+                        {/* Divider between sections */}
+                        {onUpdateQtyPerUnit && onUpdateQtyOverride && (
+                          <div className="border-t border-border" />
+                        )}
+
+                        {/* Per-tool override section */}
+                        {onUpdateQtyOverride && (
+                          <>
+                            <div className="text-sm font-medium">Override for {tool.tool_number}</div>
+                            <div className="text-xs text-muted-foreground">Base: {item.qty_per_unit}</div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8"
+                                onClick={() => setQtyOverrideValue(String(Math.max(0, parseInt(qtyOverrideValue) - 1)))}
+                                disabled={isSavingOverride || parseInt(qtyOverrideValue) <= 0}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={qtyOverrideValue}
+                                onChange={(e) => setQtyOverrideValue(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveQtyOverride(item.id); }}
+                                className="w-16 h-8 text-center"
+                                disabled={isSavingOverride}
+                              />
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8"
+                                onClick={() => setQtyOverrideValue(String(parseInt(qtyOverrideValue) + 1))}
+                                disabled={isSavingOverride}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="flex gap-2">
+                              {hasOverride && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="flex-1 text-xs"
+                                  onClick={() => handleResetQtyOverride(item.id)}
+                                  disabled={isSavingOverride}
+                                >
+                                  Reset
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="flex-1 text-xs"
+                                onClick={() => handleSaveQtyOverride(item.id)}
+                                disabled={isSavingOverride || !qtyOverrideValue}
+                              >
+                                {isSavingOverride ? 'Saving...' : 'Set Override'}
+                              </Button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </PopoverContent>
                   </Popover>
@@ -977,75 +1052,130 @@ export function PickingInterface({
                 {hasOverride && (
                   <span className="text-[10px] text-blue-500" title={`Default: ${item.qty_per_unit}`}>*</span>
                 )}
-                {onUpdateQtyOverride && (
+                {(onUpdateQtyPerUnit || onUpdateQtyOverride) && (
                   <Popover open={qtyOverrideItem === item.id} onOpenChange={(open) => {
                     if (open) openQtyOverridePopover(item);
-                    else { setQtyOverrideItem(null); setQtyOverrideValue(''); }
+                    else { setQtyOverrideItem(null); setQtyPerUnitValue(''); setQtyOverrideValue(''); }
                   }}>
                     <PopoverTrigger asChild>
                       <button
                         className="ml-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                        title="Edit qty for this tool"
+                        title="Edit quantities"
                       >
                         <Pencil className="h-3 w-3 text-muted-foreground" />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-56 p-3" align="center">
+                    <PopoverContent className="w-64 p-3" align="center">
                       <div className="space-y-3">
-                        <div className="text-sm font-medium">Qty for {tool.tool_number}</div>
-                        <div className="text-xs text-muted-foreground">Default: {item.qty_per_unit}</div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-8 w-8"
-                            onClick={() => setQtyOverrideValue(String(Math.max(0, parseInt(qtyOverrideValue) - 1)))}
-                            disabled={isSavingOverride || parseInt(qtyOverrideValue) <= 0}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={qtyOverrideValue}
-                            onChange={(e) => setQtyOverrideValue(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveQtyOverride(item.id); }}
-                            className="w-16 h-8 text-center"
-                            disabled={isSavingOverride}
-                            autoFocus
-                          />
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-8 w-8"
-                            onClick={() => setQtyOverrideValue(String(parseInt(qtyOverrideValue) + 1))}
-                            disabled={isSavingOverride}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="flex gap-2">
-                          {hasOverride && (
+                        {/* Base Qty Per Unit section */}
+                        {onUpdateQtyPerUnit && (
+                          <>
+                            <div className="text-sm font-medium">Qty Per Unit (all tools)</div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8"
+                                onClick={() => setQtyPerUnitValue(String(Math.max(0, parseInt(qtyPerUnitValue) - 1)))}
+                                disabled={isSavingOverride || parseInt(qtyPerUnitValue) <= 0}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={qtyPerUnitValue}
+                                onChange={(e) => setQtyPerUnitValue(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveQtyPerUnit(item.id); }}
+                                className="w-16 h-8 text-center"
+                                disabled={isSavingOverride}
+                                autoFocus
+                              />
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8"
+                                onClick={() => setQtyPerUnitValue(String(parseInt(qtyPerUnitValue) + 1))}
+                                disabled={isSavingOverride}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
                             <Button
                               size="sm"
-                              variant="ghost"
-                              className="flex-1 text-xs"
-                              onClick={() => handleResetQtyOverride(item.id)}
-                              disabled={isSavingOverride}
+                              variant="default"
+                              className="w-full text-xs"
+                              onClick={() => handleSaveQtyPerUnit(item.id)}
+                              disabled={isSavingOverride || !qtyPerUnitValue}
                             >
-                              Reset
+                              {isSavingOverride ? 'Saving...' : 'Save Base Qty'}
                             </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="flex-1 text-xs"
-                            onClick={() => handleSaveQtyOverride(item.id)}
-                            disabled={isSavingOverride || !qtyOverrideValue}
-                          >
-                            {isSavingOverride ? 'Saving...' : 'Save'}
-                          </Button>
-                        </div>
+                          </>
+                        )}
+
+                        {/* Divider between sections */}
+                        {onUpdateQtyPerUnit && onUpdateQtyOverride && (
+                          <div className="border-t border-border" />
+                        )}
+
+                        {/* Per-tool override section */}
+                        {onUpdateQtyOverride && (
+                          <>
+                            <div className="text-sm font-medium">Override for {tool.tool_number}</div>
+                            <div className="text-xs text-muted-foreground">Base: {item.qty_per_unit}</div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8"
+                                onClick={() => setQtyOverrideValue(String(Math.max(0, parseInt(qtyOverrideValue) - 1)))}
+                                disabled={isSavingOverride || parseInt(qtyOverrideValue) <= 0}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={qtyOverrideValue}
+                                onChange={(e) => setQtyOverrideValue(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveQtyOverride(item.id); }}
+                                className="w-16 h-8 text-center"
+                                disabled={isSavingOverride}
+                              />
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8"
+                                onClick={() => setQtyOverrideValue(String(parseInt(qtyOverrideValue) + 1))}
+                                disabled={isSavingOverride}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="flex gap-2">
+                              {hasOverride && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="flex-1 text-xs"
+                                  onClick={() => handleResetQtyOverride(item.id)}
+                                  disabled={isSavingOverride}
+                                >
+                                  Reset
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="flex-1 text-xs"
+                                onClick={() => handleSaveQtyOverride(item.id)}
+                                disabled={isSavingOverride || !qtyOverrideValue}
+                              >
+                                {isSavingOverride ? 'Saving...' : 'Set Override'}
+                              </Button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </PopoverContent>
                   </Popover>

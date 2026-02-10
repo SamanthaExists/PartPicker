@@ -651,29 +651,34 @@ export function PickingInterface({
     setToolOverrideValues({});
   }, [onUpdateQtyPerUnit, qtyPerUnitValue, allTools]);
 
-  const handleSaveQtyOverride = useCallback(async (lineItemId: string, toolId: string) => {
-    if (!onUpdateQtyOverride) return;
-    const qty = parseInt(toolOverrideValues[toolId] || '0', 10);
-    if (isNaN(qty) || qty < 0) return;
+  const handleSaveAllOverrides = useCallback(async (lineItemId: string, currentItem: LineItem) => {
+    if (!onUpdateQtyOverride && !onResetQtyOverride) return;
 
     setIsSavingOverride(true);
     const allToolIds = allTools.map(t => t.id);
-    await onUpdateQtyOverride(lineItemId, toolId, qty, allToolIds);
+
+    for (const t of allTools) {
+      const newVal = parseInt(toolOverrideValues[t.id] || '0', 10);
+      if (isNaN(newVal) || newVal < 0) continue;
+
+      const originalVal = getQtyForTool(currentItem, t.id);
+      if (newVal === originalVal) continue; // unchanged, skip
+
+      const toolHasOverride = currentItem.qty_overrides?.[t.id] != null;
+
+      // If value matches base qty and tool had an override, reset it
+      if (newVal === currentItem.qty_per_unit && toolHasOverride && onResetQtyOverride) {
+        await onResetQtyOverride(lineItemId, t.id, allToolIds);
+      } else if (newVal !== currentItem.qty_per_unit && onUpdateQtyOverride) {
+        // Set override (different from base)
+        await onUpdateQtyOverride(lineItemId, t.id, newVal, allToolIds);
+      }
+    }
+
     setIsSavingOverride(false);
     setQtyOverrideItem(null);
     setToolOverrideValues({});
-  }, [onUpdateQtyOverride, toolOverrideValues, allTools]);
-
-  const handleResetQtyOverride = useCallback(async (lineItemId: string, toolId: string) => {
-    if (!onResetQtyOverride) return;
-
-    setIsSavingOverride(true);
-    const allToolIds = allTools.map(t => t.id);
-    await onResetQtyOverride(lineItemId, toolId, allToolIds);
-    setIsSavingOverride(false);
-    setQtyOverrideItem(null);
-    setToolOverrideValues({});
-  }, [onResetQtyOverride, allTools]);
+  }, [onUpdateQtyOverride, onResetQtyOverride, toolOverrideValues, allTools]);
 
   const openQtyOverridePopover = useCallback((item: LineItem) => {
     setQtyOverrideItem(item.id);
@@ -1005,7 +1010,6 @@ export function PickingInterface({
                                       min="0"
                                       value={toolVal}
                                       onChange={(e) => setToolOverrideValues(prev => ({ ...prev, [t.id]: e.target.value }))}
-                                      onKeyDown={(e) => { if (e.key === 'Enter') handleSaveQtyOverride(item.id, t.id); }}
                                       className="w-12 h-6 text-center text-xs px-1"
                                       disabled={isSavingOverride}
                                     />
@@ -1021,25 +1025,19 @@ export function PickingInterface({
                                     >
                                       <Plus className="h-3 w-3" />
                                     </Button>
-                                    <Button
-                                      size="sm"
-                                      variant={toolHasOverride ? 'ghost' : 'default'}
-                                      className="h-6 text-[10px] px-2 flex-shrink-0"
-                                      onClick={() => {
-                                        if (toolHasOverride && String(item.qty_per_unit) === toolVal) {
-                                          handleResetQtyOverride(item.id, t.id);
-                                        } else {
-                                          handleSaveQtyOverride(item.id, t.id);
-                                        }
-                                      }}
-                                      disabled={isSavingOverride}
-                                    >
-                                      {toolHasOverride && String(item.qty_per_unit) === toolVal ? 'Reset' : 'Set'}
-                                    </Button>
                                   </div>
                                 );
                               })}
                             </div>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="w-full text-xs"
+                              onClick={() => handleSaveAllOverrides(item.id, item)}
+                              disabled={isSavingOverride}
+                            >
+                              {isSavingOverride ? 'Saving...' : 'Save Overrides'}
+                            </Button>
                           </>
                         )}
                       </div>
@@ -1166,7 +1164,6 @@ export function PickingInterface({
                                       min="0"
                                       value={toolVal}
                                       onChange={(e) => setToolOverrideValues(prev => ({ ...prev, [t.id]: e.target.value }))}
-                                      onKeyDown={(e) => { if (e.key === 'Enter') handleSaveQtyOverride(item.id, t.id); }}
                                       className="w-12 h-6 text-center text-xs px-1"
                                       disabled={isSavingOverride}
                                     />
@@ -1182,25 +1179,19 @@ export function PickingInterface({
                                     >
                                       <Plus className="h-3 w-3" />
                                     </Button>
-                                    <Button
-                                      size="sm"
-                                      variant={toolHasOverride ? 'ghost' : 'default'}
-                                      className="h-6 text-[10px] px-2 flex-shrink-0"
-                                      onClick={() => {
-                                        if (toolHasOverride && String(item.qty_per_unit) === toolVal) {
-                                          handleResetQtyOverride(item.id, t.id);
-                                        } else {
-                                          handleSaveQtyOverride(item.id, t.id);
-                                        }
-                                      }}
-                                      disabled={isSavingOverride}
-                                    >
-                                      {toolHasOverride && String(item.qty_per_unit) === toolVal ? 'Reset' : 'Set'}
-                                    </Button>
                                   </div>
                                 );
                               })}
                             </div>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="w-full text-xs"
+                              onClick={() => handleSaveAllOverrides(item.id, item)}
+                              disabled={isSavingOverride}
+                            >
+                              {isSavingOverride ? 'Saving...' : 'Save Overrides'}
+                            </Button>
                           </>
                         )}
                       </div>

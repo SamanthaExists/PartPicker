@@ -197,7 +197,7 @@ function generateBarcodeSVG(value: string): string {
     // We calculate the module width to make the barcode ~2" wide (192px at 96dpi),
     // clamped so bars are neither too thin to print nor too thick to scan.
     const numModules = 11 * (value.length + 2) + 13; // approximate CODE128 module count
-    const targetWidthPx = 192; // ~2 inches at 96 CSS px/in
+    const targetWidthPx = 240; // ~2.5 inches at 96 CSS px/in
     const calculatedWidth = targetWidthPx / numModules;
     // Clamp: min 0.75px (~7.8 mil at 96dpi/300dpi) to stay scannable,
     //        max 2px (~21 mil) so wide bars don't bleed together

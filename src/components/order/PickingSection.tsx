@@ -313,7 +313,7 @@ export function PickingSection({
       <Card>
         <CardContent className="pt-4">
           <PickingInterface
-            tool={tools.find(t => t.id === currentToolId) || tools[0]}
+            tool={tools.find(t => t.id === (toolFilter !== 'all' ? toolFilter : currentToolId)) || tools[0]}
             allTools={tools}
             orderId={order.id}
             soNumber={order.so_number}

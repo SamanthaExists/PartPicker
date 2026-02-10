@@ -186,9 +186,26 @@ function generateBarcodeSVG(value: string): string {
   // Create a temporary SVG element, render the barcode, and return the SVG string
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   try {
+    // Tag is 3.4" wide with 0.12" padding each side = 3.16" printable width.
+    // At 96 CSS px/in that's ~303px. We want the barcode around 60-70% of that
+    // to leave breathing room and keep bars from touching the edges.
+    //
+    // CODE128 has roughly (11 * (numChars + 2) + 13) modules per barcode.
+    // For reliable scanning on a 300 DPI thermal printer, each module (narrowest bar)
+    // should be at least 7.5 mil (0.0075") = ~2.25 dots, and no wider than ~20 mil.
+    //
+    // We calculate the module width to make the barcode ~2" wide (192px at 96dpi),
+    // clamped so bars are neither too thin to print nor too thick to scan.
+    const numModules = 11 * (value.length + 2) + 13; // approximate CODE128 module count
+    const targetWidthPx = 192; // ~2 inches at 96 CSS px/in
+    const calculatedWidth = targetWidthPx / numModules;
+    // Clamp: min 0.75px (~7.8 mil at 96dpi/300dpi) to stay scannable,
+    //        max 2px (~21 mil) so wide bars don't bleed together
+    const moduleWidth = Math.max(0.75, Math.min(2, calculatedWidth));
+
     JsBarcode(svg, value, {
       format: 'CODE128',
-      width: 2,
+      width: moduleWidth,
       height: 30,
       displayValue: false,
       margin: 0,
@@ -196,10 +213,10 @@ function generateBarcodeSVG(value: string): string {
   } catch (e) {
     console.error('Barcode generation failed:', e);
   }
-  // Remove fixed dimensions so CSS can stretch the barcode to fill the container
-  svg.removeAttribute('width');
+  // Keep the SVG's natural width so bars maintain correct proportions.
+  // Only remove fixed height so it can flex vertically within the container.
   svg.removeAttribute('height');
-  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   return svg.outerHTML;
 }
 
@@ -295,13 +312,14 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         .barcode-container {
           flex: 1;
           display: flex;
-          align-items: stretch;
+          align-items: center;
+          justify-content: center;
           min-height: 0;
           overflow: hidden;
         }
 
         .barcode-container svg {
-          width: 100%;
+          max-width: 100%;
           height: 100%;
         }
 

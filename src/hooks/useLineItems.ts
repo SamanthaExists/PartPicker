@@ -9,6 +9,8 @@ export interface LineItemInput {
   location?: string | null;
   qty_per_unit: number;
   total_qty_needed: number;
+  tool_ids?: string[] | null;
+  qty_overrides?: Record<string, number> | null;
 }
 
 export function useLineItems(orderId: string | undefined) {
@@ -36,6 +38,8 @@ export function useLineItems(orderId: string | undefined) {
           location: input.location || null,
           qty_per_unit: input.qty_per_unit,
           total_qty_needed: input.total_qty_needed,
+          tool_ids: input.tool_ids ?? null,
+          qty_overrides: input.qty_overrides ?? null,
         })
         .select()
         .single();
@@ -75,6 +79,12 @@ export function useLineItems(orderId: string | undefined) {
       }
       if (input.total_qty_needed !== undefined) {
         updateData.total_qty_needed = input.total_qty_needed;
+      }
+      if (input.tool_ids !== undefined) {
+        updateData.tool_ids = input.tool_ids;
+      }
+      if (input.qty_overrides !== undefined) {
+        updateData.qty_overrides = input.qty_overrides;
       }
 
       const { data, error: updateError } = await supabase

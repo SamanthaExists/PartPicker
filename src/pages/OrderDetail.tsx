@@ -415,6 +415,7 @@ export function OrderDetail() {
           return success;
         }}
         isLoading={lineItemLoading}
+        tools={tools}
       />
 
       <LineItemDialog
@@ -428,6 +429,7 @@ export function OrderDetail() {
         }}
         lineItem={lineItemToEdit}
         isLoading={lineItemLoading}
+        tools={tools}
       />
 
       <DeleteConfirmDialog

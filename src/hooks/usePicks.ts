@@ -535,8 +535,19 @@ export function useRecentActivity() {
         so_number: undo.so_number,
       }));
 
+      // Generate reconstructed "original pick" entries from undos
+      const pickUndoneActivities: RecentActivity[] = (undoData || []).map((undo) => ({
+        id: `pick-undone-${undo.id}`,
+        type: 'pick_undone' as const,
+        message: `Picked ${undo.qty_picked}x ${undo.part_number} (undone)`,
+        timestamp: undo.picked_at,
+        user: undo.picked_by || 'Unknown',
+        order_id: undo.order_id,
+        so_number: undo.so_number,
+      }));
+
       // Merge and sort by timestamp descending
-      const allActivities = [...pickActivities, ...undoActivities]
+      const allActivities = [...pickActivities, ...undoActivities, ...pickUndoneActivities]
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, 20);
 

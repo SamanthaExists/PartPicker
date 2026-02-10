@@ -25,7 +25,8 @@ import type { Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '@/types
 import { Layers, SplitSquareVertical } from 'lucide-react';
 import { useSettings } from '@/hooks/useSettings';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
-import { cn, formatDateTime, getLocationPrefix, alphanumericCompare, getTopLevelAssembly } from '@/lib/utils';
+import { cn, formatDateTime, getLocationPrefix, alphanumericCompare, getTopLevelAssembly, getQtyForTool } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ReportIssueDialog } from './ReportIssueDialog';
 import { DistributeInventoryDialog } from './DistributeInventoryDialog';
 import { PrintTagDialog, type TagData } from './PrintTagDialog';
@@ -70,6 +71,8 @@ interface PickingInterfaceProps {
     notes?: string
   ) => Promise<boolean>;
   onDeleteLineItem?: (lineItemId: string) => Promise<boolean>;
+  onUpdateQtyOverride?: (lineItemId: string, toolId: string, qty: number, allToolIds: string[]) => Promise<unknown>;
+  onResetQtyOverride?: (lineItemId: string, toolId: string, allToolIds: string[]) => Promise<unknown>;
   toolFilter?: string; // 'all' or specific tool ID to filter by
 }
 
@@ -91,6 +94,8 @@ export function PickingInterface({
   hasOpenIssue,
   onBatchUpdateAllocations,
   onDeleteLineItem,
+  onUpdateQtyOverride,
+  onResetQtyOverride,
   toolFilter = 'all',
 }: PickingInterfaceProps) {
   void _picks;
@@ -147,6 +152,10 @@ export function PickingInterface({
   const [undoPasswordError, setUndoPasswordError] = useState<string | null>(null);
   const [isUndoing, setIsUndoing] = useState(false);
   const [deleteConfirmLineItem, setDeleteConfirmLineItem] = useState<LineItem | null>(null);
+  // Qty override popover state
+  const [qtyOverrideItem, setQtyOverrideItem] = useState<string | null>(null); // line item ID
+  const [qtyOverrideValue, setQtyOverrideValue] = useState('');
+  const [isSavingOverride, setIsSavingOverride] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.SORT_PREFERENCE);
     return (saved as SortMode) || 'part_number';
@@ -194,7 +203,7 @@ export function PickingInterface({
   const totalItems = filteredLineItems.length;
   const completedItems = filteredLineItems.filter(item => {
     const pickedForTool = toolPicks.get(item.id) || 0;
-    return item.qty_per_unit - pickedForTool <= 0;
+    return getQtyForTool(item, tool.id) - pickedForTool <= 0;
   }).length;
 
   // Sort and group items
@@ -214,7 +223,7 @@ export function PickingInterface({
       const before = items.length;
       items = items.filter(item => {
         const pickedForTool = toolPicks.get(item.id) || 0;
-        return item.qty_per_unit - pickedForTool > 0;
+        return getQtyForTool(item, tool.id) - pickedForTool > 0;
       });
       hiddenItemsCount = before - items.length;
     }
@@ -320,7 +329,7 @@ export function PickingInterface({
     }
 
     const pickedForTool = toolPicks.get(item.id) || 0;
-    const remaining = item.qty_per_unit - pickedForTool;
+    const remaining = getQtyForTool(item, tool.id) - pickedForTool;
 
     if (remaining <= 0) return;
 
@@ -379,7 +388,7 @@ export function PickingInterface({
     getItemId: (item) => item.id,
     onAction: (item) => {
       const pickedForTool = toolPicks.get(item.id) || 0;
-      const remaining = item.qty_per_unit - pickedForTool;
+      const remaining = getQtyForTool(item, tool.id) - pickedForTool;
       if (remaining > 0 && !isSubmitting) {
         handleQuickPick(item);
       }
@@ -424,7 +433,7 @@ export function PickingInterface({
         return false;
       }
       const pickedForTool = toolPicks.get(item.id) || 0;
-      return item.qty_per_unit - pickedForTool > 0;
+      return getQtyForTool(item, tool.id) - pickedForTool > 0;
     });
 
     if (itemsToPick.length === 0) return;
@@ -440,7 +449,7 @@ export function PickingInterface({
       const successfulPicks: { item: LineItem; qty: number }[] = [];
       for (const item of itemsToPick) {
         const pickedForTool = toolPicks.get(item.id) || 0;
-        const remaining = item.qty_per_unit - pickedForTool;
+        const remaining = getQtyForTool(item, tool.id) - pickedForTool;
         if (remaining > 0) {
           const result = await onRecordPick(item.id, tool.id, remaining, pickedBy);
           if (result) {
@@ -481,9 +490,9 @@ export function PickingInterface({
   const getUnpickedCountInLocation = useCallback((locationItems: LineItem[]) => {
     return locationItems.filter(item => {
       const pickedForTool = toolPicks.get(item.id) || 0;
-      return item.qty_per_unit - pickedForTool > 0;
+      return getQtyForTool(item, tool.id) - pickedForTool > 0;
     }).length;
-  }, [toolPicks]);
+  }, [toolPicks, tool.id]);
 
   // Count how many tools still need this part
   const getRemainingToolsCount = useCallback((item: LineItem) => {
@@ -493,7 +502,7 @@ export function PickingInterface({
     return applicableTools.filter(t => {
       const toolPicks = allToolsPicksMap.get(t.id);
       const picked = toolPicks?.get(item.id) || 0;
-      return picked < item.qty_per_unit;
+      return picked < getQtyForTool(item, t.id);
     }).length;
   }, [allTools, allToolsPicksMap]);
 
@@ -602,7 +611,7 @@ export function PickingInterface({
 
   const openPartialPick = (item: LineItem) => {
     const pickedForTool = toolPicks.get(item.id) || 0;
-    const remaining = item.qty_per_unit - pickedForTool;
+    const remaining = getQtyForTool(item, tool.id) - pickedForTool;
     setPartialPickItem(item);
     setPartialQty(String(Math.min(1, remaining)));
     setPartialNote('');
@@ -623,6 +632,36 @@ export function PickingInterface({
     );
     return success;
   };
+
+  // Qty override handlers
+  const handleSaveQtyOverride = useCallback(async (lineItemId: string) => {
+    if (!onUpdateQtyOverride) return;
+    const qty = parseInt(qtyOverrideValue, 10);
+    if (isNaN(qty) || qty < 0) return;
+
+    setIsSavingOverride(true);
+    const allToolIds = allTools.map(t => t.id);
+    await onUpdateQtyOverride(lineItemId, tool.id, qty, allToolIds);
+    setIsSavingOverride(false);
+    setQtyOverrideItem(null);
+    setQtyOverrideValue('');
+  }, [onUpdateQtyOverride, qtyOverrideValue, tool.id, allTools]);
+
+  const handleResetQtyOverride = useCallback(async (lineItemId: string) => {
+    if (!onResetQtyOverride) return;
+
+    setIsSavingOverride(true);
+    const allToolIds = allTools.map(t => t.id);
+    await onResetQtyOverride(lineItemId, tool.id, allToolIds);
+    setIsSavingOverride(false);
+    setQtyOverrideItem(null);
+    setQtyOverrideValue('');
+  }, [onResetQtyOverride, tool.id, allTools]);
+
+  const openQtyOverridePopover = useCallback((item: LineItem) => {
+    setQtyOverrideItem(item.id);
+    setQtyOverrideValue(String(getQtyForTool(item, tool.id)));
+  }, [tool.id]);
 
   // Toggle expanded state for a line item to show/hide pick history
   const toggleExpanded = (itemId: string) => {
@@ -706,8 +745,10 @@ export function PickingInterface({
   // Render desktop line item row with expandable pick history
   const renderDesktopLineItem = (item: LineItem) => {
     const pickedForTool = toolPicks.get(item.id) || 0;
-    const remaining = item.qty_per_unit - pickedForTool;
+    const qtyForTool = getQtyForTool(item, tool.id);
+    const remaining = qtyForTool - pickedForTool;
     const isComplete = remaining <= 0;
+    const hasOverride = item.qty_overrides?.[tool.id] != null;
     const itemHasIssue = hasOpenIssue ? hasOpenIssue(item.id) : false;
     const isExpanded = expandedItems.has(item.id);
     const pickHistory = getPickHistory(item.id, tool.id);
@@ -836,7 +877,85 @@ export function PickingInterface({
                   {totalPicked}
                 </span>
                 <span className="text-muted-foreground text-sm">/</span>
-                <span className="text-sm">{totalNeeded}</span>
+                <span className={cn('text-sm', hasOverride && 'text-blue-600 dark:text-blue-400 font-medium')}>
+                  {totalNeeded}
+                </span>
+                {item.qty_overrides && Object.keys(item.qty_overrides).length > 0 && (
+                  <span className="text-[10px] text-blue-500" title="Has per-tool qty overrides">*</span>
+                )}
+                {onUpdateQtyOverride && (
+                  <Popover open={qtyOverrideItem === item.id} onOpenChange={(open) => {
+                    if (open) openQtyOverridePopover(item);
+                    else { setQtyOverrideItem(null); setQtyOverrideValue(''); }
+                  }}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className="ml-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        title={`Edit qty for ${tool.tool_number}`}
+                      >
+                        <Pencil className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-3" align="center">
+                      <div className="space-y-3">
+                        <div className="text-sm font-medium">Qty for {tool.tool_number}</div>
+                        <div className="text-xs text-muted-foreground">Default: {item.qty_per_unit}</div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            onClick={() => setQtyOverrideValue(String(Math.max(0, parseInt(qtyOverrideValue) - 1)))}
+                            disabled={isSavingOverride || parseInt(qtyOverrideValue) <= 0}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={qtyOverrideValue}
+                            onChange={(e) => setQtyOverrideValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveQtyOverride(item.id); }}
+                            className="w-16 h-8 text-center"
+                            disabled={isSavingOverride}
+                            autoFocus
+                          />
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            onClick={() => setQtyOverrideValue(String(parseInt(qtyOverrideValue) + 1))}
+                            disabled={isSavingOverride}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex gap-2">
+                          {hasOverride && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="flex-1 text-xs"
+                              onClick={() => handleResetQtyOverride(item.id)}
+                              disabled={isSavingOverride}
+                            >
+                              Reset
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="flex-1 text-xs"
+                            onClick={() => handleSaveQtyOverride(item.id)}
+                            disabled={isSavingOverride || !qtyOverrideValue}
+                          >
+                            {isSavingOverride ? 'Saving...' : 'Save'}
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
             </div>
           )}
@@ -854,7 +973,83 @@ export function PickingInterface({
                   {pickedForTool}
                 </span>
                 <span className="text-muted-foreground text-sm">/</span>
-                <span className="text-sm">{item.qty_per_unit}</span>
+                <span className={cn('text-sm', hasOverride && 'text-blue-600 dark:text-blue-400 font-medium')}>{qtyForTool}</span>
+                {hasOverride && (
+                  <span className="text-[10px] text-blue-500" title={`Default: ${item.qty_per_unit}`}>*</span>
+                )}
+                {onUpdateQtyOverride && (
+                  <Popover open={qtyOverrideItem === item.id} onOpenChange={(open) => {
+                    if (open) openQtyOverridePopover(item);
+                    else { setQtyOverrideItem(null); setQtyOverrideValue(''); }
+                  }}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className="ml-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        title="Edit qty for this tool"
+                      >
+                        <Pencil className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-3" align="center">
+                      <div className="space-y-3">
+                        <div className="text-sm font-medium">Qty for {tool.tool_number}</div>
+                        <div className="text-xs text-muted-foreground">Default: {item.qty_per_unit}</div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            onClick={() => setQtyOverrideValue(String(Math.max(0, parseInt(qtyOverrideValue) - 1)))}
+                            disabled={isSavingOverride || parseInt(qtyOverrideValue) <= 0}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={qtyOverrideValue}
+                            onChange={(e) => setQtyOverrideValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveQtyOverride(item.id); }}
+                            className="w-16 h-8 text-center"
+                            disabled={isSavingOverride}
+                            autoFocus
+                          />
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            onClick={() => setQtyOverrideValue(String(parseInt(qtyOverrideValue) + 1))}
+                            disabled={isSavingOverride}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex gap-2">
+                          {hasOverride && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="flex-1 text-xs"
+                              onClick={() => handleResetQtyOverride(item.id)}
+                              disabled={isSavingOverride}
+                            >
+                              Reset
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="flex-1 text-xs"
+                            onClick={() => handleSaveQtyOverride(item.id)}
+                            disabled={isSavingOverride || !qtyOverrideValue}
+                          >
+                            {isSavingOverride ? 'Saving...' : 'Save'}
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
             </div>
           )}
@@ -931,7 +1126,7 @@ export function PickingInterface({
                       <Check className="h-4 w-4 mr-1" />
                       {pendingPicks.get(item.id)?.qty ?? remaining}
                     </Button>
-                    {item.qty_per_unit > 1 && (
+                    {qtyForTool > 1 && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -1051,7 +1246,8 @@ export function PickingInterface({
   // Render mobile line item
   const renderMobileLineItem = (item: LineItem) => {
     const pickedForTool = toolPicks.get(item.id) || 0;
-    const remaining = item.qty_per_unit - pickedForTool;
+    const qtyForTool = getQtyForTool(item, tool.id);
+    const remaining = qtyForTool - pickedForTool;
     const isComplete = remaining <= 0;
     const itemHasIssue = hasOpenIssue ? hasOpenIssue(item.id) : false;
 
@@ -1245,7 +1441,7 @@ export function PickingInterface({
                               : `Pick All (${remaining})`}
                         </span>
                       </Button>
-                      {item.qty_per_unit > 1 && (
+                      {qtyForTool > 1 && (
                         <Button
                           size="touch-lg"
                           variant="outline"
@@ -1639,7 +1835,7 @@ export function PickingInterface({
                       type="number"
                       min="1"
                       max={
-                        partialPickItem.qty_per_unit -
+                        getQtyForTool(partialPickItem, tool.id) -
                         (toolPicks.get(partialPickItem.id) || 0)
                       }
                       value={partialQty}
@@ -1654,7 +1850,7 @@ export function PickingInterface({
                           String(
                             Math.min(
                               parseInt(partialQty) + 1,
-                              partialPickItem.qty_per_unit -
+                              getQtyForTool(partialPickItem, tool.id) -
                                 (toolPicks.get(partialPickItem.id) || 0)
                             )
                           )
@@ -1669,7 +1865,7 @@ export function PickingInterface({
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground">Remaining</p>
                   <p className="text-2xl font-bold">
-                    {partialPickItem.qty_per_unit -
+                    {getQtyForTool(partialPickItem, tool.id) -
                       (toolPicks.get(partialPickItem.id) || 0)}
                   </p>
                 </div>

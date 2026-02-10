@@ -37,6 +37,7 @@ export interface LineItem {
   qty_available: number | null;
   qty_on_order: number | null;
   tool_ids: string[] | null; // Array of tool IDs this part applies to (null = all tools)
+  qty_overrides: Record<string, number> | null; // Per-tool qty overrides: {"<tool_uuid>": 6} (null = no overrides)
   assembly_group: string | null; // Top-level assembly name for multi-BOM grouping
   created_at: string;
 }
@@ -231,7 +232,7 @@ export interface PickUndo {
 
 export interface RecentActivity {
   id: string;
-  type: 'pick' | 'pick_undo' | 'order_created' | 'order_completed' | 'part_added' | 'part_removed' | 'order_imported';
+  type: 'pick' | 'pick_undo' | 'pick_undone' | 'order_created' | 'order_completed' | 'part_added' | 'part_removed' | 'order_imported';
   message: string;
   timestamp: string;
   user?: string;

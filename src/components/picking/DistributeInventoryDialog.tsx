@@ -12,7 +12,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import type { Tool, LineItem } from '@/types';
-import { cn } from '@/lib/utils';
+import { cn, getQtyForTool } from '@/lib/utils';
 
 interface DistributeInventoryDialogProps {
   open: boolean;
@@ -79,8 +79,8 @@ export function DistributeInventoryDialog({
   const updateAllocation = useCallback((toolId: string, newQty: number) => {
     if (!lineItem) return;
 
-    // Clamp to valid range: 0 to qty_per_unit
-    const clampedQty = Math.max(0, Math.min(newQty, lineItem.qty_per_unit));
+    // Clamp to valid range: 0 to per-tool qty (may be overridden)
+    const clampedQty = Math.max(0, Math.min(newQty, getQtyForTool(lineItem, toolId)));
 
     setDraftAllocations(prev => {
       const next = new Map(prev);
@@ -93,15 +93,17 @@ export function DistributeInventoryDialog({
   const calculateEvenDistribution = useCallback(() => {
     if (!lineItem || tools.length === 0) return;
 
-    const qtyPerTool = lineItem.qty_per_unit;
-    const maxPerTool = Math.min(qtyPerTool, Math.floor(availableStock / tools.length));
+    // Use per-tool qty (may differ per tool with overrides)
+    const minQtyPerTool = Math.min(...tools.map(t => getQtyForTool(lineItem, t.id)));
+    const maxPerTool = Math.min(minQtyPerTool, Math.floor(availableStock / tools.length));
     let remainingStock = availableStock;
 
     const newAllocations = new Map<string, number>();
 
-    // First pass: give each tool the base amount
+    // First pass: give each tool the base amount (capped at their per-tool qty)
     tools.forEach(tool => {
-      const allocation = Math.min(maxPerTool, remainingStock, qtyPerTool);
+      const qtyForThisTool = getQtyForTool(lineItem, tool.id);
+      const allocation = Math.min(maxPerTool, remainingStock, qtyForThisTool);
       newAllocations.set(tool.id, allocation);
       remainingStock -= allocation;
     });
@@ -110,7 +112,8 @@ export function DistributeInventoryDialog({
     if (remainingStock > 0) {
       for (const tool of tools) {
         const current = newAllocations.get(tool.id) || 0;
-        const capacity = qtyPerTool - current;
+        const qtyForThisTool = getQtyForTool(lineItem, tool.id);
+        const capacity = qtyForThisTool - current;
         if (capacity > 0 && remainingStock > 0) {
           const add = Math.min(capacity, remainingStock);
           newAllocations.set(tool.id, current + add);
@@ -229,7 +232,7 @@ export function DistributeInventoryDialog({
           <div className="divide-y">
             {tools.map(tool => {
               const allocated = draftAllocations.get(tool.id) || 0;
-              const needed = lineItem.qty_per_unit;
+              const needed = getQtyForTool(lineItem, tool.id);
               const isToolComplete = allocated >= needed;
               const isToolPartial = allocated > 0 && allocated < needed;
               const original = currentAllocations.get(tool.id) || 0;

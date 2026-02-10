@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { parseISO, isBefore, startOfDay, differenceInDays } from 'date-fns';
+import type { LineItem } from '@/types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -186,4 +187,22 @@ export function getTopLevelAssembly(assemblyGroup: string | null): string {
   if (!assemblyGroup) return '';
   const idx = assemblyGroup.indexOf(' > ');
   return idx === -1 ? assemblyGroup : assemblyGroup.substring(0, idx);
+}
+
+/**
+ * Get the quantity needed for a specific tool on a line item.
+ * Returns the override value if one exists, otherwise the default qty_per_unit.
+ */
+export function getQtyForTool(lineItem: LineItem, toolId: string): number {
+  return lineItem.qty_overrides?.[toolId] ?? lineItem.qty_per_unit;
+}
+
+/**
+ * Compute total_qty_needed from per-tool quantities (overrides + defaults).
+ * Used client-side to mirror what the DB function does.
+ */
+export function computeTotalQtyNeeded(lineItem: LineItem, applicableToolIds: string[]): number {
+  return applicableToolIds.reduce((sum, toolId) => {
+    return sum + getQtyForTool(lineItem, toolId);
+  }, 0);
 }

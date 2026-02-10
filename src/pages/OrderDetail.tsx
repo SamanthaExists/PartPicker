@@ -27,7 +27,7 @@ import { useIssues } from '@/hooks/useIssues';
 import { useSettings } from '@/hooks/useSettings';
 import { useActivityLog } from '@/hooks/useActivityLog';
 import type { Tool, LineItem } from '@/types';
-import { getStatusColor } from '@/lib/utils';
+import { getStatusColor, getQtyForTool } from '@/lib/utils';
 import { exportOrderToExcel } from '@/lib/excelExport';
 
 export function OrderDetail() {
@@ -36,7 +36,7 @@ export function OrderDetail() {
 
   const { updateOrder } = useOrders();
   const { lineItemsWithPicks, picks, recordPick, undoPick, getPicksForTool, getPickHistory, getPicksForAllTools, batchUpdateAllocations } = usePicks(id);
-  const { addLineItem, updateLineItem, deleteLineItem, loading: lineItemLoading } = useLineItems(id);
+  const { addLineItem, updateLineItem, deleteLineItem, updateQtyOverride, resetQtyOverride, loading: lineItemLoading } = useLineItems(id);
   const { reportIssue, hasOpenIssue } = useIssues(id);
   const { getUserName } = useSettings();
   const { createTemplateFromOrder } = useBOMTemplates();
@@ -243,13 +243,13 @@ export function OrderDetail() {
       }
       const toolPicks = allToolsPicksMap.get(t.id);
       const picked = toolPicks?.get(lineItemId) || 0;
-      return picked < lineItem.qty_per_unit;
+      return picked < getQtyForTool(lineItem, t.id);
     });
 
     const pickPromises = toolsToPick.map(t => {
       const toolPicks = allToolsPicksMap.get(t.id);
       const picked = toolPicks?.get(lineItemId) || 0;
-      const remaining = lineItem.qty_per_unit - picked;
+      const remaining = getQtyForTool(lineItem, t.id) - picked;
       return recordPick(lineItemId, t.id, remaining, userName);
     });
 
@@ -262,7 +262,7 @@ export function OrderDetail() {
         const t = toolsToPick[i];
         const toolPicks = allToolsPicksMap.get(t.id);
         const picked = toolPicks?.get(lineItemId) || 0;
-        pickedTools.push({ toolNumber: t.tool_number, qty: lineItem.qty_per_unit - picked });
+        pickedTools.push({ toolNumber: t.tool_number, qty: getQtyForTool(lineItem, t.id) - picked });
       }
     }
     return pickedTools;
@@ -376,6 +376,16 @@ export function OrderDetail() {
         hasOpenIssue={hasOpenIssue}
         onBatchUpdateAllocations={batchUpdateAllocations}
         onDeleteLineItem={handleDeleteLineItem}
+        onUpdateQtyOverride={async (lineItemId, toolId, qty, allToolIds) => {
+          const result = await updateQtyOverride(lineItemId, toolId, qty, allToolIds);
+          if (result) refresh();
+          return result;
+        }}
+        onResetQtyOverride={async (lineItemId, toolId, allToolIds) => {
+          const result = await resetQtyOverride(lineItemId, toolId, allToolIds);
+          if (result) refresh();
+          return result;
+        }}
       />
 
       {/* Dialogs */}

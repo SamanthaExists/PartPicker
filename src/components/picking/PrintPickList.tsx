@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import type { Order, Tool, LineItem } from '@/types';
-import { formatDate } from '@/lib/utils';
+import { formatDate, getQtyForTool } from '@/lib/utils';
 
 interface PrintPickListProps {
   order: Order;
@@ -46,13 +46,14 @@ export function PrintPickList({
     const toolPicks = getPicksForTool(tool.id);
     const items = lineItems.map((item) => {
       const picked = toolPicks.get(item.id) || 0;
+      const qtyNeeded = getQtyForTool(item, tool.id);
       return {
         partNumber: item.part_number,
         description: item.description || '-',
         location: item.location || '-',
-        qtyNeeded: item.qty_per_unit,
+        qtyNeeded,
         qtyPicked: picked,
-        remaining: item.qty_per_unit - picked,
+        remaining: qtyNeeded - picked,
       };
     });
     return { tool, items };

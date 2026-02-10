@@ -15,7 +15,7 @@ import { FilterMultiSelect } from '@/components/filters';
 import { PickingInterface } from '@/components/picking/PickingInterface';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import type { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '@/types';
-import { cn, getTopLevelAssembly } from '@/lib/utils';
+import { cn, getTopLevelAssembly, getQtyForTool } from '@/lib/utils';
 
 interface PickingSectionProps {
   order: Order;
@@ -38,6 +38,8 @@ interface PickingSectionProps {
   hasOpenIssue: (lineItemId: string) => boolean;
   onBatchUpdateAllocations: (lineItemId: string, newAllocations: Map<string, number>, pickedBy?: string, notes?: string) => Promise<boolean>;
   onDeleteLineItem?: (lineItemId: string) => Promise<boolean>;
+  onUpdateQtyOverride?: (lineItemId: string, toolId: string, qty: number, allToolIds: string[]) => Promise<unknown>;
+  onResetQtyOverride?: (lineItemId: string, toolId: string, allToolIds: string[]) => Promise<unknown>;
 }
 
 export function PickingSection({
@@ -61,6 +63,8 @@ export function PickingSection({
   hasOpenIssue,
   onBatchUpdateAllocations,
   onDeleteLineItem,
+  onUpdateQtyOverride,
+  onResetQtyOverride,
 }: PickingSectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAssemblies, setSelectedAssemblies] = useState<Set<string>>(new Set());
@@ -200,7 +204,7 @@ export function PickingSection({
             const toolTotalItems = applicableItems.length;
             const toolCompletedItems = applicableItems.filter(item => {
               const picked = toolPicks.get(item.id) || 0;
-              return picked >= item.qty_per_unit;
+              return picked >= getQtyForTool(item, tool.id);
             }).length;
             const toolProgress =
               toolTotalItems > 0 ? Math.round((toolCompletedItems / toolTotalItems) * 100) : 0;
@@ -324,6 +328,8 @@ export function PickingSection({
             hasOpenIssue={hasOpenIssue}
             onBatchUpdateAllocations={onBatchUpdateAllocations}
             onDeleteLineItem={onDeleteLineItem}
+            onUpdateQtyOverride={onUpdateQtyOverride}
+            onResetQtyOverride={onResetQtyOverride}
             toolFilter={toolFilter}
           />
         </CardContent>

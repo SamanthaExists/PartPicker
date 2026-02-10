@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { LineItem } from '@/types';
+import { getQtyForTool } from '@/lib/utils';
 
 export interface LineItemInput {
   part_number: string;
@@ -117,6 +118,119 @@ export function useLineItems(orderId: string | undefined) {
     }
   }, []);
 
+  const updateQtyOverride = useCallback(async (
+    lineItemId: string,
+    toolId: string,
+    qty: number,
+    allToolIds: string[]
+  ): Promise<LineItem | null> => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch current line item to get existing overrides and qty_per_unit
+      const { data: current, error: fetchError } = await supabase
+        .from('line_items')
+        .select('qty_per_unit, qty_overrides, tool_ids')
+        .eq('id', lineItemId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const overrides = { ...(current.qty_overrides || {}) };
+
+      // If the override matches the default, remove it instead
+      if (qty === current.qty_per_unit) {
+        delete overrides[toolId];
+      } else {
+        overrides[toolId] = qty;
+      }
+
+      const cleanOverrides = Object.keys(overrides).length > 0 ? overrides : null;
+
+      // Recompute total_qty_needed
+      const applicableToolIds = (current.tool_ids && current.tool_ids.length > 0)
+        ? current.tool_ids
+        : allToolIds;
+
+      const newTotal = applicableToolIds.reduce((sum: number, tid: string) => {
+        return sum + (cleanOverrides?.[tid] ?? current.qty_per_unit);
+      }, 0);
+
+      const { data, error: updateError } = await supabase
+        .from('line_items')
+        .update({
+          qty_overrides: cleanOverrides,
+          total_qty_needed: newTotal,
+        })
+        .eq('id', lineItemId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      return data;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update qty override';
+      setError(message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const resetQtyOverride = useCallback(async (
+    lineItemId: string,
+    toolId: string,
+    allToolIds: string[]
+  ): Promise<LineItem | null> => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch current line item
+      const { data: current, error: fetchError } = await supabase
+        .from('line_items')
+        .select('qty_per_unit, qty_overrides, tool_ids')
+        .eq('id', lineItemId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const overrides = { ...(current.qty_overrides || {}) };
+      delete overrides[toolId];
+
+      const cleanOverrides = Object.keys(overrides).length > 0 ? overrides : null;
+
+      // Recompute total_qty_needed
+      const applicableToolIds = (current.tool_ids && current.tool_ids.length > 0)
+        ? current.tool_ids
+        : allToolIds;
+
+      const newTotal = applicableToolIds.reduce((sum: number, tid: string) => {
+        return sum + (cleanOverrides?.[tid] ?? current.qty_per_unit);
+      }, 0);
+
+      const { data, error: updateError } = await supabase
+        .from('line_items')
+        .update({
+          qty_overrides: cleanOverrides,
+          total_qty_needed: newTotal,
+        })
+        .eq('id', lineItemId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      return data;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to reset qty override';
+      setError(message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -127,6 +241,8 @@ export function useLineItems(orderId: string | undefined) {
     addLineItem,
     updateLineItem,
     deleteLineItem,
+    updateQtyOverride,
+    resetQtyOverride,
     clearError,
   };
 }

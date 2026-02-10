@@ -72,6 +72,20 @@ interface UndoRecord {
   order_id: string;
 }
 
+interface PickUndoneRecord {
+  id: string;
+  type: 'pick_undone';
+  qty_picked: number;
+  picked_by: string | null;
+  picked_at: string;
+  part_number: string;
+  tool_number: string;
+  so_number: string;
+  order_id: string;
+  undone_by: string;
+  undone_at: string;
+}
+
 interface ActivityLogRecord {
   id: string;
   type: 'part_added' | 'part_removed' | 'order_imported';
@@ -84,7 +98,7 @@ interface ActivityLogRecord {
   order_id: string;
 }
 
-type ActivityRecord = PickRecord | IssueRecord | UndoRecord | ActivityLogRecord;
+type ActivityRecord = PickRecord | IssueRecord | UndoRecord | PickUndoneRecord | ActivityLogRecord;
 
 const PAGE_SIZE = 50;
 
@@ -451,6 +465,7 @@ export function PickHistory() {
   const getActivityTimestamp = (a: ActivityRecord): string => {
     switch (a.type) {
       case 'pick': return a.picked_at;
+      case 'pick_undone': return a.picked_at;
       case 'undo': return a.undone_at;
       case 'part_added':
       case 'part_removed':
@@ -474,6 +489,20 @@ export function PickHistory() {
 
     if (showUndos && page === 0) {
       activities.push(...undos);
+      // Generate reconstructed "original pick (undone)" entries from undo records
+      activities.push(...undos.map((undo): PickUndoneRecord => ({
+        id: `pick-undone-${undo.id}`,
+        type: 'pick_undone' as const,
+        qty_picked: undo.qty_picked,
+        picked_by: undo.picked_by,
+        picked_at: undo.picked_at,
+        part_number: undo.part_number,
+        tool_number: undo.tool_number,
+        so_number: undo.so_number,
+        order_id: undo.order_id,
+        undone_by: undo.undone_by,
+        undone_at: undo.undone_at,
+      })));
     }
 
     if (page === 0) {
@@ -523,6 +552,13 @@ export function PickHistory() {
           activity.so_number.toLowerCase().includes(query) ||
           activity.tool_number.toLowerCase().includes(query)
         );
+      } else if (activity.type === 'pick_undone') {
+        return (
+          (activity.picked_by && activity.picked_by.toLowerCase().includes(query)) ||
+          activity.part_number.toLowerCase().includes(query) ||
+          activity.so_number.toLowerCase().includes(query) ||
+          activity.tool_number.toLowerCase().includes(query)
+        );
       } else if (activity.type === 'part_added' || activity.type === 'part_removed' || activity.type === 'order_imported') {
         return (
           (activity.performed_by && activity.performed_by.toLowerCase().includes(query)) ||
@@ -567,8 +603,9 @@ export function PickHistory() {
     const partChangesCount = showPartChanges ? activityLogs.filter(a => a.type === 'part_added' || a.type === 'part_removed').length : 0;
     const importsCount = showImports ? activityLogs.filter(a => a.type === 'order_imported').length : 0;
 
-    return { totalQty, uniqueParts, uniqueUsers, pickCount, issueCount, undoCount, partChangesCount, importsCount };
-  }, [showPicks, showIssues, showUndos, showPartChanges, showImports, totalPickCount, totalQtyPicked, allUniqueParts, allUniqueUsers, totalIssueCount, totalUndoCount, activityLogs]);
+    const undoQty = undos.reduce((sum, u) => sum + u.qty_picked, 0);
+    return { totalQty, uniqueParts, uniqueUsers, pickCount, issueCount, undoCount, undoQty, partChangesCount, importsCount };
+  }, [showPicks, showIssues, showUndos, showPartChanges, showImports, totalPickCount, totalQtyPicked, allUniqueParts, allUniqueUsers, totalIssueCount, totalUndoCount, undos, activityLogs]);
 
   // Handle preset selection - also triggers search
   const handlePreset = useCallback((preset: typeof DATE_PRESETS[0]) => {
@@ -932,6 +969,8 @@ export function PickHistory() {
     switch (type) {
       case 'pick':
         return <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />;
+      case 'pick_undone':
+        return <CheckCircle className="h-4 w-4 text-green-500/50 dark:text-green-400/50" />;
       case 'undo':
         return <Undo2 className="h-4 w-4 text-red-500 dark:text-red-400" />;
       case 'issue_created':
@@ -951,6 +990,8 @@ export function PickHistory() {
     switch (type) {
       case 'pick':
         return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800 text-xs">Pick</Badge>;
+      case 'pick_undone':
+        return <Badge variant="outline" className="bg-green-50 text-green-700/60 border-green-200 dark:bg-green-950/20 dark:text-green-400/60 dark:border-green-800 text-xs line-through">Pick (Undone)</Badge>;
       case 'undo':
         return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800 text-xs">Undo</Badge>;
       case 'issue_created':
@@ -1034,7 +1075,10 @@ export function PickHistory() {
             <Card>
               <CardContent className="pt-4">
                 <div className="text-2xl font-bold">{summaryStats.totalQty.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">Qty Picked</p>
+                <p className="text-xs text-muted-foreground">Qty Picked (Net)</p>
+                {summaryStats.undoQty > 0 && (
+                  <p className="text-xs text-red-500 dark:text-red-400">-{summaryStats.undoQty} undone</p>
+                )}
               </CardContent>
             </Card>
             <Card>
@@ -1120,7 +1164,7 @@ export function PickHistory() {
                         {dayActivities.map((activity) => (
                           <div
                             key={activity.id}
-                            className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                            className={`flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors${activity.type === 'pick_undone' ? ' opacity-60' : ''}`}
                           >
                             <div className="mt-0.5">
                               {getActivityIcon(activity.type)}
@@ -1130,14 +1174,15 @@ export function PickHistory() {
                                 <span className="font-medium flex items-center gap-1">
                                   <User className="h-3 w-3" />
                                   {activity.type === 'pick' ? (activity.picked_by || 'Unknown')
+                                    : activity.type === 'pick_undone' ? (activity.picked_by || 'Unknown')
                                     : activity.type === 'undo' ? activity.undone_by
                                     : activity.type === 'part_added' || activity.type === 'part_removed' || activity.type === 'order_imported' ? (activity.performed_by || 'Unknown')
                                     : ((activity as IssueRecord).user || 'Unknown')}
                                 </span>
                                 {getActivityBadge(activity.type)}
-                                {activity.type === 'pick' && (
+                                {(activity.type === 'pick' || activity.type === 'pick_undone') && (
                                   <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800 text-xs">
-                                    {activity.qty_picked}x
+                                    {(activity as PickRecord | PickUndoneRecord).qty_picked}x
                                   </Badge>
                                 )}
                                 {activity.type === 'undo' && (
@@ -1151,9 +1196,9 @@ export function PickHistory() {
                                 >
                                   SO-{activity.so_number}
                                 </Link>
-                                {activity.type === 'pick' && (
+                                {(activity.type === 'pick' || activity.type === 'pick_undone') && (
                                   <Badge variant="secondary" className="text-xs">
-                                    {activity.tool_number}
+                                    {(activity as PickRecord | PickUndoneRecord).tool_number}
                                   </Badge>
                                 )}
                                 {activity.type === 'undo' && (
@@ -1175,6 +1220,12 @@ export function PickHistory() {
                                     {activity.description && (
                                       <span className="text-muted-foreground"> - {activity.description}</span>
                                     )}
+                                  </>
+                                )}
+                                {activity.type === 'pick_undone' && (
+                                  <>
+                                    <span className="font-mono font-medium line-through">{activity.part_number}</span>
+                                    <span className="text-muted-foreground"> - undone by {activity.undone_by}</span>
                                   </>
                                 )}
                                 {activity.type === 'undo' && (

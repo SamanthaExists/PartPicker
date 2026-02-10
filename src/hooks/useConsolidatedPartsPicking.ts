@@ -61,18 +61,18 @@ export function useConsolidatedPartsPicking() {
         throw new Error('No line item IDs found. Try refreshing the page.');
       }
 
-      // Fetch line items with their qty_per_unit and tool_ids
+      // Fetch line items with their qty_per_unit, qty_overrides, and tool_ids
       const { data: lineItemsData, error: lineItemsError } = await supabase
         .from('line_items')
-        .select('id, order_id, qty_per_unit, tool_ids, assembly_group')
+        .select('id, order_id, qty_per_unit, qty_overrides, tool_ids, assembly_group')
         .in('id', lineItemIds);
 
       if (lineItemsError) throw lineItemsError;
 
       // Create map of line item data
-      const lineItemMap = new Map<string, { qty_per_unit: number; tool_ids: string[] | null; assembly_group: string | null }>();
+      const lineItemMap = new Map<string, { qty_per_unit: number; qty_overrides: Record<string, number> | null; tool_ids: string[] | null; assembly_group: string | null }>();
       for (const li of lineItemsData || []) {
-        lineItemMap.set(li.id, { qty_per_unit: li.qty_per_unit, tool_ids: li.tool_ids, assembly_group: li.assembly_group });
+        lineItemMap.set(li.id, { qty_per_unit: li.qty_per_unit, qty_overrides: li.qty_overrides, tool_ids: li.tool_ids, assembly_group: li.assembly_group });
       }
 
       // Fetch all tools for the orders involved
@@ -132,16 +132,17 @@ export function useConsolidatedPartsPicking() {
 
         const toolPicksMap = picksByLineItemAndTool.get(orderInfo.line_item_id) || new Map();
 
+        const qtyOverrides = lineItemData?.qty_overrides;
         const tools: ToolPickingInfo[] = applicableTools.map(tool => ({
           tool_id: tool.id,
           tool_number: tool.tool_number,
           serial_number: tool.serial_number,
-          qty_per_unit: qtyPerUnit,
+          qty_per_unit: qtyOverrides?.[tool.id] ?? qtyPerUnit,
           current_picked: toolPicksMap.get(tool.id) || 0,
         }));
 
         const orderPicked = tools.reduce((sum, t) => sum + t.current_picked, 0);
-        const orderNeeded = tools.length * qtyPerUnit;
+        const orderNeeded = tools.reduce((sum, t) => sum + t.qty_per_unit, 0);
 
         orders.push({
           order_id: orderInfo.order_id,

@@ -199,11 +199,12 @@ function generateBarcodeSVG(value: string): string {
   } catch (e) {
     console.error('Barcode generation failed:', e);
   }
-  // Remove fixed dimensions so CSS controls sizing, but keep aspect ratio
-  // so bar proportions stay correct (unlike 'none' which distorts them).
+  // Remove fixed dimensions so CSS controls sizing. 'none' is safe for
+  // barcodes — horizontal stretch is uniform so relative bar widths are
+  // preserved. The container CSS constrains width to ~80% of the tag.
   svg.removeAttribute('width');
   svg.removeAttribute('height');
-  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.setAttribute('preserveAspectRatio', 'none');
   return svg.outerHTML;
 }
 
@@ -299,14 +300,16 @@ function generateTagsHTML(tagsArray: TagData[]): string {
         .barcode-container {
           flex: 1;
           display: flex;
-          align-items: center;
+          align-items: stretch;
           justify-content: center;
           min-height: 0;
           overflow: hidden;
+          width: 80%;
+          margin: 0 auto;
         }
 
         .barcode-container svg {
-          width: 80%;
+          width: 100%;
           height: 100%;
         }
 

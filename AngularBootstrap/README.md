@@ -90,15 +90,15 @@ npm run build
 
 The build artifacts will be stored in the `dist/` directory.
 
-## Migration from React Version
+## Technology Choices
 
-This Angular version is a complete rewrite of the React application, maintaining the same functionality:
+Built with Angular for enterprise-grade maintainability:
 
-- React Hooks → Angular Services with RxJS
-- React Router → Angular Router with lazy loading
-- Tailwind CSS → Bootstrap 5
-- Radix UI → Native Bootstrap components
-- Vite → Angular CLI
+- **Angular Services with RxJS**: Reactive state management with observables
+- **Angular Router**: Built-in routing with lazy loading support
+- **Bootstrap 5**: Comprehensive UI framework with responsive utilities
+- **Native Bootstrap Components**: No external component library dependencies
+- **Angular CLI**: Powerful build and development tooling
 
 ## Database Schema
 

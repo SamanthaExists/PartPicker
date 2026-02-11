@@ -1,6 +1,5 @@
-# IMPORTANT: Only build the Angular app (AngularBootstrap/)
-# The React app at root is deprecated and should NOT be deployed
-# Root-level package.json has been renamed to package.json.deprecated
+# Angular App Deployment Configuration
+# Builds and deploys the Angular application from AngularBootstrap/
 [build]
   base = "AngularBootstrap"
   command = "npm install && npm run build"

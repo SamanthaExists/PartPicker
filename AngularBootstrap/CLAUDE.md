@@ -1,6 +1,6 @@
 # Tool Pick List Tracker - Angular App
 
-> **This is the PRIMARY and ONLY actively maintained implementation.** Deployed to production at https://partpick.netlify.app. A legacy React version exists in the parent directory but is no longer maintained.
+> **This is the ONLY maintained implementation.** Deployed to production at https://partpick.netlify.app.
 
 A warehouse tool picking application built with Angular and Bootstrap.
 

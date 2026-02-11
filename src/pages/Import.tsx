@@ -1,12 +1,13 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, X, Download, Database, FileText, Trash2, Files } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, X, Download, Database, FileText, Trash2, Files, Tag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { parseEnhancedExcelFile, parseCsvFile } from '@/lib/excelParser';
 import { parseBOMCsv, mergeMultipleBOMs, buildImportedOrder } from '@/lib/bomParser';
 import type { ParsedBOM, ToolMapping, MergedBOMResult } from '@/lib/bomParser';
@@ -16,9 +17,11 @@ import { usePartsCatalog } from '@/hooks/usePartsCatalog';
 import { useBOMTemplates } from '@/hooks/useBOMTemplates';
 import { useActivityLog } from '@/hooks/useActivityLog';
 import { useSettings } from '@/hooks/useSettings';
+import { useParts } from '@/hooks/useParts';
+import { usePartRelationships } from '@/hooks/usePartRelationships';
 import { DuplicatePartsDialog } from '@/components/dialogs/DuplicatePartsDialog';
 import { TemplateSelectDialog } from '@/components/dialogs/TemplateSelectDialog';
-import type { ImportedOrder, PartConflict, BOMTemplateWithItems } from '@/types';
+import type { ImportedOrder, PartConflict, BOMTemplateWithItems, AssemblyRelationshipData, AssemblyPartData } from '@/types';
 
 export function Import() {
   const navigate = useNavigate();
@@ -44,6 +47,8 @@ export function Import() {
   const { templates, autoExtractTemplate, autoExtractAssemblyTemplates } = useBOMTemplates();
   const { logActivity } = useActivityLog();
   const { getUserName } = useSettings();
+  const { findOrCreatePart } = useParts();
+  const { bulkCreateRelationships } = usePartRelationships();
 
   // Multi-BOM state
   const [bomFiles, setBomFiles] = useState<{ file: File; toolModel: string; toolNumber: string }[]>([]);
@@ -62,6 +67,8 @@ export function Import() {
   } | null>(null);
   const [bomParseErrors, setBomParseErrors] = useState<string[]>([]);
   const [isBomDragging, setIsBomDragging] = useState(false);
+  const [unclassifiedPartsCount, setUnclassifiedPartsCount] = useState<number>(0);
+  const [showUnclassifiedAlert, setShowUnclassifiedAlert] = useState(false);
 
   // --- Standard Import Handlers ---
 
@@ -137,20 +144,26 @@ export function Import() {
 
     setIsImporting(true);
 
-    // Apply any conflict resolutions first
-    if (conflicts.length > 0) {
-      await applyConflictResolutions(conflicts);
-    }
+    try {
+      // Apply any conflict resolutions first
+      if (conflicts.length > 0) {
+        await applyConflictResolutions(conflicts);
+      }
 
-    // Save parts to catalog if enabled
-    if (saveToCatalog) {
-      await savePartsFromImport(parseResult.order.line_items, true);
-    }
+      // Process parts with classification and assembly relationships
+      let unclassifiedCount = 0;
+      if (saveToCatalog) {
+        const processResult = await processPartsAndRelationships(
+          parseResult.order.line_items,
+          parseResult.order.assembly_relationships,
+          parseResult.order.assembly_parts
+        );
+        unclassifiedCount = processResult.unclassifiedCount;
+      }
 
-    const result = await importOrder(parseResult.order);
-    setIsImporting(false);
+        const result = await importOrder(parseResult.order);
 
-    if (result) {
+      if (result) {
       const partCount = parseResult.order.line_items.length;
       const toolCount = parseResult.order.tools.length;
       const toolNumbers = parseResult.order.tools.map(t => t.tool_number);
@@ -174,8 +187,146 @@ export function Import() {
       // Auto-extract assembly templates
       await autoExtractAssemblyTemplates(parseResult.order.line_items);
 
-      navigate(`/orders/${result.id}`);
+        // Show unclassified parts notification if needed
+        if (unclassifiedCount > 0) {
+          setUnclassifiedPartsCount(unclassifiedCount);
+          setShowUnclassifiedAlert(true);
+          // Wait a moment for user to see the alert before navigating
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+
+        navigate(`/orders/${result.id}`);
+      }
+    } catch (error) {
+      console.error('Import failed:', error);
+    } finally {
+      setIsImporting(false);
     }
+  };
+
+  /**
+   * Process imported line items to create/update parts with classifications
+   * and set up assembly relationships.
+   *
+   * When assemblyRelationships/assemblyParts are provided (BOM import path),
+   * creates real multi-level parent-child relationships using actual part numbers.
+   * Otherwise falls back to assembly_group-based logic (standard import path).
+   */
+  const processPartsAndRelationships = async (
+    lineItems: ImportedOrder['line_items'],
+    assemblyRelationships?: AssemblyRelationshipData[],
+    assemblyPartsData?: AssemblyPartData[]
+  ) => {
+    const warnings: string[] = [];
+    let unclassifiedCount = 0;
+
+    // Step 1: Create/update all line item parts with classifications
+    const partMap = new Map<string, string>(); // part_number -> part_id
+
+    for (const item of lineItems) {
+      const part = await findOrCreatePart(
+        item.part_number,
+        item.description,
+        item.location,
+        item.classification_type || null
+      );
+      partMap.set(item.part_number, part.id);
+
+      if (!part.classification_type) {
+        unclassifiedCount++;
+      }
+    }
+
+    if (assemblyRelationships && assemblyRelationships.length > 0 && assemblyPartsData) {
+      // BOM import path: create real multi-level assembly relationships
+
+      // Step 2: Create all assembly parts with their real part numbers
+      for (const ap of assemblyPartsData) {
+        const part = await findOrCreatePart(
+          ap.partNumber,
+          ap.description,
+          null,
+          'assembly'
+        );
+        partMap.set(ap.partNumber, part.id);
+      }
+
+      // Step 3: Group relationships by parent and bulk-create
+      const relByParent = new Map<string, Array<{ childPartNumber: string; rawQty: number }>>();
+      for (const rel of assemblyRelationships) {
+        const parentId = partMap.get(rel.parentPartNumber);
+        const childId = partMap.get(rel.childPartNumber);
+        if (!parentId || !childId) continue;
+
+        const children = relByParent.get(rel.parentPartNumber) || [];
+        children.push({ childPartNumber: rel.childPartNumber, rawQty: rel.rawQty });
+        relByParent.set(rel.parentPartNumber, children);
+      }
+
+      for (const [parentPN, children] of relByParent) {
+        try {
+          const parentId = partMap.get(parentPN);
+          if (!parentId) continue;
+
+          const childRecords = children
+            .map(c => ({
+              childId: partMap.get(c.childPartNumber)!,
+              quantity: c.rawQty,
+            }))
+            .filter(c => c.childId);
+
+          if (childRecords.length > 0) {
+            await bulkCreateRelationships(parentId, childRecords, {
+              skipCircularCheck: true,
+            });
+          }
+        } catch (error) {
+          console.error(`Failed to create assembly relationships for ${parentPN}:`, error);
+          warnings.push(`Could not link assembly "${parentPN}"`);
+        }
+      }
+    } else {
+      // Standard import fallback: use assembly_group-based logic
+      const assemblyGroups = new Map<string, typeof lineItems>();
+
+      for (const item of lineItems) {
+        if (item.assembly_group) {
+          const group = assemblyGroups.get(item.assembly_group) || [];
+          group.push(item);
+          assemblyGroups.set(item.assembly_group, group);
+        }
+      }
+
+      for (const [assemblyName, members] of assemblyGroups) {
+        try {
+          const assemblyPart = await findOrCreatePart(
+            assemblyName,
+            `Assembly: ${assemblyName}`,
+            null,
+            'assembly'
+          );
+
+          const relationships = members
+            .filter(m => m.part_number !== assemblyName)
+            .map(m => ({
+              childId: partMap.get(m.part_number)!,
+              quantity: m.qty_per_unit,
+            }))
+            .filter(r => r.childId);
+
+          if (relationships.length > 0) {
+            await bulkCreateRelationships(assemblyPart.id, relationships, {
+              skipCircularCheck: true,
+            });
+          }
+        } catch (error) {
+          console.error(`Failed to create assembly relationships for ${assemblyName}:`, error);
+          warnings.push(`Could not link assembly "${assemblyName}"`);
+        }
+      }
+    }
+
+    return { unclassifiedCount, warnings };
   };
 
   const handleConflictResolve = (resolvedConflicts: PartConflict[]) => {
@@ -362,20 +513,26 @@ export function Import() {
 
     setIsImporting(true);
 
-    // Apply conflict resolutions
-    if (conflicts.length > 0) {
-      await applyConflictResolutions(conflicts);
-    }
+    try {
+      // Apply conflict resolutions
+      if (conflicts.length > 0) {
+        await applyConflictResolutions(conflicts);
+      }
 
-    // Save parts to catalog
-    if (saveToCatalog) {
-      await savePartsFromImport(bomParseResult.order.line_items, true);
-    }
+      // Process parts with classification and assembly relationships
+      let unclassifiedCount = 0;
+      if (saveToCatalog) {
+        const processResult = await processPartsAndRelationships(
+          bomParseResult.order.line_items,
+          bomParseResult.order.assembly_relationships,
+          bomParseResult.order.assembly_parts
+        );
+        unclassifiedCount = processResult.unclassifiedCount;
+      }
 
-    const result = await importOrder(bomParseResult.order);
-    setIsImporting(false);
+      const result = await importOrder(bomParseResult.order);
 
-    if (result) {
+      if (result) {
       const partCount = bomParseResult.order.line_items.length;
       const toolCount = bomParseResult.order.tools.length;
       const toolNumbers = bomParseResult.order.tools.map(t => t.tool_number);
@@ -399,7 +556,20 @@ export function Import() {
       // Auto-extract assembly templates
       await autoExtractAssemblyTemplates(bomParseResult.order.line_items);
 
-      navigate(`/orders/${result.id}`);
+        // Show unclassified parts notification if needed
+        if (unclassifiedCount > 0) {
+          setUnclassifiedPartsCount(unclassifiedCount);
+          setShowUnclassifiedAlert(true);
+          // Wait a moment for user to see the alert before navigating
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+
+        navigate(`/orders/${result.id}`);
+      }
+    } catch (error) {
+      console.error('BOM import failed:', error);
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -418,6 +588,38 @@ export function Import() {
           Upload an Excel or CSV file to import a sales order
         </p>
       </div>
+
+      {/* Unclassified Parts Alert */}
+      {showUnclassifiedAlert && unclassifiedPartsCount > 0 && (
+        <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+          <Tag className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertTitle className="text-amber-900 dark:text-amber-200">Unclassified Parts Found</AlertTitle>
+          <AlertDescription className="text-amber-800 dark:text-amber-300">
+            <div className="flex items-center justify-between gap-4">
+              <span>
+                {unclassifiedPartsCount} part{unclassifiedPartsCount !== 1 ? 's' : ''} {unclassifiedPartsCount !== 1 ? 'were' : 'was'} imported without classification.
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/30"
+                  onClick={() => navigate('/parts?filter=unclassified')}
+                >
+                  Classify Now
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowUnclassifiedAlert(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="standard" className="space-y-4">
         <TabsList>

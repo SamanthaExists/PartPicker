@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, ChevronDown, ChevronRight, MapPin, X, Download, AlertCircle, CheckCircle2, Truck, Filter, Package, Wrench } from 'lucide-react';
+import { ShoppingCart, ChevronDown, ChevronRight, MapPin, X, Download, AlertCircle, CheckCircle2, Truck, Filter, Package, Wrench, Copy } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,8 @@ import {
   UnifiedFilterBar,
   type SortOption,
 } from '@/components/filters';
+import { PartDetail } from '@/components/parts/PartDetail';
+import { useParts } from '@/hooks/useParts';
 
 type SortMode = 'part_number' | 'remaining' | 'location';
 
@@ -28,9 +30,11 @@ const SORT_OPTIONS: SortOption<SortMode>[] = [
 
 export function ItemsToOrder() {
   const { items, onOrderItems, loading } = useItemsToOrder();
+  const { getPartByPartNumber } = useParts();
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     const saved = localStorage.getItem(ITEMS_TO_ORDER_SORT_KEY);
     return (saved as SortMode) || 'remaining';
@@ -164,6 +168,23 @@ export function ItemsToOrder() {
     exportItemsToOrderToExcel(items);
   };
 
+  const handleCopyPartNumbers = async () => {
+    const partNumbers = sortedItems.map(item => item.part_number).join('\n');
+    try {
+      await navigator.clipboard.writeText(partNumbers);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const handlePartNumberClick = async (partNumber: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const part = await getPartByPartNumber(partNumber);
+    if (part) {
+      setSelectedPartId(part.id);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -173,10 +194,16 @@ export function ItemsToOrder() {
             Parts with insufficient stock to complete active orders
           </p>
         </div>
-        <Button variant="outline" onClick={handleExport}>
-          <Download className="mr-2 h-4 w-4" />
-          Export
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleCopyPartNumbers} disabled={sortedItems.length === 0}>
+            <Copy className="mr-2 h-4 w-4" />
+            Copy Part Numbers
+          </Button>
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -362,9 +389,15 @@ export function ItemsToOrder() {
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-semibold text-lg">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePartNumberClick(item.part_number, e);
+                              }}
+                              className="font-mono font-semibold text-lg hover:underline hover:text-primary cursor-pointer text-left"
+                            >
                               {item.part_number}
-                            </span>
+                            </button>
                             {item.location && (
                               <Badge variant="outline" className="gap-1">
                                 <MapPin className="h-3 w-3" />
@@ -496,9 +529,15 @@ export function ItemsToOrder() {
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-semibold text-lg">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePartNumberClick(item.part_number, e);
+                              }}
+                              className="font-mono font-semibold text-lg hover:underline hover:text-primary cursor-pointer text-left"
+                            >
                               {item.part_number}
-                            </span>
+                            </button>
                             {item.location && (
                               <Badge variant="outline" className="gap-1">
                                 <MapPin className="h-3 w-3" />
@@ -579,6 +618,15 @@ export function ItemsToOrder() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Part Detail Dialog */}
+      {selectedPartId && (
+        <PartDetail
+          partId={selectedPartId}
+          open={!!selectedPartId}
+          onClose={() => setSelectedPartId(null)}
+        />
+      )}
     </div>
   );
 }

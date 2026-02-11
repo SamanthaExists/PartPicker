@@ -19,6 +19,8 @@ import {
   type StatusButtonOption,
   type SortOption,
 } from '@/components/filters';
+import { PartDetail } from '@/components/parts/PartDetail';
+import { useParts } from '@/hooks/useParts';
 
 type SortMode = 'part_number' | 'location' | 'assembly';
 
@@ -34,15 +36,34 @@ const SORT_OPTIONS: SortOption<SortMode>[] = [
   { value: 'assembly', label: 'Sort by Assembly' },
 ];
 
-// Assembly breadcrumb component
-function AssemblyBreadcrumb({ path }: { path: string }) {
-  const segments = path.split(' > ');
+// Assembly breadcrumb component - renders all paths inline as a breadcrumb trail
+function AssemblyBreadcrumbs({ paths, isComplete }: { paths: string[]; isComplete?: boolean }) {
+  // Flatten all paths into a single breadcrumb trail
+  const allSegments = paths.flatMap(path => path.split(' > '));
+  // Deduplicate while preserving order
+  const uniqueSegments = [...new Set(allSegments)];
+
   return (
-    <div className="flex items-center gap-1 text-xs text-purple-700 dark:text-purple-300">
-      <Layers className="h-3 w-3 shrink-0 text-purple-500 dark:text-purple-400" />
-      {segments.map((segment, i) => (
+    <div className={cn(
+      "flex items-center gap-1 text-xs flex-wrap",
+      isComplete
+        ? "text-green-800 dark:text-green-200"
+        : "text-purple-700 dark:text-purple-300"
+    )}>
+      <Layers className={cn(
+        "h-3 w-3 shrink-0",
+        isComplete
+          ? "text-green-700 dark:text-green-300"
+          : "text-purple-500 dark:text-purple-400"
+      )} />
+      {uniqueSegments.map((segment, i) => (
         <span key={i} className="flex items-center gap-1">
-          {i > 0 && <ChevronRight className="h-3 w-3 text-purple-400 dark:text-purple-500" />}
+          {i > 0 && <ChevronRight className={cn(
+            "h-3 w-3 shrink-0",
+            isComplete
+              ? "text-green-600 dark:text-green-400"
+              : "text-purple-400 dark:text-purple-500"
+          )} />}
           <span className="font-medium">{segment}</span>
         </span>
       ))}
@@ -59,9 +80,10 @@ interface PartCardProps {
   refCallback?: (el: HTMLDivElement | null) => void;
   hasIssue: boolean;
   onReportIssue: (part: ConsolidatedPart) => void;
+  onPartNumberClick: (partNumber: string, e?: React.MouseEvent) => void;
 }
 
-function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, hasIssue, onReportIssue }: PartCardProps) {
+function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, hasIssue, onReportIssue, onPartNumberClick }: PartCardProps) {
   const isComplete = part.remaining === 0;
   const progressPercent =
     part.total_needed > 0
@@ -80,9 +102,15 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono font-semibold text-base">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPartNumberClick(part.part_number, e);
+                  }}
+                  className="font-mono font-semibold text-base hover:underline hover:text-primary cursor-pointer text-left"
+                >
                   {part.part_number}
-                </span>
+                </button>
                 {isComplete && <Badge variant="success" className="text-xs">Complete</Badge>}
                 {hasIssue && (
                   <Badge variant="destructive" className="text-xs gap-1">
@@ -92,7 +120,12 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
                 )}
               </div>
               {part.description && (
-                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                <p className={cn(
+                  "text-sm mt-1 line-clamp-2",
+                  isComplete
+                    ? "text-green-900 dark:text-green-100"
+                    : "text-muted-foreground"
+                )}>
                   {part.description}
                 </p>
               )}
@@ -108,11 +141,7 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
 
           {/* Assembly Breadcrumbs */}
           {part.assembly_groups.length > 0 && (
-            <div className="flex flex-col gap-0.5">
-              {part.assembly_groups.map((path) => (
-                <AssemblyBreadcrumb key={path} path={path} />
-              ))}
-            </div>
+            <AssemblyBreadcrumbs paths={part.assembly_groups} isComplete={isComplete} />
           )}
 
           {/* Row 2: Location */}
@@ -127,7 +156,11 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
           <div className="flex gap-4 text-sm">
             {part.qty_available !== null && (
               <div>
-                <span className="text-muted-foreground">Available: </span>
+                <span className={cn(
+                  isComplete
+                    ? "text-green-800 dark:text-green-200"
+                    : "text-muted-foreground"
+                )}>Available: </span>
                 <span className={cn(
                   "font-semibold",
                   part.qty_available >= part.remaining ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"
@@ -139,7 +172,11 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
             {part.qty_on_order !== null && part.qty_on_order > 0 && (
               <div className="flex items-center gap-1">
                 <Truck className="h-3 w-3 text-blue-500 dark:text-blue-400" />
-                <span className="text-muted-foreground">On Order: </span>
+                <span className={cn(
+                  isComplete
+                    ? "text-green-800 dark:text-green-200"
+                    : "text-muted-foreground"
+                )}>On Order: </span>
                 <span className="font-semibold text-blue-600 dark:text-blue-400">{part.qty_on_order}</span>
               </div>
             )}
@@ -151,9 +188,21 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
               <Progress value={progressPercent} className="h-2" />
             </div>
             <div className="text-right shrink-0">
-              <span className="font-bold">{part.total_picked}</span>
-              <span className="text-muted-foreground"> / {part.total_needed}</span>
-              <span className="text-xs text-muted-foreground ml-2">({part.remaining} left)</span>
+              <span className={cn(
+                "font-bold",
+                isComplete && "text-green-900 dark:text-green-100"
+              )}>{part.total_picked}</span>
+              <span className={cn(
+                isComplete
+                  ? "text-green-800 dark:text-green-200"
+                  : "text-muted-foreground"
+              )}> / {part.total_needed}</span>
+              <span className={cn(
+                "text-xs ml-2",
+                isComplete
+                  ? "text-green-800 dark:text-green-200"
+                  : "text-muted-foreground"
+              )}>({part.remaining} left)</span>
             </div>
           </div>
 
@@ -210,9 +259,15 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono font-semibold text-lg">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPartNumberClick(part.part_number, e);
+                }}
+                className="font-mono font-semibold text-lg hover:underline hover:text-primary cursor-pointer text-left"
+              >
                 {part.part_number}
-              </span>
+              </button>
               {part.location && (
                 <Badge variant="outline" className="gap-1">
                   <MapPin className="h-3 w-3" />
@@ -228,15 +283,18 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
               )}
             </div>
             {part.description && (
-              <p className="text-sm text-muted-foreground truncate">
+              <p className={cn(
+                "text-sm truncate",
+                isComplete
+                  ? "text-green-900 dark:text-green-100"
+                  : "text-muted-foreground"
+              )}>
                 {part.description}
               </p>
             )}
             {part.assembly_groups.length > 0 && (
-              <div className="flex flex-col gap-0.5 mt-1">
-                {part.assembly_groups.map((path) => (
-                  <AssemblyBreadcrumb key={path} path={path} />
-                ))}
+              <div className="mt-1">
+                <AssemblyBreadcrumbs paths={part.assembly_groups} isComplete={isComplete} />
               </div>
             )}
           </div>
@@ -246,11 +304,20 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
             <div className="text-center shrink-0 min-w-[70px]">
               <div className={cn(
                 "text-lg font-bold",
-                part.qty_available >= part.remaining ? "text-green-600" : "text-amber-600"
+                isComplete
+                  ? "text-green-800 dark:text-green-100"
+                  : part.qty_available >= part.remaining
+                    ? "text-green-600"
+                    : "text-amber-600"
               )}>
                 {part.qty_available}
               </div>
-              <p className="text-xs text-muted-foreground">available</p>
+              <p className={cn(
+                "text-xs",
+                isComplete
+                  ? "text-green-800 dark:text-green-200"
+                  : "text-muted-foreground"
+              )}>available</p>
             </div>
           )}
 
@@ -262,20 +329,40 @@ function PartCard({ part, isExpanded, onToggleExpand, onPickClick, refCallback, 
                   <Truck className="h-4 w-4" />
                   {part.qty_on_order}
                 </div>
-                <p className="text-xs text-muted-foreground">on order</p>
+                <p className={cn(
+                  "text-xs",
+                  isComplete
+                    ? "text-green-800 dark:text-green-200"
+                    : "text-muted-foreground"
+                )}>on order</p>
               </>
             )}
           </div>
 
           <div className="text-right shrink-0">
             <div className="flex items-center gap-2">
-              <span className="text-xl font-bold">
+              <span className={cn(
+                "text-xl font-bold",
+                isComplete && "text-green-900 dark:text-green-100"
+              )}>
                 {part.total_picked}
               </span>
-              <span className="text-muted-foreground">/</span>
-              <span className="text-lg">{part.total_needed}</span>
+              <span className={cn(
+                isComplete
+                  ? "text-green-800 dark:text-green-200"
+                  : "text-muted-foreground"
+              )}>/</span>
+              <span className={cn(
+                "text-lg",
+                isComplete && "text-green-900 dark:text-green-100"
+              )}>{part.total_needed}</span>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className={cn(
+              "text-sm",
+              isComplete
+                ? "text-green-800 dark:text-green-200"
+                : "text-muted-foreground"
+            )}>
               {part.remaining} remaining
             </p>
           </div>
@@ -384,7 +471,9 @@ export function ConsolidatedParts() {
   });
   const { parts, loading } = useConsolidatedParts(statusFilter);
   const { reportIssue, resolveIssue, hasOpenIssue, getOpenIssue } = usePartIssues();
+  const { getPartByPartNumber } = useParts();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
   const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(() => localStorage.getItem(CONSOLIDATED_SHOW_COMPLETED_KEY) === 'true');
@@ -655,8 +744,15 @@ export function ConsolidatedParts() {
   // Stats (computed from filteredParts so they update when filters are applied)
   const totalParts = filteredParts.length;
   const completeParts = filteredParts.filter((p) => p.remaining === 0).length;
-  const totalNeeded = filteredParts.reduce((sum, p) => sum + p.total_needed, 0);
-  const totalPicked = filteredParts.reduce((sum, p) => sum + p.total_picked, 0);
+  const lowStockParts = filteredParts.filter((p) => {
+    if (p.remaining === 0) return false;
+    if (p.qty_available === null) return false;
+    return p.qty_available < p.remaining;
+  }).length;
+  const outOfStockParts = filteredParts.filter((p) => {
+    if (p.remaining === 0) return false;
+    return p.qty_available === 0;
+  }).length;
 
   const handleExport = () => {
     exportConsolidatedPartsToExcel(filteredParts);
@@ -682,11 +778,19 @@ export function ConsolidatedParts() {
     exportPartNumbersToExcel(partNumbers);
   };
 
+  const handlePartNumberClick = async (partNumber: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const part = await getPartByPartNumber(partNumber);
+    if (part) {
+      setSelectedPartId(part.id);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Consolidated Parts</h1>
+          <h1 className="text-3xl font-bold">Part Picker</h1>
           <p className="text-muted-foreground">
             View all parts across active orders, grouped by part number
           </p>
@@ -712,27 +816,29 @@ export function ConsolidatedParts() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold">{totalParts}</div>
-            <p className="text-sm text-muted-foreground">Unique Parts</p>
+            <p className="text-sm text-muted-foreground">Total Parts</p>
+            <p className="text-xs text-muted-foreground mt-1">&nbsp;</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{totalNeeded}</div>
-            <p className="text-sm text-muted-foreground">Total Qty Needed</p>
+            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{lowStockParts}</div>
+            <p className="text-sm text-muted-foreground">Low Stock</p>
+            <p className="text-xs text-muted-foreground mt-1">Available &lt; Needed</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalPicked}</div>
-            <p className="text-sm text-muted-foreground">Total Qty Picked</p>
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{outOfStockParts}</div>
+            <p className="text-sm text-muted-foreground">Out of Stock</p>
+            <p className="text-xs text-muted-foreground mt-1">Qty Available = 0</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">
-              {completeParts}/{totalParts}
-            </div>
-            <p className="text-sm text-muted-foreground">Parts Complete</p>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{completeParts}</div>
+            <p className="text-sm text-muted-foreground">Complete</p>
+            <p className="text-xs text-muted-foreground mt-1">Fully picked</p>
           </CardContent>
         </Card>
       </div>
@@ -878,6 +984,7 @@ export function ConsolidatedParts() {
                   }}
                   hasIssue={hasOpenIssue(part.part_number)}
                   onReportIssue={handleReportIssue}
+                  onPartNumberClick={handlePartNumberClick}
                 />
               ))}
             </div>
@@ -910,6 +1017,7 @@ export function ConsolidatedParts() {
                   }}
                   hasIssue={hasOpenIssue(part.part_number)}
                   onReportIssue={handleReportIssue}
+                  onPartNumberClick={handlePartNumberClick}
                 />
               ))}
             </div>
@@ -931,6 +1039,7 @@ export function ConsolidatedParts() {
               }}
               hasIssue={hasOpenIssue(part.part_number)}
               onReportIssue={handleReportIssue}
+              onPartNumberClick={handlePartNumberClick}
             />
           ))}
         </div>
@@ -954,6 +1063,15 @@ export function ConsolidatedParts() {
         onSubmit={handleSubmitIssue}
         onResolve={handleResolveIssue}
       />
+
+      {/* Part Detail Dialog */}
+      {selectedPartId && (
+        <PartDetail
+          partId={selectedPartId}
+          open={!!selectedPartId}
+          onClose={() => setSelectedPartId(null)}
+        />
+      )}
     </div>
   );
 }

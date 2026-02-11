@@ -1,6 +1,6 @@
 import type { ImportedOrder, ImportedLineItem, ImportedTool, PartsCatalogItem } from '@/types';
-import { resolveHierarchyLeaves } from './hierarchyUtils';
-import type { HierarchyRow } from './hierarchyUtils';
+import { resolveHierarchyLeaves, resolveHierarchy } from './hierarchyUtils';
+import type { HierarchyRow, HierarchyRowExtended, AssemblyRelationship, AssemblyPartInfo } from './hierarchyUtils';
 
 /**
  * Multi-level BOM CSV parser and merger for multi-BOM imports.
@@ -22,6 +22,8 @@ export interface ParsedLeafPart {
 export interface ParsedBOM {
   toolModel: string; // Extracted from filename
   leafParts: ParsedLeafPart[];
+  relationships: AssemblyRelationship[];
+  assemblyParts: AssemblyPartInfo[];
   warnings: string[];
 }
 
@@ -39,6 +41,8 @@ export interface MergedLineItem {
 export interface MergedBOMResult {
   lineItems: MergedLineItem[];
   allToolModels: string[];
+  relationships: AssemblyRelationship[];
+  assemblyParts: AssemblyPartInfo[];
   stats: {
     totalParts: number;
     sharedCount: number;
@@ -112,12 +116,12 @@ export function parseBOMCsv(csvText: string, filename: string): ParsedBOM {
 
   if (headerIndex === -1) {
     warnings.push(`Could not find header row in ${filename}`);
-    return { toolModel, leafParts: [], warnings };
+    return { toolModel, leafParts: [], relationships: [], assemblyParts: [], warnings };
   }
 
   if (qtyCol === -1) {
     warnings.push(`No quantity column found in ${filename}`);
-    return { toolModel, leafParts: [], warnings };
+    return { toolModel, leafParts: [], relationships: [], assemblyParts: [], warnings };
   }
 
   // Parse data rows
@@ -154,18 +158,19 @@ export function parseBOMCsv(csvText: string, filename: string): ParsedBOM {
 
   if (dataRows.length === 0) {
     warnings.push(`No data rows found in ${filename}`);
-    return { toolModel, leafParts: [], warnings };
+    return { toolModel, leafParts: [], relationships: [], assemblyParts: [], warnings };
   }
 
-  // Resolve leaf parts using shared hierarchy utility
-  const hierarchyRows: HierarchyRow[] = dataRows.map(r => ({
+  // Resolve hierarchy using shared utility (extracts leaves + relationships)
+  const hierarchyRows: HierarchyRowExtended[] = dataRows.map(r => ({
     level: r.level,
     partNumber: r.partNumber,
     qty: r.qty,
     description: r.description,
+    type: r.type,
   }));
 
-  const resolvedLeaves = resolveHierarchyLeaves(hierarchyRows);
+  const resolved = resolveHierarchy(hierarchyRows);
 
   // Build a type lookup from dataRows for the resolved leaves
   const typeByPartNumber = new Map<string, string>();
@@ -175,7 +180,7 @@ export function parseBOMCsv(csvText: string, filename: string): ParsedBOM {
     }
   }
 
-  const leafParts: ParsedLeafPart[] = resolvedLeaves.map(leaf => ({
+  const leafParts: ParsedLeafPart[] = resolved.leafParts.map(leaf => ({
     partNumber: leaf.partNumber,
     description: leaf.description,
     qty: leaf.effectiveQty,
@@ -183,7 +188,7 @@ export function parseBOMCsv(csvText: string, filename: string): ParsedBOM {
     type: typeByPartNumber.get(leaf.partNumber) || '',
   }));
 
-  return { toolModel, leafParts, warnings };
+  return { toolModel, leafParts, relationships: resolved.relationships, assemblyParts: resolved.assemblyParts, warnings };
 }
 
 /**
@@ -302,9 +307,32 @@ export function mergeMultipleBOMs(
 
   const sharedCount = lineItems.filter(li => li.isShared).length;
 
+  // Deduplicate relationships across BOMs (keyed by parent+child)
+  const relMap = new Map<string, AssemblyRelationship>();
+  for (const bom of parsedBOMs) {
+    for (const rel of bom.relationships) {
+      const key = `${rel.parentPartNumber}|${rel.childPartNumber}`;
+      if (!relMap.has(key)) {
+        relMap.set(key, rel);
+      }
+    }
+  }
+
+  // Deduplicate assembly parts across BOMs
+  const apMap = new Map<string, AssemblyPartInfo>();
+  for (const bom of parsedBOMs) {
+    for (const ap of bom.assemblyParts) {
+      if (!apMap.has(ap.partNumber)) {
+        apMap.set(ap.partNumber, ap);
+      }
+    }
+  }
+
   return {
     lineItems,
     allToolModels,
+    relationships: Array.from(relMap.values()),
+    assemblyParts: Array.from(apMap.values()),
     stats: {
       totalParts: lineItems.length,
       sharedCount,
@@ -393,6 +421,20 @@ export function buildImportedOrder(
     estimated_ship_date: orderInfo.estimatedShipDate,
     tools,
     line_items: lineItems,
+    assembly_relationships: mergedResult.relationships.length > 0
+      ? mergedResult.relationships.map(r => ({
+          parentPartNumber: r.parentPartNumber,
+          childPartNumber: r.childPartNumber,
+          rawQty: r.rawQty,
+        }))
+      : undefined,
+    assembly_parts: mergedResult.assemblyParts.length > 0
+      ? mergedResult.assemblyParts.map(ap => ({
+          partNumber: ap.partNumber,
+          description: ap.description,
+          type: ap.type,
+        }))
+      : undefined,
   };
 }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, MapPin, Package, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useGlobalSearch, type SearchResult } from '@/hooks/useGlobalSearch';
+import { usePartClassifications } from '@/hooks/usePartClassifications';
+import { ClassificationBadge } from '@/components/parts/ClassificationBadge';
 
 interface GlobalSearchProps {
   className?: string;
@@ -21,6 +23,10 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { results, loading, search, clearResults } = useGlobalSearch();
+
+  // Fetch part classifications for search results
+  const partNumbers = useMemo(() => results.map(r => r.part_number), [results]);
+  const { partsMap } = usePartClassifications(partNumbers);
 
   // Debounced search
   useEffect(() => {
@@ -247,6 +253,10 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
                           <span className="font-mono font-semibold text-sm">
                             {result.part_number}
                           </span>
+                          {(() => {
+                            const part = partsMap.get(result.part_number);
+                            return part ? <ClassificationBadge classification={part.classification_type} size="sm" /> : null;
+                          })()}
                           {result.location && (
                             <Badge variant="outline" className="gap-1 text-xs py-0">
                               <MapPin className="h-3 w-3" />

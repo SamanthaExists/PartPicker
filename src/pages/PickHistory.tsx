@@ -54,8 +54,8 @@ interface IssueRecord {
   user: string | null;
   timestamp: string;
   part_number: string;
-  so_number: string;
-  order_id: string;
+  so_number: string | null;
+  order_id: string | null;
 }
 
 interface UndoRecord {
@@ -277,6 +277,7 @@ export function PickHistory() {
 
       // Fetch issues (only on first page to avoid complexity)
       if (page === 0) {
+        // Fetch order-related issues
         const { data: issuesData, error: issuesError } = await supabase
           .from('issues')
           .select(`
@@ -303,14 +304,36 @@ export function PickHistory() {
           console.error('Error fetching issues:', issuesError);
         }
 
+        // Fetch part-related issues
+        const { data: partIssuesData, error: partIssuesError } = await supabase
+          .from('part_issues')
+          .select(`
+            id,
+            issue_type,
+            description,
+            reported_by,
+            status,
+            created_at,
+            resolved_at,
+            resolved_by,
+            part_number
+          `)
+          .or(`created_at.gte.${startISO},resolved_at.gte.${startISO}`)
+          .or(`created_at.lte.${endISO},resolved_at.lte.${endISO}`);
+
+        if (partIssuesError) {
+          console.error('Error fetching part issues:', partIssuesError);
+        }
+
         const transformedIssues: IssueRecord[] = [];
 
+        // Process order issues
         for (const issue of (issuesData || []) as any[]) {
           // Issue created event
           const createdAt = new Date(issue.created_at);
           if (createdAt >= new Date(startDate) && createdAt <= new Date(endDate)) {
             transformedIssues.push({
-              id: `issue-created-${issue.id}`,
+              id: `order-issue-created-${issue.id}`,
               type: 'issue_created',
               issue_type: issue.issue_type,
               description: issue.description,
@@ -327,7 +350,7 @@ export function PickHistory() {
             const resolvedAt = new Date(issue.resolved_at);
             if (resolvedAt >= new Date(startDate) && resolvedAt <= new Date(endDate)) {
               transformedIssues.push({
-                id: `issue-resolved-${issue.id}`,
+                id: `order-issue-resolved-${issue.id}`,
                 type: 'issue_resolved',
                 issue_type: issue.issue_type,
                 description: issue.description,
@@ -336,6 +359,43 @@ export function PickHistory() {
                 part_number: issue.line_items.part_number,
                 so_number: issue.line_items.orders.so_number,
                 order_id: issue.line_items.order_id,
+              });
+            }
+          }
+        }
+
+        // Process part issues
+        for (const issue of (partIssuesData || []) as any[]) {
+          // Issue created event
+          const createdAt = new Date(issue.created_at);
+          if (createdAt >= new Date(startDate) && createdAt <= new Date(endDate)) {
+            transformedIssues.push({
+              id: `part-issue-created-${issue.id}`,
+              type: 'issue_created',
+              issue_type: issue.issue_type,
+              description: issue.description,
+              user: issue.reported_by,
+              timestamp: issue.created_at,
+              part_number: issue.part_number,
+              so_number: null,
+              order_id: null,
+            });
+          }
+
+          // Issue resolved event
+          if (issue.status === 'resolved' && issue.resolved_at) {
+            const resolvedAt = new Date(issue.resolved_at);
+            if (resolvedAt >= new Date(startDate) && resolvedAt <= new Date(endDate)) {
+              transformedIssues.push({
+                id: `part-issue-resolved-${issue.id}`,
+                type: 'issue_resolved',
+                issue_type: issue.issue_type,
+                description: issue.description,
+                user: issue.resolved_by,
+                timestamp: issue.resolved_at,
+                part_number: issue.part_number,
+                so_number: null,
+                order_id: null,
               });
             }
           }
@@ -454,6 +514,11 @@ export function PickHistory() {
         { event: '*', schema: 'public', table: 'issues' },
         () => fetchData()
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'part_issues' },
+        () => fetchData()
+      )
       .subscribe();
 
     return () => {
@@ -570,7 +635,7 @@ export function PickHistory() {
         return (
           (activity.user && activity.user.toLowerCase().includes(query)) ||
           activity.part_number.toLowerCase().includes(query) ||
-          activity.so_number.toLowerCase().includes(query) ||
+          (activity.so_number && activity.so_number.toLowerCase().includes(query)) ||
           activity.issue_type.toLowerCase().includes(query) ||
           (activity.description && activity.description.toLowerCase().includes(query))
         );
@@ -715,7 +780,7 @@ export function PickHistory() {
           setAllUniqueUsers(uniqueUsers);
         }
 
-        // Fetch issues
+        // Fetch order-related issues
         const { data: issuesData, error: issuesError } = await supabase
           .from('issues')
           .select(`
@@ -742,13 +807,35 @@ export function PickHistory() {
           console.error('Error fetching issues:', issuesError);
         }
 
+        // Fetch part-related issues
+        const { data: partIssuesData, error: partIssuesError } = await supabase
+          .from('part_issues')
+          .select(`
+            id,
+            issue_type,
+            description,
+            reported_by,
+            status,
+            created_at,
+            resolved_at,
+            resolved_by,
+            part_number
+          `)
+          .or(`created_at.gte.${startISO},resolved_at.gte.${startISO}`)
+          .or(`created_at.lte.${endISO},resolved_at.lte.${endISO}`);
+
+        if (partIssuesError) {
+          console.error('Error fetching part issues:', partIssuesError);
+        }
+
         const transformedIssues: IssueRecord[] = [];
 
+        // Process order issues
         for (const issue of (issuesData || []) as any[]) {
           const createdAt = new Date(issue.created_at);
           if (createdAt >= new Date(newStartDate) && createdAt <= new Date(newEndDate)) {
             transformedIssues.push({
-              id: `issue-created-${issue.id}`,
+              id: `order-issue-created-${issue.id}`,
               type: 'issue_created',
               issue_type: issue.issue_type,
               description: issue.description,
@@ -764,7 +851,7 @@ export function PickHistory() {
             const resolvedAt = new Date(issue.resolved_at);
             if (resolvedAt >= new Date(newStartDate) && resolvedAt <= new Date(newEndDate)) {
               transformedIssues.push({
-                id: `issue-resolved-${issue.id}`,
+                id: `order-issue-resolved-${issue.id}`,
                 type: 'issue_resolved',
                 issue_type: issue.issue_type,
                 description: issue.description,
@@ -773,6 +860,41 @@ export function PickHistory() {
                 part_number: issue.line_items.part_number,
                 so_number: issue.line_items.orders.so_number,
                 order_id: issue.line_items.order_id,
+              });
+            }
+          }
+        }
+
+        // Process part issues
+        for (const issue of (partIssuesData || []) as any[]) {
+          const createdAt = new Date(issue.created_at);
+          if (createdAt >= new Date(newStartDate) && createdAt <= new Date(newEndDate)) {
+            transformedIssues.push({
+              id: `part-issue-created-${issue.id}`,
+              type: 'issue_created',
+              issue_type: issue.issue_type,
+              description: issue.description,
+              user: issue.reported_by,
+              timestamp: issue.created_at,
+              part_number: issue.part_number,
+              so_number: null,
+              order_id: null,
+            });
+          }
+
+          if (issue.status === 'resolved' && issue.resolved_at) {
+            const resolvedAt = new Date(issue.resolved_at);
+            if (resolvedAt >= new Date(newStartDate) && resolvedAt <= new Date(newEndDate)) {
+              transformedIssues.push({
+                id: `part-issue-resolved-${issue.id}`,
+                type: 'issue_resolved',
+                issue_type: issue.issue_type,
+                description: issue.description,
+                user: issue.resolved_by,
+                timestamp: issue.resolved_at,
+                part_number: issue.part_number,
+                so_number: null,
+                order_id: null,
               });
             }
           }
@@ -1190,12 +1312,19 @@ export function PickHistory() {
                                     {activity.qty_picked}x
                                   </Badge>
                                 )}
-                                <Link
-                                  to={`/orders/${activity.order_id}`}
-                                  className="text-sm text-primary hover:underline"
-                                >
-                                  SO-{activity.so_number}
-                                </Link>
+                                {activity.order_id && activity.so_number && (
+                                  <Link
+                                    to={`/orders/${activity.order_id}`}
+                                    className="text-sm text-primary hover:underline"
+                                  >
+                                    SO-{activity.so_number}
+                                  </Link>
+                                )}
+                                {(activity.type === 'issue_created' || activity.type === 'issue_resolved') && !activity.order_id && (
+                                  <Badge variant="outline" className="text-xs">
+                                    Part Issue
+                                  </Badge>
+                                )}
                                 {(activity.type === 'pick' || activity.type === 'pick_undone') && (
                                   <Badge variant="secondary" className="text-xs">
                                     {(activity as PickRecord | PickUndoneRecord).tool_number}

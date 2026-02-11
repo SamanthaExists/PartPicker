@@ -17,6 +17,7 @@ const Templates = lazy(() => import('@/pages/Templates').then(m => ({ default: m
 const Settings = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })));
 const Issues = lazy(() => import('@/pages/Issues').then(m => ({ default: m.Issues })));
 const PickHistory = lazy(() => import('@/pages/PickHistory').then(m => ({ default: m.PickHistory })));
+const PartsCatalog = lazy(() => import('@/pages/PartsCatalog').then(m => ({ default: m.PartsCatalog })));
 
 function PageSpinner() {
   return (
@@ -42,6 +43,7 @@ function App() {
             <Route path="/items-to-order" element={<PageErrorBoundary><ItemsToOrder /></PageErrorBoundary>} />
             <Route path="/issues" element={<PageErrorBoundary><Issues /></PageErrorBoundary>} />
             <Route path="/activity" element={<PageErrorBoundary><PickHistory /></PageErrorBoundary>} />
+            <Route path="/parts-catalog" element={<PageErrorBoundary><PartsCatalog /></PageErrorBoundary>} />
             <Route path="/templates" element={<PageErrorBoundary><Templates /></PageErrorBoundary>} />
             <Route path="/import" element={<PageErrorBoundary><Import /></PageErrorBoundary>} />
             <Route path="/settings" element={<PageErrorBoundary><Settings /></PageErrorBoundary>} />

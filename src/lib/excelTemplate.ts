@@ -46,12 +46,12 @@ function createSingleToolTypeTemplate(XLSX: XLSXModule, workbook: XLSXType.WorkB
 
   // Parts sheet
   const partsData = [
-    ['Part Number', 'Description', 'Location', 'Qty/Unit'],
-    ['ABC-123', 'Widget Assembly', 'A-01', 2],
-    ['DEF-456', 'Spring Kit', 'B-02', 1],
-    ['GHI-789', 'Gasket Set', 'C-03', 4],
-    ['JKL-012', 'Bearing Pack', 'A-05', 2],
-    ['MNO-345', 'Seal Ring', 'D-01', 3],
+    ['Part Number', 'Description', 'Location', 'Qty/Unit', 'Classification'],
+    ['ABC-123', 'Widget Assembly', 'A-01', 2, 'assembly'],
+    ['DEF-456', 'Spring Kit', 'B-02', 1, 'purchased'],
+    ['GHI-789', 'Gasket Set', 'C-03', 4, 'purchased'],
+    ['JKL-012', 'Bearing Pack', 'A-05', 2, 'purchased'],
+    ['MNO-345', 'Seal Ring', 'D-01', 3, 'manufactured'],
   ];
   const partsSheet = XLSX.utils.aoa_to_sheet(partsData);
 
@@ -61,6 +61,7 @@ function createSingleToolTypeTemplate(XLSX: XLSXModule, workbook: XLSXType.WorkB
     { wch: 30 }, // Description
     { wch: 12 }, // Location
     { wch: 10 }, // Qty/Unit
+    { wch: 15 }, // Classification
   ];
 
   XLSX.utils.book_append_sheet(workbook, partsSheet, 'Parts');
@@ -84,17 +85,17 @@ function createSingleBomTemplate(XLSX: XLSXModule, workbook: XLSXType.WorkBook) 
 
   // Parts sheet with Level column
   const partsData = [
-    ['Level', 'Part Number', 'Description', 'Location', 'Qty/Unit'],
-    [0, '230Q-TOOL', '230Q Complete Tool Assembly', '', 1],
-    [1, 'FRAME-ASY', 'Frame Sub-Assembly', '', 1],
-    [2, 'ABC-123', 'Frame Plate', 'A-01', 2],
-    [2, 'DEF-456', 'Frame Bracket', 'B-02', 4],
-    [2, 'GHI-789', 'Frame Bolt Kit', 'C-03', 8],
-    [1, 'MOTOR-ASY', 'Motor Sub-Assembly', '', 1],
-    [2, 'JKL-012', 'Motor Unit', 'A-05', 1],
-    [2, 'MNO-345', 'Motor Mount', 'D-01', 2],
-    [2, 'PQR-678', 'Wiring Harness', 'D-03', 1],
-    [1, 'STU-901', 'Seal Ring (standalone leaf)', 'E-02', 3],
+    ['Level', 'Part Number', 'Description', 'Location', 'Qty/Unit', 'Classification'],
+    [0, '230Q-TOOL', '230Q Complete Tool Assembly', '', 1, 'assembly'],
+    [1, 'FRAME-ASY', 'Frame Sub-Assembly', '', 1, 'assembly'],
+    [2, 'ABC-123', 'Frame Plate', 'A-01', 2, 'manufactured'],
+    [2, 'DEF-456', 'Frame Bracket', 'B-02', 4, 'purchased'],
+    [2, 'GHI-789', 'Frame Bolt Kit', 'C-03', 8, 'purchased'],
+    [1, 'MOTOR-ASY', 'Motor Sub-Assembly', '', 1, 'assembly'],
+    [2, 'JKL-012', 'Motor Unit', 'A-05', 1, 'purchased'],
+    [2, 'MNO-345', 'Motor Mount', 'D-01', 2, 'manufactured'],
+    [2, 'PQR-678', 'Wiring Harness', 'D-03', 1, 'purchased'],
+    [1, 'STU-901', 'Seal Ring (standalone leaf)', 'E-02', 3, 'purchased'],
   ];
   const partsSheet = XLSX.utils.aoa_to_sheet(partsData);
 
@@ -104,6 +105,7 @@ function createSingleBomTemplate(XLSX: XLSXModule, workbook: XLSXType.WorkBook) 
     { wch: 35 }, // Description
     { wch: 12 }, // Location
     { wch: 10 }, // Qty/Unit
+    { wch: 15 }, // Classification
   ];
 
   XLSX.utils.book_append_sheet(workbook, partsSheet, 'Parts');
@@ -127,11 +129,11 @@ function createMultiToolTypeTemplate(XLSX: XLSXModule, workbook: XLSXType.WorkBo
 
   // 230Q Tool Type sheet
   const tool230QData = [
-    ['Qty', 'Part Number', 'Description', 'Location', 'Qty/Unit'],
-    [2, 'ABC-123', 'Widget Assembly', 'A-01', 2],
-    ['', 'DEF-456', '230Q Spring Kit', 'B-02', 1],
-    ['', 'GHI-789', '230Q Gasket Set', 'C-03', 4],
-    ['', 'QRS-230', '230Q Specific Part', 'E-01', 1],
+    ['Qty', 'Part Number', 'Description', 'Location', 'Qty/Unit', 'Classification'],
+    [2, 'ABC-123', 'Widget Assembly', 'A-01', 2, 'assembly'],
+    ['', 'DEF-456', '230Q Spring Kit', 'B-02', 1, 'purchased'],
+    ['', 'GHI-789', '230Q Gasket Set', 'C-03', 4, 'purchased'],
+    ['', 'QRS-230', '230Q Specific Part', 'E-01', 1, 'manufactured'],
   ];
   const tool230QSheet = XLSX.utils.aoa_to_sheet(tool230QData);
   tool230QSheet['!cols'] = [
@@ -140,16 +142,17 @@ function createMultiToolTypeTemplate(XLSX: XLSXModule, workbook: XLSXType.WorkBo
     { wch: 30 }, // Description
     { wch: 12 }, // Location
     { wch: 10 }, // Qty/Unit
+    { wch: 15 }, // Classification
   ];
   XLSX.utils.book_append_sheet(workbook, tool230QSheet, '230Q');
 
   // 450Q Tool Type sheet
   const tool450QData = [
-    ['Qty', 'Part Number', 'Description', 'Location', 'Qty/Unit'],
-    [1, 'ABC-123', 'Widget Assembly', 'A-01', 2],
-    ['', 'TUV-450', '450Q Spring Kit', 'B-05', 1],
-    ['', 'WXY-450', '450Q Gasket Set', 'C-08', 4],
-    ['', 'ZAB-450', '450Q Specific Part', 'F-01', 2],
+    ['Qty', 'Part Number', 'Description', 'Location', 'Qty/Unit', 'Classification'],
+    [1, 'ABC-123', 'Widget Assembly', 'A-01', 2, 'assembly'],
+    ['', 'TUV-450', '450Q Spring Kit', 'B-05', 1, 'purchased'],
+    ['', 'WXY-450', '450Q Gasket Set', 'C-08', 4, 'purchased'],
+    ['', 'ZAB-450', '450Q Specific Part', 'F-01', 2, 'manufactured'],
   ];
   const tool450QSheet = XLSX.utils.aoa_to_sheet(tool450QData);
   tool450QSheet['!cols'] = [
@@ -158,6 +161,7 @@ function createMultiToolTypeTemplate(XLSX: XLSXModule, workbook: XLSXType.WorkBo
     { wch: 30 }, // Description
     { wch: 12 }, // Location
     { wch: 10 }, // Qty/Unit
+    { wch: 15 }, // Classification
   ];
   XLSX.utils.book_append_sheet(workbook, tool450QSheet, '450Q');
 }
@@ -184,6 +188,7 @@ function createInstructionsSheet(XLSX: XLSXModule, workbook: XLSXType.WorkBook) 
     ['- Description: Part description (optional)'],
     ['- Location: Bin/location code (optional)'],
     ['- Qty/Unit: Quantity needed per tool (required)'],
+    ['- Classification: purchased, manufactured, assembly, or modified (optional)'],
     [''],
     [''],
     ['MULTIPLE TOOL TYPES FORMAT'],
@@ -200,6 +205,7 @@ function createInstructionsSheet(XLSX: XLSXModule, workbook: XLSXType.WorkBook) 
     ['- Description: Part description (optional)'],
     ['- Location: Bin/location code (optional)'],
     ['- Qty/Unit: Quantity needed per tool (required)'],
+    ['- Classification: purchased, manufactured, assembly, or modified (optional)'],
     [''],
     ['Example: Sheet "230Q" with Qty=2 creates tools 3137-1 and 3137-2'],
     ['         Sheet "450Q" with Qty=1 creates tool 3137-3'],
@@ -219,6 +225,7 @@ function createInstructionsSheet(XLSX: XLSXModule, workbook: XLSXType.WorkBook) 
     ['- Description: Part description (optional)'],
     ['- Location: Bin/location code (optional)'],
     ['- Qty/Unit: Quantity per parent assembly (required)'],
+    ['- Classification: purchased, manufactured, assembly, or modified (optional)'],
     [''],
     ['How it works:'],
     ['- Only LEAF parts (parts with no children) are imported for picking'],

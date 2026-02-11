@@ -16,6 +16,7 @@ import {
   Moon,
   Monitor,
   FileText,
+  Boxes,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -35,7 +36,8 @@ interface MainLayoutProps {
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/orders', label: 'Orders', icon: ClipboardList },
-  { path: '/parts', label: 'Parts', icon: Package },
+  { path: '/parts', label: 'Part Picker', icon: Package },
+  { path: '/parts-catalog', label: 'Catalog', icon: Boxes },
   { path: '/items-to-order', label: 'Items to Order', icon: ShoppingCart },
   { path: '/issues', label: 'Issues', icon: AlertTriangle },
   { path: '/activity', label: 'Activity History', icon: History },

@@ -32,6 +32,129 @@ export interface ResolvedLeafPart {
  * Assembly group = level 1 ancestor's part number, or the part's own number
  * when it is at level 0 or 1.
  */
+// Extended row with type info for full hierarchy resolution
+export interface HierarchyRowExtended extends HierarchyRow {
+  type: string; // MFG, PUR, etc.
+}
+
+export interface AssemblyRelationship {
+  parentPartNumber: string;
+  childPartNumber: string;
+  rawQty: number; // Raw quantity (NOT multiplied through ancestors)
+}
+
+export interface AssemblyPartInfo {
+  partNumber: string;
+  description: string;
+  type: string;
+}
+
+export interface HierarchyResolutionResult {
+  leafParts: ResolvedLeafPart[];
+  relationships: AssemblyRelationship[];
+  assemblyParts: AssemblyPartInfo[];
+}
+
+/**
+ * Walk a list of hierarchical rows and return leaf parts WITH full assembly
+ * relationship data (parent-child chains at every level).
+ *
+ * This does everything resolveHierarchyLeaves() does PLUS:
+ * - Records parent→child relationships at every hierarchy level
+ * - Tracks non-leaf parts that have children as assembly parts
+ */
+export function resolveHierarchy(rows: HierarchyRowExtended[]): HierarchyResolutionResult {
+  const assemblyStack = new Map<number, { partNumber: string; effectiveQty: number; type: string; description: string }>();
+  const leafParts: ResolvedLeafPart[] = [];
+  const relationships: AssemblyRelationship[] = [];
+  const assemblyPartSet = new Map<string, AssemblyPartInfo>();
+
+  const minLevel = rows.length > 0 ? Math.min(...rows.map(r => r.level)) : 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const nextRow = i + 1 < rows.length ? rows[i + 1] : null;
+    const isLeaf = !nextRow || nextRow.level <= row.level;
+
+    // Calculate effective quantity by multiplying through parent chain
+    let parentEffectiveQty = 1;
+    for (let lvl = row.level - 1; lvl >= 0; lvl--) {
+      const ancestor = assemblyStack.get(lvl);
+      if (ancestor) {
+        parentEffectiveQty = ancestor.effectiveQty;
+        break;
+      }
+    }
+
+    const effectiveQty = row.qty * parentEffectiveQty;
+
+    // Update assembly stack for this level
+    assemblyStack.set(row.level, { partNumber: row.partNumber, effectiveQty, type: row.type, description: row.description });
+
+    // Clean up deeper levels from stack (they're no longer in scope)
+    for (const [lvl] of assemblyStack) {
+      if (lvl > row.level) {
+        assemblyStack.delete(lvl);
+      }
+    }
+
+    // Record parent-child relationship for rows deeper than min level
+    if (row.level > minLevel) {
+      for (let lvl = row.level - 1; lvl >= minLevel; lvl--) {
+        const parent = assemblyStack.get(lvl);
+        if (parent) {
+          relationships.push({
+            parentPartNumber: parent.partNumber,
+            childPartNumber: row.partNumber,
+            rawQty: row.qty, // Raw qty, NOT multiplied through ancestors
+          });
+          // Track the parent as an assembly part
+          if (!assemblyPartSet.has(parent.partNumber)) {
+            assemblyPartSet.set(parent.partNumber, {
+              partNumber: parent.partNumber,
+              description: parent.description,
+              type: parent.type,
+            });
+          }
+          break;
+        }
+      }
+    }
+
+    // Build full assembly hierarchy path from ancestors (same logic as resolveHierarchyLeaves)
+    let assemblyGroup = '';
+    if (row.level <= 1) {
+      assemblyGroup = row.partNumber;
+    } else {
+      const pathParts: string[] = [];
+      for (let lvl = 1; lvl < row.level; lvl++) {
+        const ancestor = assemblyStack.get(lvl);
+        if (ancestor) {
+          pathParts.push(ancestor.partNumber);
+        }
+      }
+      assemblyGroup = pathParts.length > 0 ? pathParts.join(' > ') : row.partNumber;
+    }
+
+    if (isLeaf) {
+      const finalQty = Math.max(1, Math.ceil(effectiveQty));
+
+      leafParts.push({
+        partNumber: row.partNumber,
+        description: row.description,
+        effectiveQty: finalQty,
+        assemblyGroup,
+      });
+    }
+  }
+
+  return {
+    leafParts,
+    relationships,
+    assemblyParts: Array.from(assemblyPartSet.values()),
+  };
+}
+
 export function resolveHierarchyLeaves(rows: HierarchyRow[]): ResolvedLeafPart[] {
   // assemblyStack[level] = { partNumber, effectiveQty }
   const assemblyStack = new Map<number, { partNumber: string; effectiveQty: number }>();

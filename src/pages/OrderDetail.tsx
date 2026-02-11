@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Package, CheckCircle, AlertCircle, Download, Plus, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import { ManageToolsDialog } from '@/components/dialogs/ManageToolsDialog';
 import { OrderStatusAlerts } from '@/components/order/OrderStatusAlerts';
 import { OrderInfoCard } from '@/components/order/OrderInfoCard';
 import { PickingSection } from '@/components/order/PickingSection';
+import { ExplodedBOMDialog } from '@/components/parts/ExplodedBOMDialog';
 import { useOrder, useOrders } from '@/hooks/useOrders';
 import { useBOMTemplates } from '@/hooks/useBOMTemplates';
 import { usePicks } from '@/hooks/usePicks';
@@ -26,6 +27,7 @@ import { useLineItems, type LineItemInput } from '@/hooks/useLineItems';
 import { useIssues } from '@/hooks/useIssues';
 import { useSettings } from '@/hooks/useSettings';
 import { useActivityLog } from '@/hooks/useActivityLog';
+import { usePartClassifications } from '@/hooks/usePartClassifications';
 import type { Tool, LineItem } from '@/types';
 import { getStatusColor, getQtyForTool } from '@/lib/utils';
 import { exportOrderToExcel } from '@/lib/excelExport';
@@ -53,6 +55,12 @@ export function OrderDetail() {
   const [lineItemToEdit, setLineItemToEdit] = useState<LineItem | null>(null);
   const [lineItemToDelete, setLineItemToDelete] = useState<LineItem | null>(null);
   const [isSaveTemplateOpen, setIsSaveTemplateOpen] = useState(false);
+  const [bomDialogOpen, setBomDialogOpen] = useState(false);
+  const [bomDialogPart, setBomDialogPart] = useState<{ id: string; partNumber: string; description?: string | null }>({ id: '', partNumber: '' });
+
+  // Fetch part classifications for line items
+  const partNumbers = useMemo(() => lineItems.map(item => item.part_number), [lineItems]);
+  const { partsMap } = usePartClassifications(partNumbers);
 
   // Calculate overall progress by line items (parts), not quantities
   const totalLineItems = lineItemsWithPicks.length;
@@ -391,6 +399,14 @@ export function OrderDetail() {
           if (result) refresh();
           return result;
         }}
+        partsMap={partsMap}
+        onViewBOM={(partNumber) => {
+          const part = partsMap.get(partNumber);
+          if (part && part.classification_type === 'assembly') {
+            setBomDialogPart({ id: part.id, partNumber: part.part_number, description: part.description });
+            setBomDialogOpen(true);
+          }
+        }}
       />
 
       {/* Dialogs */}
@@ -450,6 +466,14 @@ export function OrderDetail() {
         lineItems={lineItems}
         defaultToolModel={order.tool_model || undefined}
         onSave={handleSaveAsTemplate}
+      />
+
+      <ExplodedBOMDialog
+        open={bomDialogOpen}
+        onOpenChange={setBomDialogOpen}
+        partId={bomDialogPart.id}
+        partNumber={bomDialogPart.partNumber}
+        partDescription={bomDialogPart.description}
       />
     </div>
   );

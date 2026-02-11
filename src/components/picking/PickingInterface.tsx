@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Plus, Minus, Check, MapPin, MessageSquare, ArrowUpDown, AlertTriangle, CheckCircle2, ChevronRight, ChevronDown, Undo2, Trash2, Clock, User, Package, Eye, EyeOff, X, Pencil } from 'lucide-react';
+import { Plus, Minus, Check, MapPin, MessageSquare, ArrowUpDown, AlertTriangle, CheckCircle2, ChevronRight, ChevronDown, Undo2, Trash2, Clock, User, Package, Eye, EyeOff, X, Pencil, Box } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '@/types';
+import type { Tool, LineItem, LineItemWithPicks, Pick, IssueType, Part } from '@/types';
 import { Layers, SplitSquareVertical } from 'lucide-react';
 import { useSettings } from '@/hooks/useSettings';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
@@ -31,6 +31,9 @@ import { ReportIssueDialog } from './ReportIssueDialog';
 import { DistributeInventoryDialog } from './DistributeInventoryDialog';
 import { PrintTagDialog, type TagData } from './PrintTagDialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ClassificationBadge } from '@/components/parts/ClassificationBadge';
+import { PartDetail } from '@/components/parts/PartDetail';
+import { useParts } from '@/hooks/useParts';
 
 import { STORAGE_KEYS } from '@/lib/constants';
 
@@ -75,6 +78,8 @@ interface PickingInterfaceProps {
   onResetQtyOverride?: (lineItemId: string, toolId: string, allToolIds: string[]) => Promise<unknown>;
   onUpdateQtyPerUnit?: (lineItemId: string, newQty: number, allToolIds: string[]) => Promise<unknown>;
   toolFilter?: string; // 'all' or specific tool ID to filter by
+  partsMap?: Map<string, Part>;
+  onViewBOM?: (partNumber: string) => void;
 }
 
 export function PickingInterface({
@@ -99,6 +104,8 @@ export function PickingInterface({
   onResetQtyOverride,
   onUpdateQtyPerUnit,
   toolFilter = 'all',
+  partsMap,
+  onViewBOM,
 }: PickingInterfaceProps) {
   void _picks;
 
@@ -129,10 +136,13 @@ export function PickingInterface({
     return map;
   }, [lineItemsWithPicks]);
   const { getUserName, isTagPrintingEnabled } = useSettings();
+  const { getPartByPartNumber } = useParts();
   const [partialPickItem, setPartialPickItem] = useState<LineItem | null>(null);
   // Tag printing state
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [printTagData, setPrintTagData] = useState<TagData | TagData[] | null>(null);
+  // Part detail dialog state
+  const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
   const [partialQty, setPartialQty] = useState('1');
   const [partialNote, setPartialNote] = useState('');
   // Track pending pick quantities per item (item.id -> { qty, note })
@@ -620,6 +630,13 @@ export function PickingInterface({
     setPartialNote('');
   };
 
+  const handlePartNumberClick = async (partNumber: string) => {
+    const part = await getPartByPartNumber(partNumber);
+    if (part) {
+      setSelectedPartId(part.id);
+    }
+  };
+
   const handleReportIssue = async (
     lineItemId: string,
     issueType: IssueType,
@@ -828,7 +845,36 @@ export function PickingInterface({
               ) : (
                 <div className="w-5" /> // Spacer for alignment
               )}
-              <span className="font-mono font-medium">{item.part_number}</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePartNumberClick(item.part_number);
+                }}
+                className="font-mono font-medium hover:underline hover:text-primary cursor-pointer text-left"
+              >
+                {item.part_number}
+              </button>
+              {partsMap && (() => {
+                const part = partsMap.get(item.part_number);
+                return part ? <ClassificationBadge classification={part.classification_type} size="sm" /> : null;
+              })()}
+              {partsMap && onViewBOM && (() => {
+                const part = partsMap.get(item.part_number);
+                return part?.classification_type === 'assembly' ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewBOM(item.part_number);
+                    }}
+                    title="View BOM"
+                  >
+                    <Box className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null;
+              })()}
               {itemHasIssue && (
                 <Badge variant="destructive" className="gap-1 text-xs">
                   <AlertTriangle className="h-3 w-3" />
@@ -845,10 +891,20 @@ export function PickingInterface({
           </div>
 
           {/* Description */}
-          <div className="col-span-3 text-sm text-muted-foreground min-w-0">
+          <div className={cn(
+            "col-span-3 text-sm min-w-0",
+            allToolsComplete
+              ? "text-green-900 dark:text-green-100"
+              : "text-muted-foreground"
+          )}>
             <div className="truncate">{item.description || '-'}</div>
             {item.assembly_group && (
-              <div className="text-xs text-muted-foreground/70 truncate font-mono">
+              <div className={cn(
+                "text-xs truncate font-mono",
+                allToolsComplete
+                  ? "text-green-800 dark:text-green-200"
+                  : "text-muted-foreground/70"
+              )}>
                 Assy: {item.assembly_group}
               </div>
             )}
@@ -864,12 +920,18 @@ export function PickingInterface({
           {/* Location */}
           <div className="col-span-2">
             {item.location ? (
-              <Badge variant="outline" className="gap-1">
+              <Badge variant="outline" className={cn(
+                "gap-1",
+                allToolsComplete && "dark:bg-green-800 dark:text-green-100 dark:border-green-600"
+              )}>
                 <MapPin className="h-3 w-3" />
                 {item.location}
               </Badge>
             ) : (
-              <span className="text-muted-foreground text-sm">-</span>
+              <span className={cn(
+                "text-sm",
+                allToolsComplete ? "text-green-800 dark:text-green-200" : "text-muted-foreground"
+              )}>-</span>
             )}
           </div>
 
@@ -879,16 +941,21 @@ export function PickingInterface({
               <span
                 className={cn(
                   'text-sm font-medium',
-                  item.qty_available < totalNeeded
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-green-600 dark:text-green-400'
+                  allToolsComplete
+                    ? 'text-green-800 dark:text-green-100'
+                    : item.qty_available < totalNeeded
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-green-600 dark:text-green-400'
                 )}
                 title={item.qty_available < totalNeeded ? 'Low stock - may not have enough' : 'Sufficient stock'}
               >
                 {item.qty_available}
               </span>
             ) : (
-              <span className="text-muted-foreground text-sm">-</span>
+              <span className={cn(
+                "text-sm",
+                allToolsComplete ? "text-green-800 dark:text-green-200" : "text-muted-foreground"
+              )}>-</span>
             )}
           </div>
 
@@ -899,13 +966,25 @@ export function PickingInterface({
                 <span
                   className={cn(
                     'font-semibold',
-                    allToolsComplete ? 'text-green-600 dark:text-green-400' : ''
+                    allToolsComplete
+                      ? 'text-green-800 dark:text-green-100'
+                      : 'text-foreground'
                   )}
                 >
                   {totalPicked}
                 </span>
-                <span className="text-muted-foreground text-sm">/</span>
-                <span className={cn('text-sm', hasOverride && 'text-blue-600 dark:text-blue-400 font-medium')}>
+                <span className={cn(
+                  "text-sm",
+                  allToolsComplete ? "text-green-800 dark:text-green-200" : "text-muted-foreground"
+                )}>/</span>
+                <span className={cn(
+                  'text-sm',
+                  allToolsComplete
+                    ? 'text-green-800 dark:text-green-100'
+                    : hasOverride
+                      ? 'text-blue-600 dark:text-blue-400 font-medium'
+                      : 'text-foreground'
+                )}>
                   {totalNeeded}
                 </span>
                 {item.qty_overrides && Object.keys(item.qty_overrides).length > 0 && (
@@ -1055,13 +1134,27 @@ export function PickingInterface({
                 <span
                   className={cn(
                     'font-semibold',
-                    isComplete ? 'text-green-600 dark:text-green-400' : ''
+                    allToolsComplete
+                      ? 'text-green-800 dark:text-green-100'
+                      : isComplete
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-foreground'
                   )}
                 >
                   {pickedForTool}
                 </span>
-                <span className="text-muted-foreground text-sm">/</span>
-                <span className={cn('text-sm', hasOverride && 'text-blue-600 dark:text-blue-400 font-medium')}>{qtyForTool}</span>
+                <span className={cn(
+                  "text-sm",
+                  allToolsComplete ? "text-green-800 dark:text-green-200" : "text-muted-foreground"
+                )}>/</span>
+                <span className={cn(
+                  'text-sm',
+                  allToolsComplete
+                    ? 'text-green-800 dark:text-green-100'
+                    : hasOverride
+                      ? 'text-blue-600 dark:text-blue-400 font-medium'
+                      : 'text-foreground'
+                )}>{qtyForTool}</span>
                 {hasOverride && (
                   <span className="text-[10px] text-blue-500" title={`Default: ${item.qty_per_unit}`}>*</span>
                 )}
@@ -1432,9 +1525,33 @@ export function PickingInterface({
           <div className="flex items-start justify-between mb-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono font-bold text-xl tracking-tight">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePartNumberClick(item.part_number);
+                  }}
+                  className="font-mono font-bold text-xl tracking-tight hover:underline hover:text-primary cursor-pointer text-left"
+                >
                   {item.part_number}
-                </span>
+                </button>
+                {partsMap && (() => {
+                  const part = partsMap.get(item.part_number);
+                  return part ? <ClassificationBadge classification={part.classification_type} /> : null;
+                })()}
+                {partsMap && onViewBOM && (() => {
+                  const part = partsMap.get(item.part_number);
+                  return part?.classification_type === 'assembly' ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => onViewBOM(item.part_number)}
+                      title="View BOM"
+                    >
+                      <Box className="h-4 w-4" />
+                    </Button>
+                  ) : null;
+                })()}
                 {itemHasIssue && (
                   <Badge variant="destructive" className="gap-1 text-xs">
                     <AlertTriangle className="h-3 w-3" />
@@ -1449,12 +1566,22 @@ export function PickingInterface({
                 )}
               </div>
               {item.description && (
-                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
+                <p className={cn(
+                  "text-sm mt-0.5 line-clamp-2",
+                  allToolsComplete
+                    ? "text-green-900 dark:text-green-100"
+                    : "text-muted-foreground"
+                )}>
                   {item.description}
                 </p>
               )}
               {item.assembly_group && (
-                <p className="text-xs text-muted-foreground/70 mt-0.5 font-mono">
+                <p className={cn(
+                  "text-xs mt-0.5 font-mono",
+                  allToolsComplete
+                    ? "text-green-800 dark:text-green-200"
+                    : "text-muted-foreground/70"
+                )}>
                   Assy: {item.assembly_group}
                 </p>
               )}
@@ -2299,6 +2426,15 @@ export function PickingInterface({
         onOpenChange={setShowPrintDialog}
         tagData={printTagData}
       />
+
+      {/* Part Detail Dialog */}
+      {selectedPartId && (
+        <PartDetail
+          partId={selectedPartId}
+          open={!!selectedPartId}
+          onClose={() => setSelectedPartId(null)}
+        />
+      )}
     </div>
   );
 }

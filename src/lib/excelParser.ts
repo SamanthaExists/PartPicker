@@ -36,6 +36,7 @@ interface ColumnMapping {
   qtyPerUnit: number;
   totalQty: number;
   level: number;
+  classificationType: number;
   // Tool-specific quantity columns (tool number -> column index)
   toolColumns: Map<string, number>;
 }
@@ -48,6 +49,7 @@ interface RawRow {
   level: number | null; // null when no Level column
   qtyPerUnit: number;
   totalQty: number;
+  classificationType: string | null;
 }
 
 /**
@@ -84,6 +86,7 @@ function applyHierarchy(
           location: r.location || undefined,
           qty_per_unit: qtyPerUnit,
           total_qty_needed: totalQtyNeeded,
+          classification_type: r.classificationType as any,
         };
       });
   }
@@ -91,6 +94,7 @@ function applyHierarchy(
   // Build hierarchy rows (skip rows with invalid/missing level)
   const hierarchyRows: HierarchyRow[] = [];
   const locationByPartNumber = new Map<string, string>();
+  const classificationByPartNumber = new Map<string, string>();
 
   for (const r of rawRows) {
     if (r.level === null) continue; // skip rows with non-numeric level
@@ -105,6 +109,11 @@ function applyHierarchy(
     // Track location from the original row
     if (r.location) {
       locationByPartNumber.set(r.partNumber, r.location);
+    }
+
+    // Track classification type from the original row
+    if (r.classificationType) {
+      classificationByPartNumber.set(r.partNumber, r.classificationType);
     }
   }
 
@@ -124,6 +133,7 @@ function applyHierarchy(
           location: r.location || undefined,
           qty_per_unit: qtyPerUnit,
           total_qty_needed: totalQtyNeeded,
+          classification_type: r.classificationType as any,
         };
       });
   }
@@ -136,6 +146,7 @@ function applyHierarchy(
     effectiveQty: number;
     assemblyGroup: string;
     location: string;
+    classificationType: string | null;
   }>();
 
   for (const leaf of resolvedLeaves) {
@@ -149,6 +160,7 @@ function applyHierarchy(
         effectiveQty: leaf.effectiveQty,
         assemblyGroup: leaf.assemblyGroup,
         location: locationByPartNumber.get(leaf.partNumber) || '',
+        classificationType: classificationByPartNumber.get(leaf.partNumber) || null,
       });
     }
   }
@@ -162,6 +174,7 @@ function applyHierarchy(
       qty_per_unit: info.effectiveQty,
       total_qty_needed: info.effectiveQty * Math.max(toolCount, 1),
       assembly_group: info.assemblyGroup || undefined,
+      classification_type: info.classificationType as any,
     });
   }
 
@@ -254,6 +267,19 @@ export async function parseExcelFile(file: File): Promise<ParseResult> {
         ? String(row[mapping.location] || '').trim()
         : '';
 
+      // Parse classification type if column exists
+      let classificationType: string | null = null;
+      if (mapping.classificationType >= 0) {
+        const rawClass = String(row[mapping.classificationType] || '').toLowerCase().trim();
+        if (rawClass) {
+          if (['purchased', 'manufactured', 'assembly', 'modified'].includes(rawClass)) {
+            classificationType = rawClass;
+          } else {
+            warnings.push(`Invalid classification type "${rawClass}" for part "${partNumber}" - must be purchased, manufactured, assembly, or modified`);
+          }
+        }
+      }
+
       // Parse level if column exists
       let level: number | null = null;
       if (mapping.level >= 0) {
@@ -303,6 +329,7 @@ export async function parseExcelFile(file: File): Promise<ParseResult> {
         level,
         qtyPerUnit: qtyPerUnit || 1,
         totalQty: totalQty || qtyPerUnit,
+        classificationType,
       });
     }
 
@@ -373,6 +400,7 @@ function detectColumns(data: unknown[][]): { headerRowIndex: number; mapping: Co
     qtyPerUnit: -1,
     totalQty: -1,
     level: -1,
+    classificationType: -1,
     toolColumns: new Map(),
   };
 
@@ -389,6 +417,12 @@ function detectColumns(data: unknown[][]): { headerRowIndex: number; mapping: Co
       // Level detection (for hierarchical BOMs)
       if (cell === 'level' || cell === 'lvl') {
         mapping.level = colIdx;
+      }
+
+      // Classification type detection
+      if (cell === 'classification' || cell === 'classification_type' ||
+          cell === 'type' || cell === 'part_type' || cell === 'class') {
+        mapping.classificationType = colIdx;
       }
 
       // Part number detection
@@ -559,6 +593,19 @@ export async function parseCsvFile(file: File): Promise<ParseResult> {
         ? String(row[mapping.location] || '').trim()
         : '';
 
+      // Parse classification type if column exists
+      let classificationType: string | null = null;
+      if (mapping.classificationType >= 0) {
+        const rawClass = String(row[mapping.classificationType] || '').toLowerCase().trim();
+        if (rawClass) {
+          if (['purchased', 'manufactured', 'assembly', 'modified'].includes(rawClass)) {
+            classificationType = rawClass;
+          } else {
+            warnings.push(`Invalid classification type "${rawClass}" for part "${partNumber}" - must be purchased, manufactured, assembly, or modified`);
+          }
+        }
+      }
+
       // Parse level if column exists
       let level: number | null = null;
       if (mapping.level >= 0) {
@@ -579,6 +626,7 @@ export async function parseCsvFile(file: File): Promise<ParseResult> {
         level,
         qtyPerUnit: qtyPerUnit || 1,
         totalQty: totalQty || qtyPerUnit,
+        classificationType,
       });
     }
 
@@ -702,6 +750,15 @@ function parseToolTypeSheet(XLSX: typeof import('xlsx'), sheet: XLSX.WorkSheet, 
       ? String(row[mapping.location] || '').trim()
       : '';
 
+    // Parse classification type if column exists
+    let classificationType: string | null = null;
+    if (mapping.classificationType >= 0) {
+      const rawClass = String(row[mapping.classificationType] || '').toLowerCase().trim();
+      if (rawClass && ['purchased', 'manufactured', 'assembly', 'modified'].includes(rawClass)) {
+        classificationType = rawClass;
+      }
+    }
+
     // Parse level if column exists
     let level: number | null = null;
     if (mapping.level >= 0) {
@@ -723,6 +780,7 @@ function parseToolTypeSheet(XLSX: typeof import('xlsx'), sheet: XLSX.WorkSheet, 
       level,
       qtyPerUnit: qtyPerUnit || 1,
       totalQty: totalQty || qtyPerUnit * toolQty,
+      classificationType,
     });
   }
 
@@ -829,6 +887,15 @@ export async function parseEnhancedExcelFile(file: File): Promise<ParseResult> {
         const description = mapping.description >= 0 ? String(row[mapping.description] || '').trim() : '';
         const location = mapping.location >= 0 ? String(row[mapping.location] || '').trim() : '';
 
+        // Parse classification type if column exists
+        let classificationType: string | null = null;
+        if (mapping.classificationType >= 0) {
+          const rawClass = String(row[mapping.classificationType] || '').toLowerCase().trim();
+          if (rawClass && ['purchased', 'manufactured', 'assembly', 'modified'].includes(rawClass)) {
+            classificationType = rawClass;
+          }
+        }
+
         // Parse level if column exists
         let level: number | null = null;
         if (mapping.level >= 0) {
@@ -848,6 +915,7 @@ export async function parseEnhancedExcelFile(file: File): Promise<ParseResult> {
           level,
           qtyPerUnit: qtyPerUnit || 1,
           totalQty: (qtyPerUnit || 1) * toolQty,
+          classificationType,
         });
       }
 

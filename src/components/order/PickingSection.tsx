@@ -14,7 +14,7 @@ import { SearchInput } from '@/components/common/SearchInput';
 import { FilterMultiSelect } from '@/components/filters';
 import { PickingInterface } from '@/components/picking/PickingInterface';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import type { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '@/types';
+import type { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType, Part } from '@/types';
 import { cn, getTopLevelAssembly, getQtyForTool } from '@/lib/utils';
 
 interface PickingSectionProps {
@@ -41,6 +41,8 @@ interface PickingSectionProps {
   onUpdateQtyOverride?: (lineItemId: string, toolId: string, qty: number, allToolIds: string[]) => Promise<unknown>;
   onResetQtyOverride?: (lineItemId: string, toolId: string, allToolIds: string[]) => Promise<unknown>;
   onUpdateQtyPerUnit?: (lineItemId: string, newQty: number, allToolIds: string[]) => Promise<unknown>;
+  partsMap?: Map<string, Part>;
+  onViewBOM?: (partNumber: string) => void;
 }
 
 export function PickingSection({
@@ -67,6 +69,8 @@ export function PickingSection({
   onUpdateQtyOverride,
   onResetQtyOverride,
   onUpdateQtyPerUnit,
+  partsMap,
+  onViewBOM,
 }: PickingSectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAssemblies, setSelectedAssemblies] = useState<Set<string>>(new Set());
@@ -334,6 +338,8 @@ export function PickingSection({
             onResetQtyOverride={onResetQtyOverride}
             onUpdateQtyPerUnit={onUpdateQtyPerUnit}
             toolFilter={toolFilter}
+            partsMap={partsMap}
+            onViewBOM={onViewBOM}
           />
         </CardContent>
       </Card>

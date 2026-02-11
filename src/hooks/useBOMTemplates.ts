@@ -145,7 +145,8 @@ export function useBOMTemplates() {
    */
   const createTemplate = useCallback(async (
     name: string,
-    toolModel?: string
+    toolModel?: string,
+    templateType: 'bom' | 'assembly' = 'bom'
   ): Promise<BOMTemplate | null> => {
     try {
       const { data, error: insertError } = await supabase
@@ -153,7 +154,7 @@ export function useBOMTemplates() {
         .insert({
           name,
           tool_model: toolModel || null,
-          template_type: 'bom',
+          template_type: templateType,
         })
         .select()
         .single();

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { FileText, Plus, ArrowLeft, Pencil, Trash2, Search, Loader2, ListChecks, Package, Puzzle, Filter, X } from 'lucide-react';
+import { FileText, Plus, ArrowLeft, Pencil, Trash2, Search, Loader2, ListChecks, Package, Puzzle, Filter, X, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +21,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SearchInput } from '@/components/common/SearchInput';
+import { ClassificationBadge } from '@/components/parts/ClassificationBadge';
+import { ExplodedBOMDialog } from '@/components/parts/ExplodedBOMDialog';
 import { useBOMTemplates } from '@/hooks/useBOMTemplates';
+import { usePartClassifications } from '@/hooks/usePartClassifications';
 import type { BOMTemplate, BOMTemplateItem, BOMTemplateWithItems } from '@/types';
 
 interface AssemblyGroup {
@@ -62,7 +65,7 @@ export function Templates() {
   // Template dialog
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<BOMTemplate | null>(null);
-  const [templateForm, setTemplateForm] = useState({ name: '', tool_model: '' });
+  const [templateForm, setTemplateForm] = useState({ name: '', tool_model: '', template_type: 'bom' as 'bom' | 'assembly' });
 
   // Item dialog
   const [showItemDialog, setShowItemDialog] = useState(false);
@@ -83,6 +86,17 @@ export function Templates() {
   const [showExtractDialog, setShowExtractDialog] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractResult, setExtractResult] = useState<{ created: number; skipped: number; errors: string[] } | null>(null);
+
+  // BOM dialog
+  const [bomDialogOpen, setBomDialogOpen] = useState(false);
+  const [bomDialogPart, setBomDialogPart] = useState<{ id: string; partNumber: string; description?: string | null }>({ id: '', partNumber: '' });
+
+  // Fetch part classifications for the selected template
+  const partNumbers = useMemo(() => {
+    if (!selectedTemplate) return [];
+    return selectedTemplate.items.map(item => item.part_number);
+  }, [selectedTemplate]);
+  const { partsMap, loading: partsLoading } = usePartClassifications(partNumbers);
 
   // Unique tool models for filter dropdown
   const uniqueModels = useMemo(() => {
@@ -230,13 +244,13 @@ export function Templates() {
   // Template CRUD
   const openCreateTemplate = () => {
     setEditingTemplate(null);
-    setTemplateForm({ name: '', tool_model: '' });
+    setTemplateForm({ name: '', tool_model: '', template_type: 'bom' });
     setShowTemplateDialog(true);
   };
 
   const openEditTemplate = (t: BOMTemplate) => {
     setEditingTemplate(t);
-    setTemplateForm({ name: t.name, tool_model: t.tool_model || '' });
+    setTemplateForm({ name: t.name, tool_model: t.tool_model || '', template_type: t.template_type || 'bom' });
     setShowTemplateDialog(true);
   };
 
@@ -254,7 +268,11 @@ export function Templates() {
         setSelectedTemplate(detail);
       }
     } else {
-      await createTemplate(templateForm.name.trim(), templateForm.tool_model.trim() || undefined);
+      await createTemplate(
+        templateForm.name.trim(),
+        templateForm.tool_model.trim() || undefined,
+        templateForm.template_type
+      );
     }
 
     setShowTemplateDialog(false);
@@ -343,6 +361,15 @@ export function Templates() {
     const result = await extractTemplatesFromOrders();
     setExtractResult(result);
     setExtracting(false);
+  };
+
+  // View BOM for assembly part
+  const handleViewBOM = (partNumber: string) => {
+    const part = partsMap.get(partNumber);
+    if (part && part.classification_type === 'assembly') {
+      setBomDialogPart({ id: part.id, partNumber: part.part_number, description: part.description });
+      setBomDialogOpen(true);
+    }
   };
 
   // Detail view
@@ -587,7 +614,15 @@ export function Templates() {
 
                         {/* Item Row */}
                         <tr className="border-t">
-                          <td className="p-2 font-mono whitespace-nowrap">{item.part_number}</td>
+                          <td className="p-2 font-mono whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              {item.part_number}
+                              {(() => {
+                                const part = partsMap.get(item.part_number);
+                                return part ? <ClassificationBadge classification={part.classification_type} /> : null;
+                              })()}
+                            </div>
+                          </td>
                           <td className="p-2 text-muted-foreground max-w-[200px] truncate">
                             {item.description || '-'}
                           </td>
@@ -600,6 +635,20 @@ export function Templates() {
                           <td className="p-2 text-center">{item.qty_per_unit}</td>
                           <td className="p-2 text-right">
                             <div className="flex justify-end gap-1">
+                              {(() => {
+                                const part = partsMap.get(item.part_number);
+                                return part?.classification_type === 'assembly' ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => handleViewBOM(item.part_number)}
+                                    title="View BOM"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                  </Button>
+                                ) : null;
+                              })()}
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditItem(item)}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
@@ -957,6 +1006,38 @@ export function Templates() {
               />
             </div>
             <div className="space-y-2">
+              <Label>Template Type</Label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="template-type"
+                    value="bom"
+                    checked={templateForm.template_type === 'bom'}
+                    onChange={e => setTemplateForm(f => ({ ...f, template_type: 'bom' }))}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm">BOM (Bill of Materials)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="template-type"
+                    value="assembly"
+                    checked={templateForm.template_type === 'assembly'}
+                    onChange={e => setTemplateForm(f => ({ ...f, template_type: 'assembly' }))}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm">Assembly</span>
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {templateForm.template_type === 'bom'
+                  ? 'Full bill of materials for a complete tool/product'
+                  : 'Component assembly template (e.g., Main Frame, Motor Assembly)'}
+              </p>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="tpl-model2">Tool Model</Label>
               <Input
                 id="tpl-model2"
@@ -1045,6 +1126,15 @@ export function Templates() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* BOM Dialog */}
+      <ExplodedBOMDialog
+        open={bomDialogOpen}
+        onOpenChange={setBomDialogOpen}
+        partId={bomDialogPart.id}
+        partNumber={bomDialogPart.partNumber}
+        partDescription={bomDialogPart.description}
+      />
 
       {/* Loading detail overlay */}
       {loadingDetail && (

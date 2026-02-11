@@ -1,6 +1,6 @@
 # Tool Pick List Tracker - Angular App
 
-> **IMPORTANT: Keep this Angular app feature-identical to the React app (Pick App).** Any new features, bug fixes, or changes made to the React version should be mirrored here. The React app is the primary implementation - this Angular version serves as a secondary/alternative implementation using a different framework stack.
+> **IMPORTANT: This is the PRIMARY implementation deployed to production.** There is a React version (`../` - outside this folder) that should be kept feature-identical to this Angular app. Any new features, bug fixes, or changes made here should be mirrored to the React version if needed.
 
 A warehouse tool picking application built with Angular and Bootstrap.
 
@@ -9,8 +9,18 @@ A warehouse tool picking application built with Angular and Bootstrap.
 ### Production URLs
 | Service | URL |
 |---------|-----|
-| **React App (Primary)** | https://partpick.netlify.app |
+| **Angular App (Primary - Deployed)** | https://partpick.netlify.app |
 | **GitHub Repo** | https://github.com/Jbcox1988/PartPicker.git |
+
+### Netlify (Frontend Hosting)
+- **Project Name**: partpick
+- **Production URL**: https://partpick.netlify.app
+- **Admin Dashboard**: https://app.netlify.com/projects/partpick
+- **Site ID**: `870749d5-40dd-4bfa-8fb6-6d792f53423e`
+- **Account**: josh.cox@corvaer.com
+- **Build Command**: `npm run build` (runs `ng build`)
+- **Publish Directory**: `dist/tool-pick-list-tracker/browser`
+- **Base Directory**: `AngularBootstrap` (configured in `netlify.toml`)
 
 ### Supabase (Backend/Database)
 - **Project URL**: https://uewypezgyyyfanltoyfv.supabase.co

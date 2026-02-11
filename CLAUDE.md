@@ -1,6 +1,6 @@
-# Tool Pick List Tracker
+# Tool Pick List Tracker - React App
 
-> **IMPORTANT: This is the PRIMARY implementation.** There is an Angular version (`../AngularBootstrap/`) that should be kept feature-identical to this React app. Any new features, bug fixes, or changes made here should be mirrored to the Angular version.
+> **IMPORTANT: This is a SECONDARY implementation.** The Angular version (`./AngularBootstrap/`) is the PRIMARY implementation deployed to production at https://partpick.netlify.app. This React app serves as an alternative implementation and should be kept feature-identical to the Angular version.
 
 A warehouse tool picking application built with React, TypeScript, and Supabase.
 
@@ -9,18 +9,17 @@ A warehouse tool picking application built with React, TypeScript, and Supabase.
 ### Production URLs
 | Service | URL |
 |---------|-----|
-| **Live App** | https://partpick.netlify.app |
+| **Live App (Angular)** | https://partpick.netlify.app |
 | **GitHub Repo** | https://github.com/Jbcox1988/PartPicker.git |
 
 ### Netlify (Frontend Hosting)
+- **NOTE**: The Angular app (`./AngularBootstrap/`) is currently deployed to Netlify, not this React app
 - **Project Name**: partpick
-- **Production URL**: https://partpick.netlify.app
+- **Production URL**: https://partpick.netlify.app (deploys Angular app)
 - **Admin Dashboard**: https://app.netlify.com/projects/partpick
 - **Site ID**: `870749d5-40dd-4bfa-8fb6-6d792f53423e`
 - **Account**: josh.cox@corvaer.com
 - **Team**: josh-cox-1hujq7m's team
-- **Build Command**: `npm run build`
-- **Publish Directory**: `dist`
 
 ### Supabase (Backend/Database)
 - **Project URL**: https://uewypezgyyyfanltoyfv.supabase.co

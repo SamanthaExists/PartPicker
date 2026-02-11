@@ -159,11 +159,10 @@ export class AppComponent implements OnInit {
     { path: '/', label: 'Dashboard', icon: 'bi-speedometer2' },
     { path: '/orders', label: 'Orders', icon: 'bi-clipboard-data' },
     { path: '/parts', label: 'Part Picker', icon: 'bi-box-seam' },
-    { path: '/parts-catalog', label: 'Catalog', icon: 'bi-journal-text' },
+    { path: '/catalog', label: 'Parts & Templates', icon: 'bi-collection' },
     { path: '/items-to-order', label: 'Items to Order', icon: 'bi-cart' },
     { path: '/issues', label: 'Issues', icon: 'bi-exclamation-triangle' },
     { path: '/activity', label: 'Activity History', icon: 'bi-clock-history' },
-    { path: '/templates', label: 'Templates', icon: 'bi-file-earmark-text' },
     { path: '/import', label: 'Import', icon: 'bi-upload' },
     { path: '/settings', label: 'Settings', icon: 'bi-gear' },
   ];

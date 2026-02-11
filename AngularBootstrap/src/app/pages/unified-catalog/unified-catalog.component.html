@@ -1,0 +1,215 @@
+<div class="container-fluid py-3">
+  <!-- Header -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
+    <div>
+      <h1 class="h3 mb-1">Parts & Templates</h1>
+      <p class="text-muted small mb-0">Unified catalog for BOM templates and parts</p>
+    </div>
+    <div class="dropdown">
+      <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+        <i class="bi bi-plus-lg me-1"></i> New
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li>
+          <button class="dropdown-item" (click)="showNewTemplateDialog()">
+            <i class="bi bi-file-earmark-text me-2"></i> Template
+          </button>
+        </li>
+        <li>
+          <button class="dropdown-item" (click)="showNewAssemblyDialog()">
+            <i class="bi bi-box-seam me-2"></i> Assembly Part
+          </button>
+        </li>
+        <li>
+          <button class="dropdown-item" (click)="showNewPartDialog()">
+            <i class="bi bi-circle me-2"></i> Part
+          </button>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- View Tabs -->
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <a class="nav-link" [class.active]="activeTab === 'all'" role="button" (click)="selectTab('all')">
+        All Items
+        <span class="badge ms-1" [class.bg-primary]="activeTab === 'all'" [class.bg-secondary]="activeTab !== 'all'">
+          {{ stats.total }}
+        </span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" [class.active]="activeTab === 'templates'" role="button" (click)="selectTab('templates')">
+        Templates
+        <span class="badge ms-1" [class.bg-primary]="activeTab === 'templates'" [class.bg-secondary]="activeTab !== 'templates'">
+          {{ stats.templates }}
+        </span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" [class.active]="activeTab === 'assemblies'" role="button" (click)="selectTab('assemblies')">
+        Assemblies
+        <span class="badge ms-1" [class.bg-primary]="activeTab === 'assemblies'" [class.bg-secondary]="activeTab !== 'assemblies'">
+          {{ stats.assemblies }}
+        </span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" [class.active]="activeTab === 'parts'" role="button" (click)="selectTab('parts')">
+        Parts
+        <span class="badge ms-1" [class.bg-primary]="activeTab === 'parts'" [class.bg-secondary]="activeTab !== 'parts'">
+          {{ stats.parts }}
+        </span>
+      </a>
+    </li>
+  </ul>
+
+  <!-- Filters -->
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <!-- Search -->
+        <div class="col-md-8">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input
+              type="search"
+              class="form-control"
+              placeholder="Search by name, description, or tool model..."
+              [(ngModel)]="searchQuery"
+              (ngModelChange)="applyFilters()"
+            />
+            <button *ngIf="searchQuery" class="btn btn-outline-secondary" (click)="searchQuery = ''; applyFilters()">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sort -->
+        <div class="col-md-4">
+          <select class="form-select" [(ngModel)]="sortBy" (ngModelChange)="applyFilters()">
+            <option value="name">Sort by Name</option>
+            <option value="type">Sort by Type</option>
+            <option value="recent">Sort by Recent</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mt-2">
+        <small class="text-muted">
+          {{ filteredItems.length }} item(s)
+        </small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="text-muted mt-3">Loading items...</p>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && filteredItems.length === 0" class="card">
+    <div class="card-body text-center py-5">
+      <i class="bi bi-collection display-4 text-muted opacity-50 d-block mb-3"></i>
+      <p class="text-muted mb-3">
+        {{ searchQuery ? 'No items match your search' : 'No items yet. Create one to get started.' }}
+      </p>
+      <div *ngIf="!searchQuery" class="d-flex gap-2 justify-content-center">
+        <button class="btn btn-outline-primary" (click)="showNewTemplateDialog()">
+          <i class="bi bi-file-earmark-text me-1"></i> New Template
+        </button>
+        <button class="btn btn-outline-primary" (click)="showNewAssemblyDialog()">
+          <i class="bi bi-box-seam me-1"></i> New Assembly
+        </button>
+        <button class="btn btn-outline-primary" (click)="showNewPartDialog()">
+          <i class="bi bi-circle me-1"></i> New Part
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Items List -->
+  <div *ngIf="!loading && filteredItems.length > 0" class="row g-3">
+    <div *ngFor="let item of filteredItems" class="col-12">
+      <div class="card hover-shadow" style="cursor: pointer;" (click)="openItem(item)">
+        <div class="card-body py-3">
+          <div class="row g-3 align-items-center">
+            <!-- Icon -->
+            <div class="col-auto d-none d-md-block">
+              <div class="icon-circle icon-circle-lg"
+                   [ngClass]="{
+                     'icon-circle-blue': item.type === 'template',
+                     'icon-circle-purple': item.badges.length > 0 && item.badges[0].text === 'Assembly',
+                     'icon-circle-green': item.badges.length > 0 && item.badges[0].text === 'Purchased',
+                     'icon-circle-amber': item.badges.length > 0 && item.badges[0].text === 'Manufactured',
+                     'icon-circle-cyan': item.badges.length > 0 && item.badges[0].text === 'Modified'
+                   }">
+                <i class="bi {{ item.icon }}"></i>
+              </div>
+            </div>
+
+            <!-- Display Name & Type Badge -->
+            <div class="col-12 col-md-3">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi {{ item.icon }} d-md-none"></i>
+                <div class="font-monospace fw-semibold">{{ item.displayName }}</div>
+              </div>
+              <div class="d-flex flex-wrap gap-1">
+                <span *ngFor="let badge of item.badges.slice(0, 2)"
+                      class="badge {{ badge.color }}">
+                  <i *ngIf="badge.icon" class="bi {{ badge.icon }} me-1"></i>{{ badge.text }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Subtitle/Description -->
+            <div class="col-12 col-md-4">
+              <div class="small text-muted text-truncate">
+                {{ item.subtitle }}
+              </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="col-6 col-md-2">
+              <div class="small text-muted" style="font-size: 0.75rem;">Stats</div>
+              <div class="small">
+                <span *ngIf="item.stats.itemCount !== undefined" class="fw-medium">
+                  {{ item.stats.itemCount }} items
+                </span>
+                <span *ngIf="item.stats.childCount !== undefined && item.stats.childCount > 0" class="fw-medium">
+                  {{ item.stats.childCount }} parts
+                </span>
+                <span *ngIf="item.stats.usedInCount !== undefined && item.stats.usedInCount > 0" class="text-muted">
+                  • {{ item.stats.usedInCount }} assy
+                </span>
+                <span *ngIf="item.stats.itemCount === 0 && item.stats.childCount === 0 && item.stats.usedInCount === 0" class="text-muted fst-italic">
+                  —
+                </span>
+              </div>
+            </div>
+
+            <!-- Additional Badges -->
+            <div class="col-6 col-md-2">
+              <div class="d-flex flex-wrap gap-1 justify-content-md-end">
+                <span *ngFor="let badge of item.badges.slice(2)"
+                      class="badge {{ badge.color }} small">
+                  <i *ngIf="badge.icon" class="bi {{ badge.icon }} me-1"></i>{{ badge.text }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Arrow Icon -->
+            <div class="col-auto d-none d-md-block ms-auto">
+              <i class="bi bi-chevron-right text-muted"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

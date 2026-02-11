@@ -110,7 +110,12 @@ type PartSortOption = 'part-number' | 'description' | 'classification' | 'locati
               <div class="row g-3 align-items-center">
                 <!-- Part Number & Classification -->
                 <div class="col-12 col-sm-3 col-lg-2">
-                  <div class="font-monospace fw-semibold">{{ part.part_number }}</div>
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="font-monospace fw-semibold">{{ part.part_number }}</div>
+                    <button class="btn btn-sm btn-link p-0 text-secondary" (click)="copyPartNumber(part.part_number, $event)" title="Copy part number">
+                      <i class="bi" [ngClass]="copiedPartNumber === part.part_number ? 'bi-check-lg text-success' : 'bi-clipboard'"></i>
+                    </button>
+                  </div>
                   <span *ngIf="part.classification_type" [class]="getClassificationBadgeClass(part.classification_type) + ' mt-1'">
                     {{ getClassificationLabel(part.classification_type) }}
                   </span>
@@ -212,6 +217,7 @@ export class PartsCatalogComponent implements OnInit, OnDestroy {
     components_count: number;
     created_relationships: number;
   }> | null = null;
+  copiedPartNumber: string | null = null;
 
   private subscription?: Subscription;
 
@@ -304,7 +310,8 @@ export class PartsCatalogComponent implements OnInit, OnDestroy {
   openPartDetail(partId: string): void {
     const modalRef = this.modalService.open(PartDetailComponent, {
       size: 'xl',
-      backdrop: 'static'
+      backdrop: 'static',
+      scrollable: true
     });
     modalRef.componentInstance.partId = partId;
   }
@@ -327,6 +334,21 @@ export class PartsCatalogComponent implements OnInit, OnDestroy {
       alert('Failed to auto-detect assemblies. Please try again.');
     } finally {
       this.autoDetecting = false;
+    }
+  }
+
+  async copyPartNumber(partNumber: string, event: Event): Promise<void> {
+    event.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(partNumber);
+      this.copiedPartNumber = partNumber;
+      setTimeout(() => {
+        if (this.copiedPartNumber === partNumber) {
+          this.copiedPartNumber = null;
+        }
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
     }
   }
 }

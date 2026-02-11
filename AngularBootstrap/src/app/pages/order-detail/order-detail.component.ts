@@ -419,14 +419,19 @@ interface PickHistoryItem {
                       </td>
                       <!-- Part Number -->
                       <td>
-                        <span class="font-monospace fw-medium text-primary" style="cursor: pointer;" (click)="openPartDetail(item.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ item.part_number }}</span>
-                        <span class="badge bg-danger ms-1" *ngIf="hasOpenIssue(item.id)">
-                          <i class="bi bi-exclamation-triangle-fill"></i> Issue
-                        </span>
-                        <span class="badge bg-primary-subtle text-primary border border-primary ms-1"
-                              *ngIf="item.tool_ids && item.tool_ids.length > 0 && item.tool_ids.length < tools.length">
-                          {{ item.tool_ids.length }} of {{ tools.length }} tools
-                        </span>
+                        <div class="d-flex align-items-center gap-2">
+                          <span class="font-monospace fw-medium text-primary" style="cursor: pointer;" (click)="openPartDetail(item.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ item.part_number }}</span>
+                          <button class="btn btn-sm btn-link p-0 text-secondary" (click)="copyPartNumber(item.part_number, $event)" title="Copy part number">
+                            <i class="bi" [ngClass]="copiedPartNumber === item.part_number ? 'bi-check-lg text-success' : 'bi-clipboard'"></i>
+                          </button>
+                          <span class="badge bg-danger ms-1" *ngIf="hasOpenIssue(item.id)">
+                            <i class="bi bi-exclamation-triangle-fill"></i> Issue
+                          </span>
+                          <span class="badge bg-primary-subtle text-primary border border-primary ms-1"
+                                *ngIf="item.tool_ids && item.tool_ids.length > 0 && item.tool_ids.length < tools.length">
+                            {{ item.tool_ids.length }} of {{ tools.length }} tools
+                          </span>
+                        </div>
                         <span class="small d-block" *ngIf="item.assembly_group && sortMode !== 'assembly'"
                               [ngClass]="{
                                 'text-success-emphasis': isItemComplete(item),
@@ -1065,6 +1070,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   undoPickTarget: LineItemWithPicks | null = null;
   overPickWarning: string | null = null;
   scrollToItemId: string | null = null;
+  copiedPartNumber: string | null = null;
 
   // Parts data
   partsMap = new Map<string, Part>();
@@ -2112,6 +2118,19 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
         scrollable: true
       });
       modalRef.componentInstance.partId = part.id;
+    }
+  }
+
+  async copyPartNumber(partNumber: string, event: Event): Promise<void> {
+    event.stopPropagation();
+    const success = await this.utils.copyToClipboard(partNumber);
+    if (success) {
+      this.copiedPartNumber = partNumber;
+      setTimeout(() => {
+        if (this.copiedPartNumber === partNumber) {
+          this.copiedPartNumber = null;
+        }
+      }, 2000);
     }
   }
 }

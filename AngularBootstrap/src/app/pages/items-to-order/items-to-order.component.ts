@@ -295,7 +295,12 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
             <tbody>
               <tr *ngFor="let item of filteredItems">
                 <td class="font-mono fw-medium">
-                  <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(item.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ item.part_number }}</span>
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(item.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ item.part_number }}</span>
+                    <button class="btn btn-sm btn-link p-0 text-secondary" (click)="copyPartNumber(item.part_number, $event)" title="Copy part number">
+                      <i class="bi" [ngClass]="copiedPartNumber === item.part_number ? 'bi-check-lg text-success' : 'bi-clipboard'"></i>
+                    </button>
+                  </div>
                 </td>
                 <td class="text-muted">{{ item.description || '-' }}</td>
                 <td>{{ item.location || '-' }}</td>
@@ -348,7 +353,12 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
             <tbody>
               <tr *ngFor="let item of filteredItems">
                 <td class="font-mono fw-medium">
-                  <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(item.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ item.part_number }}</span>
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(item.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ item.part_number }}</span>
+                    <button class="btn btn-sm btn-link p-0 text-secondary" (click)="copyPartNumber(item.part_number, $event)" title="Copy part number">
+                      <i class="bi" [ngClass]="copiedPartNumber === item.part_number ? 'bi-check-lg text-success' : 'bi-clipboard'"></i>
+                    </button>
+                  </div>
                 </td>
                 <td class="text-muted">{{ item.description || '-' }}</td>
                 <td>{{ item.location || '-' }}</td>
@@ -399,6 +409,7 @@ export class ItemsToOrderComponent implements OnInit, OnDestroy {
   selectedOrders = new Set<string>();
   selectedLocations = new Set<string>();
   selectedAssemblies = new Set<string>();
+  copiedPartNumber: string | null = null;
 
   private subscriptions: Subscription[] = [];
 
@@ -635,6 +646,19 @@ export class ItemsToOrderComponent implements OnInit, OnDestroy {
         scrollable: true
       });
       modalRef.componentInstance.partId = part.id;
+    }
+  }
+
+  async copyPartNumber(partNumber: string, event: Event): Promise<void> {
+    event.stopPropagation();
+    const success = await this.utils.copyToClipboard(partNumber);
+    if (success) {
+      this.copiedPartNumber = partNumber;
+      setTimeout(() => {
+        if (this.copiedPartNumber === partNumber) {
+          this.copiedPartNumber = null;
+        }
+      }, 2000);
     }
   }
 }

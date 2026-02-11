@@ -248,10 +248,15 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                   [class.table-warning]="part.total_picked > 0 && part.remaining > 0"
                   [class.table-danger]="getQtyAvailable(part) === 0 && part.remaining > 0">
                 <td class="font-mono fw-medium">
-                  <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(part.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ part.part_number }}</span>
-                  <span class="badge bg-danger ms-1" *ngIf="hasPartIssue(part.part_number)">
-                    <i class="bi bi-exclamation-triangle-fill"></i> Issue
-                  </span>
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(part.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ part.part_number }}</span>
+                    <button class="btn btn-sm btn-link p-0 text-secondary" (click)="copyPartNumber(part.part_number, $event)" title="Copy part number">
+                      <i class="bi" [ngClass]="copiedPartNumber === part.part_number ? 'bi-check-lg text-success' : 'bi-clipboard'"></i>
+                    </button>
+                    <span class="badge bg-danger ms-1" *ngIf="hasPartIssue(part.part_number)">
+                      <i class="bi bi-exclamation-triangle-fill"></i> Issue
+                    </span>
+                  </div>
                   <div *ngIf="getPartAssemblies(part).length > 0" class="d-flex flex-wrap gap-1 mt-1">
                     <span *ngFor="let asm of getPartAssemblies(part)" class="badge small"
                           [ngClass]="{
@@ -396,6 +401,7 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   hideIssues = false;
   sortMode: 'part_number' | 'location' | 'assembly' = 'part_number';
   selectedAssemblies = new Set<string>();
+  copiedPartNumber: string | null = null;
 
   // Multi-order pick dialog
   @ViewChild(MultiOrderPickDialogComponent) multiOrderPickDialog?: MultiOrderPickDialogComponent;
@@ -829,5 +835,18 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   closePrintTagDialog(): void {
     this.showPrintTagDialog = false;
     this.printTagData = null;
+  }
+
+  async copyPartNumber(partNumber: string, event: Event): Promise<void> {
+    event.stopPropagation();
+    const success = await this.utils.copyToClipboard(partNumber);
+    if (success) {
+      this.copiedPartNumber = partNumber;
+      setTimeout(() => {
+        if (this.copiedPartNumber === partNumber) {
+          this.copiedPartNumber = null;
+        }
+      }, 2000);
+    }
   }
 }

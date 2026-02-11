@@ -315,7 +315,6 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                     <button
                       class="btn btn-sm btn-outline-primary"
                       (click)="openMultiOrderPick(part)"
-                      [disabled]="part.remaining === 0"
                       title="Pick across orders"
                     >
                       <i class="bi bi-box-arrow-in-down"></i>

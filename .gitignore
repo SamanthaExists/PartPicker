@@ -30,3 +30,18 @@ Thumbs.db
 
 # Local Netlify folder
 .netlify
+
+# React app (DEPRECATED - removed from repository)
+# Only AngularBootstrap/ should be maintained
+/src
+/public
+/scripts
+/index.html
+/vite.config.ts
+/tailwind.config.js
+/postcss.config.js
+/tsconfig.json
+/tsconfig.node.json
+/package.json
+/package-lock.json
+/SETUP.md

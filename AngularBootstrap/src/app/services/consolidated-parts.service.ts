@@ -169,6 +169,14 @@ export class ConsolidatedPartsService implements OnDestroy {
             existing.total_needed += item.qty_per_unit;
             existing.total_picked += pickedQty;
             existing.remaining = existing.total_needed - existing.total_picked;
+            // Use the first non-null description found
+            if (!existing.description && item.description) {
+              existing.description = item.description;
+            }
+            // Use the first non-null location found
+            if (!existing.location && item.location) {
+              existing.location = item.location;
+            }
             existing.orders.push({
               order_id: item.order_id,
               so_number: orderInfo?.so_number || 'Unknown',
@@ -374,6 +382,14 @@ export class ItemsToOrderService implements OnDestroy {
           existing.total_needed += item.total_qty_needed;
           existing.total_picked += pickedQty;
           existing.remaining = existing.total_needed - existing.total_picked;
+          // Use the first non-null description found
+          if (!existing.description && item.description) {
+            existing.description = item.description;
+          }
+          // Use the first non-null location found
+          if (!existing.location && item.location) {
+            existing.location = item.location;
+          }
           // Use the first non-null qty_on_order found (should be same for same part)
           if (existing.qty_on_order === null && item.qty_on_order !== null) {
             existing.qty_on_order = item.qty_on_order;

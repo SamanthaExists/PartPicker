@@ -160,6 +160,18 @@ interface OrderAllocation {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
     }
+
+    /* Hide native number input spinners */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    input[type=number] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
   `]
 })
 export class MultiOrderPickDialogComponent implements OnChanges {
@@ -175,8 +187,19 @@ export class MultiOrderPickDialogComponent implements OnChanges {
   private pickResolve: (() => void) | null = null;
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['show'] && this.show && this.part) {
+    console.log('[MultiOrderPickDialog] ngOnChanges called:', {
+      changes,
+      show: this.show,
+      hasPart: !!this.part,
+      partData: this.part
+    });
+
+    // Initialize when modal is shown OR when part data changes
+    if ((changes['show'] && this.show && this.part) || (changes['part'] && this.show && this.part)) {
+      console.log('[MultiOrderPickDialog] Conditions met, calling initializeAllocations');
       this.initializeAllocations();
+    } else {
+      console.log('[MultiOrderPickDialog] Conditions NOT met for initialization');
     }
   }
 
@@ -186,17 +209,30 @@ export class MultiOrderPickDialogComponent implements OnChanges {
     // Start with remaining + already picked, so user can add/subtract from current state
     this.availableToPick = this.part.remaining + this.part.total_picked;
 
-    this.allocations = this.part.orders.map(order => ({
-      orderId: order.order_id,
-      soNumber: order.so_number,
-      toolId: order.tool_id,
-      toolNumber: order.tool_number,
-      lineItemId: order.line_item_id,
-      needed: order.needed,
-      picked: order.picked,
-      remaining: order.needed - order.picked,
-      allocatedQty: order.picked
-    }));
+    console.log('[MultiOrderPickDialog] Initializing allocations for part:', this.part.part_number);
+    console.log('[MultiOrderPickDialog] Part data:', {
+      total_needed: this.part.total_needed,
+      total_picked: this.part.total_picked,
+      remaining: this.part.remaining,
+      availableToPick: this.availableToPick,
+      orders: this.part.orders
+    });
+
+    this.allocations = this.part.orders.map(order => {
+      const allocation = {
+        orderId: order.order_id,
+        soNumber: order.so_number,
+        toolId: order.tool_id,
+        toolNumber: order.tool_number,
+        lineItemId: order.line_item_id,
+        needed: order.needed,
+        picked: order.picked,
+        remaining: order.needed - order.picked,
+        allocatedQty: order.picked ?? 0
+      };
+      console.log('[MultiOrderPickDialog] Created allocation:', allocation);
+      return allocation;
+    });
   }
 
   get totalAllocated(): number {

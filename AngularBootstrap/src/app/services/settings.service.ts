@@ -24,6 +24,7 @@ export class SettingsService {
     return {
       user_name: '',
       theme: 'system',
+      tagPrintingEnabled: true,
     };
   }
 

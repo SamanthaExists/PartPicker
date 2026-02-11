@@ -15,13 +15,15 @@ import { ConsolidatedPart, PartIssueType } from '../../models';
 import { MultiOrderPickDialogComponent } from '../../components/dialogs/multi-order-pick-dialog.component';
 import { ReportPartIssueDialogComponent } from '../../components/dialogs/report-part-issue-dialog.component';
 import { PartDetailComponent } from '../../components/parts/part-detail.component';
+import { PrintTagDialogComponent, TagData } from '../../components/picking/print-tag-dialog.component';
+import { OrdersService } from '../../services/orders.service';
 
 type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock' | 'has_issues';
 
 @Component({
   selector: 'app-consolidated-parts',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, MultiOrderPickDialogComponent, ReportPartIssueDialogComponent, PartDetailComponent],
+  imports: [CommonModule, RouterModule, FormsModule, MultiOrderPickDialogComponent, ReportPartIssueDialogComponent, PartDetailComponent, PrintTagDialogComponent],
   template: `
     <div>
       <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
@@ -354,6 +356,13 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
       (submitIssue)="handleSubmitIssue($event)"
       (resolveIssue)="handleResolveIssue($event)"
     ></app-report-part-issue-dialog>
+
+    <!-- Print Tag Dialog -->
+    <app-print-tag-dialog
+      [isOpen]="showPrintTagDialog"
+      [tagData]="printTagData"
+      (close)="closePrintTagDialog()"
+    ></app-print-tag-dialog>
   `,
   styles: [`
     .cursor-pointer {
@@ -405,6 +414,10 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   showReportIssue = false;
   selectedPartForIssue: ConsolidatedPart | null = null;
 
+  // Tag printing
+  showPrintTagDialog = false;
+  printTagData: TagData | TagData[] | null = null;
+
   private subscriptions: Subscription[] = [];
 
   constructor(
@@ -417,7 +430,8 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private catalogPartsService: PartsService,
-    private modalService: NgbModal
+    private modalService: NgbModal,
+    private ordersService: OrdersService
   ) {}
 
   ngOnInit(): void {
@@ -639,6 +653,49 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
       // Apply deltas directly - this fetches fresh data and applies changes
       await this.picksService.applyPickDeltas(deltas, userName);
 
+      // Trigger tag printing if enabled
+      if (picks.length > 0 && this.settingsService.isTagPrintingEnabled() && this.selectedPart) {
+        // Get unique tool information for all picks
+        const tagDataPromises = picks.map(async pick => {
+          // Find the order from the selected part's orders that contains this line item
+          const partOrder = this.selectedPart!.orders.find((o: any) => {
+            // The lineItemId belongs to this order
+            return true; // We'll get the full order data to check properly
+          });
+
+          if (!partOrder) return null;
+
+          // Fetch the full order with tools and line items
+          const { order, tools, lineItems } = await this.ordersService.getOrder(partOrder.order_id);
+          if (!order) return null;
+
+          const tool = tools.find((t: any) => t.id === pick.toolId);
+          if (!tool) return null;
+
+          // Find the line item to get assembly_group
+          const lineItem = lineItems.find((li: any) => li.id === pick.lineItemId);
+
+          return {
+            partNumber: this.selectedPart!.part_number,
+            description: this.selectedPart!.description,
+            location: this.selectedPart!.location,
+            soNumber: order.so_number,
+            toolNumber: tool.tool_number,
+            qtyPicked: pick.qty,
+            pickedBy: userName,
+            pickedAt: new Date(),
+            assembly: lineItem?.assembly_group || null,
+          } as TagData;
+        });
+
+        const tags = (await Promise.all(tagDataPromises)).filter((t): t is TagData => t !== null);
+
+        if (tags.length > 0) {
+          this.printTagData = tags;
+          this.showPrintTagDialog = true;
+        }
+      }
+
       // Wait for the parts list to refresh completely before proceeding
       await this.partsService.fetchParts();
 
@@ -774,5 +831,10 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
       });
       modalRef.componentInstance.partId = part.id;
     }
+  }
+
+  closePrintTagDialog(): void {
+    this.showPrintTagDialog = false;
+    this.printTagData = null;
   }
 }

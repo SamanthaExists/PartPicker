@@ -1696,6 +1696,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
         qtyPicked: remaining,
         pickedBy: userName,
         pickedAt: new Date(),
+        assembly: item.assembly_group,
       };
       this.showPrintTagDialog = true;
     }
@@ -2076,6 +2077,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
           qtyPicked: alloc.qty,
           pickedBy: userName,
           pickedAt: pickedAt,
+          assembly: this.distributeItem!.assembly_group,
         };
       });
       this.printTagData = tags;

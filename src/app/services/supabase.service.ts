@@ -28,6 +28,11 @@ export class SupabaseService {
   from(table: string) {
     return this.supabase.from(table);
   }
+
+  // Helper method for RPC (stored procedures/functions)
+  rpc(fn: string, params?: any) {
+    return this.supabase.rpc(fn, params);
+  }
 }
 
 // SQL schema for reference - run this in Supabase SQL editor

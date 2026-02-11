@@ -223,12 +223,13 @@ Updates `qty_available` on line items from external Excel inventory files:
 - `/` - Dashboard
 - `/orders` - Order list
 - `/orders/:id` - Order detail with picking
-- `/parts` - Consolidated parts view
-- `/items-to-order` - Parts needing to be ordered
+- `/parts` - Part Picker (cross-order aggregated parts view for picking)
+- `/parts-catalog` - Catalog (master parts list and reference data)
+- `/items-to-order` - Items needing to be ordered
 - `/issues` - Issue tracking
+- `/templates` - BOM templates
 - `/import` - Excel/CSV import wizard
 - `/activity` - Activity log
-- `/pick-history` - Pick history with date/time filtering
 - `/settings` - User settings
 
 ### Pick History Page (`/pick-history`)

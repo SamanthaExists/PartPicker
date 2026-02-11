@@ -3,10 +3,13 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ItemsToOrderService } from '../../services/consolidated-parts.service';
+import { PartsService } from '../../services/parts.service';
 import { UtilsService } from '../../services/utils.service';
 import { ExcelService } from '../../services/excel.service';
 import { ItemToOrder } from '../../models';
+import { PartDetailComponent } from '../../components/parts/part-detail.component';
 
 type SortMode = 'remaining' | 'part_number' | 'location';
 
@@ -15,7 +18,7 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
 @Component({
   selector: 'app-items-to-order',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, PartDetailComponent],
   template: `
     <div>
       <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
@@ -23,9 +26,14 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
           <h1 class="h3 fw-bold mb-1">Items to Order</h1>
           <p class="text-muted mb-0">Parts with insufficient stock to complete active orders</p>
         </div>
-        <button class="btn btn-outline-primary" (click)="handleExport()" [disabled]="filteredItems.length === 0">
-          <i class="bi bi-download me-2"></i>Export
-        </button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary" (click)="handleCopyPartNumbers()" [disabled]="filteredItems.length === 0">
+            <i class="bi bi-clipboard me-2"></i>Copy Part Numbers
+          </button>
+          <button class="btn btn-outline-primary" (click)="handleExport()" [disabled]="filteredItems.length === 0">
+            <i class="bi bi-download me-2"></i>Export
+          </button>
+        </div>
       </div>
 
       <!-- Tabs -->
@@ -286,7 +294,9 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
             </thead>
             <tbody>
               <tr *ngFor="let item of filteredItems">
-                <td class="font-mono fw-medium">{{ item.part_number }}</td>
+                <td class="font-mono fw-medium">
+                  <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(item.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ item.part_number }}</span>
+                </td>
                 <td class="text-muted">{{ item.description || '-' }}</td>
                 <td>{{ item.location || '-' }}</td>
                 <td class="text-center">
@@ -337,7 +347,9 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
             </thead>
             <tbody>
               <tr *ngFor="let item of filteredItems">
-                <td class="font-mono fw-medium">{{ item.part_number }}</td>
+                <td class="font-mono fw-medium">
+                  <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(item.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ item.part_number }}</span>
+                </td>
                 <td class="text-muted">{{ item.description || '-' }}</td>
                 <td>{{ item.location || '-' }}</td>
                 <td class="text-center">
@@ -393,7 +405,9 @@ export class ItemsToOrderComponent implements OnInit, OnDestroy {
   constructor(
     private itemsToOrderService: ItemsToOrderService,
     private excelService: ExcelService,
-    public utils: UtilsService
+    public utils: UtilsService,
+    private partsService: PartsService,
+    private modalService: NgbModal
   ) {
     const savedSort = localStorage.getItem(ITEMS_TO_ORDER_SORT_KEY);
     if (savedSort === 'remaining' || savedSort === 'part_number' || savedSort === 'location') {
@@ -601,5 +615,26 @@ export class ItemsToOrderComponent implements OnInit, OnDestroy {
 
   async handleExport(): Promise<void> {
     await this.excelService.exportItemsToOrderToExcel(this.filteredItems);
+  }
+
+  async handleCopyPartNumbers(): Promise<void> {
+    const partNumbers = this.filteredItems.map(item => item.part_number).join('\n');
+    try {
+      await navigator.clipboard.writeText(partNumbers);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  }
+
+  async openPartDetail(partNumber: string, event?: Event): Promise<void> {
+    event?.stopPropagation();
+    const part = await this.partsService.getPartByPartNumber(partNumber);
+    if (part) {
+      const modalRef = this.modalService.open(PartDetailComponent, {
+        size: 'lg',
+        scrollable: true
+      });
+      modalRef.componentInstance.partId = part.id;
+    }
   }
 }

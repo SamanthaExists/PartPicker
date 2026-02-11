@@ -493,7 +493,7 @@ body {
 }
 
 [data-bs-theme="dark"] .pick-complete {
-  background-color: rgba(25, 135, 84, 0.15) !important;
+  background-color: rgba(25, 135, 84, 0.25) !important;
 }
 
 [data-bs-theme="dark"] .pick-partial {
@@ -520,4 +520,201 @@ body {
 
 [data-bs-theme="dark"] .swipe-item.swiping-left {
   background: linear-gradient(to left, rgba(220, 53, 69, 0.2), transparent 50%);
+}
+
+/* Table row colors in dark mode - maximum specificity */
+html[data-bs-theme="dark"] body .table tr.table-success,
+html[data-bs-theme="dark"] body .table tr.table-success td,
+html[data-bs-theme="dark"] body .table tr.table-success th,
+html[data-bs-theme="dark"] body tr.table-success,
+html[data-bs-theme="dark"] body tr.table-success td,
+html[data-bs-theme="dark"] body tr.table-success th {
+  --bs-table-bg: rgba(25, 135, 84, 0.35) !important;
+  background-color: rgba(25, 135, 84, 0.35) !important;
+  border-color: rgba(25, 135, 84, 0.4) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-warning,
+html[data-bs-theme="dark"] body .table tr.table-warning td,
+html[data-bs-theme="dark"] body .table tr.table-warning th,
+html[data-bs-theme="dark"] body tr.table-warning,
+html[data-bs-theme="dark"] body tr.table-warning td,
+html[data-bs-theme="dark"] body tr.table-warning th {
+  --bs-table-bg: rgba(255, 193, 7, 0.25) !important;
+  background-color: rgba(255, 193, 7, 0.25) !important;
+  border-color: rgba(255, 193, 7, 0.3) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-danger,
+html[data-bs-theme="dark"] body .table tr.table-danger td,
+html[data-bs-theme="dark"] body .table tr.table-danger th,
+html[data-bs-theme="dark"] body tr.table-danger,
+html[data-bs-theme="dark"] body tr.table-danger td,
+html[data-bs-theme="dark"] body tr.table-danger th {
+  --bs-table-bg: rgba(220, 53, 69, 0.25) !important;
+  background-color: rgba(220, 53, 69, 0.25) !important;
+  border-color: rgba(220, 53, 69, 0.3) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-info,
+html[data-bs-theme="dark"] body .table tr.table-info td,
+html[data-bs-theme="dark"] body .table tr.table-info th,
+html[data-bs-theme="dark"] body tr.table-info,
+html[data-bs-theme="dark"] body tr.table-info td,
+html[data-bs-theme="dark"] body tr.table-info th {
+  --bs-table-bg: rgba(13, 202, 240, 0.2) !important;
+  background-color: rgba(13, 202, 240, 0.2) !important;
+  border-color: rgba(13, 202, 240, 0.25) !important;
+}
+
+html[data-bs-theme="dark"] body .table thead tr.table-secondary,
+html[data-bs-theme="dark"] body .table thead tr.table-secondary td,
+html[data-bs-theme="dark"] body .table thead tr.table-secondary th,
+html[data-bs-theme="dark"] body .table tbody tr.table-secondary,
+html[data-bs-theme="dark"] body .table tbody tr.table-secondary td,
+html[data-bs-theme="dark"] body .table tbody tr.table-secondary th,
+html[data-bs-theme="dark"] body thead tr.table-secondary,
+html[data-bs-theme="dark"] body thead tr.table-secondary td,
+html[data-bs-theme="dark"] body thead tr.table-secondary th,
+html[data-bs-theme="dark"] body tbody tr.table-secondary,
+html[data-bs-theme="dark"] body tbody tr.table-secondary td,
+html[data-bs-theme="dark"] body tbody tr.table-secondary th {
+  --bs-table-bg: rgba(108, 117, 125, 0.3) !important;
+  background-color: rgba(108, 117, 125, 0.3) !important;
+  border-color: rgba(108, 117, 125, 0.35) !important;
+  color: rgba(255, 255, 255, 0.87) !important;
+}
+
+/* Improve button contrast in colored table rows in dark mode with colors */
+html[data-bs-theme="dark"] body .table tr.table-success .btn-outline-secondary,
+html[data-bs-theme="dark"] body tr.table-success .btn-outline-secondary {
+  border-color: rgba(173, 216, 230, 0.7) !important;
+  color: rgba(173, 216, 230, 1) !important;
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-success .btn-outline-secondary:hover,
+html[data-bs-theme="dark"] body tr.table-success .btn-outline-secondary:hover {
+  border-color: rgba(173, 216, 230, 1) !important;
+  color: rgba(255, 255, 255, 1) !important;
+  background-color: rgba(173, 216, 230, 0.3) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-success .btn-outline-primary,
+html[data-bs-theme="dark"] body .table tr.table-success .btn-primary,
+html[data-bs-theme="dark"] body tr.table-success .btn-outline-primary,
+html[data-bs-theme="dark"] body tr.table-success .btn-primary {
+  border-color: rgba(100, 200, 255, 0.8) !important;
+  color: rgba(100, 200, 255, 1) !important;
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-success .btn-outline-primary:hover,
+html[data-bs-theme="dark"] body .table tr.table-success .btn-primary:hover,
+html[data-bs-theme="dark"] body tr.table-success .btn-outline-primary:hover,
+html[data-bs-theme="dark"] body tr.table-success .btn-primary:hover {
+  border-color: rgba(100, 200, 255, 1) !important;
+  color: rgba(255, 255, 255, 1) !important;
+  background-color: rgba(100, 200, 255, 0.3) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-success .btn-outline-danger,
+html[data-bs-theme="dark"] body tr.table-success .btn-outline-danger {
+  border-color: rgba(255, 120, 140, 0.8) !important;
+  color: rgba(255, 120, 140, 1) !important;
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-success .btn-outline-danger:hover,
+html[data-bs-theme="dark"] body tr.table-success .btn-outline-danger:hover {
+  border-color: rgba(255, 120, 140, 1) !important;
+  color: rgba(255, 255, 255, 1) !important;
+  background-color: rgba(255, 120, 140, 0.3) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-success .btn-outline-warning,
+html[data-bs-theme="dark"] body tr.table-success .btn-outline-warning {
+  border-color: rgba(255, 220, 100, 0.8) !important;
+  color: rgba(255, 220, 100, 1) !important;
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-success .btn-outline-warning:hover,
+html[data-bs-theme="dark"] body tr.table-success .btn-outline-warning:hover {
+  border-color: rgba(255, 220, 100, 1) !important;
+  color: rgba(50, 50, 50, 1) !important;
+  background-color: rgba(255, 220, 100, 0.4) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-success .btn-outline-success,
+html[data-bs-theme="dark"] body tr.table-success .btn-outline-success {
+  border-color: rgba(200, 120, 255, 0.8) !important;
+  color: rgba(200, 120, 255, 1) !important;
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-success .btn-outline-success:hover,
+html[data-bs-theme="dark"] body tr.table-success .btn-outline-success:hover {
+  border-color: rgba(200, 120, 255, 1) !important;
+  color: rgba(255, 255, 255, 1) !important;
+  background-color: rgba(200, 120, 255, 0.3) !important;
+}
+
+/* Improve link/text contrast on colored table rows in dark mode */
+html[data-bs-theme="dark"] body .table tr.table-success a,
+html[data-bs-theme="dark"] body .table tr.table-success .text-primary,
+html[data-bs-theme="dark"] body tr.table-success a,
+html[data-bs-theme="dark"] body tr.table-success .text-primary {
+  color: rgba(255, 255, 255, 0.95) !important;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.4);
+  text-underline-offset: 2px;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-success a:hover,
+html[data-bs-theme="dark"] body .table tr.table-success .text-primary:hover,
+html[data-bs-theme="dark"] body tr.table-success a:hover,
+html[data-bs-theme="dark"] body tr.table-success .text-primary:hover {
+  color: rgba(255, 255, 255, 1) !important;
+  text-decoration-color: rgba(255, 255, 255, 0.7);
+}
+
+html[data-bs-theme="dark"] body .table tr.table-warning a,
+html[data-bs-theme="dark"] body .table tr.table-warning .text-primary,
+html[data-bs-theme="dark"] body tr.table-warning a,
+html[data-bs-theme="dark"] body tr.table-warning .text-primary {
+  color: rgba(255, 255, 255, 0.95) !important;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.4);
+  text-underline-offset: 2px;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-warning a:hover,
+html[data-bs-theme="dark"] body .table tr.table-warning .text-primary:hover,
+html[data-bs-theme="dark"] body tr.table-warning a:hover,
+html[data-bs-theme="dark"] body tr.table-warning .text-primary:hover {
+  color: rgba(255, 255, 255, 1) !important;
+  text-decoration-color: rgba(255, 255, 255, 0.7);
+}
+
+html[data-bs-theme="dark"] body .table tr.table-warning .btn-outline-secondary,
+html[data-bs-theme="dark"] body .table tr.table-warning .btn-outline-primary,
+html[data-bs-theme="dark"] body .table tr.table-warning .btn-outline-danger,
+html[data-bs-theme="dark"] body tr.table-warning .btn-outline-secondary,
+html[data-bs-theme="dark"] body tr.table-warning .btn-outline-primary,
+html[data-bs-theme="dark"] body tr.table-warning .btn-outline-danger {
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+html[data-bs-theme="dark"] body .table tr.table-warning .btn-outline-secondary:hover,
+html[data-bs-theme="dark"] body .table tr.table-warning .btn-outline-primary:hover,
+html[data-bs-theme="dark"] body .table tr.table-warning .btn-outline-danger:hover,
+html[data-bs-theme="dark"] body tr.table-warning .btn-outline-secondary:hover,
+html[data-bs-theme="dark"] body tr.table-warning .btn-outline-primary:hover,
+html[data-bs-theme="dark"] body tr.table-warning .btn-outline-danger:hover {
+  border-color: rgba(255, 255, 255, 0.7) !important;
+  color: rgba(255, 255, 255, 1) !important;
+  background-color: rgba(0, 0, 0, 0.4) !important;
 }

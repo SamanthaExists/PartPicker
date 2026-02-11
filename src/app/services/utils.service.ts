@@ -140,6 +140,10 @@ export class UtilsService {
         return 'Wrong Part';
       case 'damaged':
         return 'Damaged';
+      case 'inventory_discrepancy':
+        return 'Inventory Discrepancy';
+      case 'wrong_location':
+        return 'Wrong Location';
       case 'other':
         return 'Other';
       default:
@@ -155,6 +159,10 @@ export class UtilsService {
         return 'badge bg-warning text-dark';
       case 'damaged':
         return 'badge bg-danger';
+      case 'inventory_discrepancy':
+        return 'badge bg-warning text-dark';
+      case 'wrong_location':
+        return 'badge bg-info text-dark';
       case 'other':
         return 'badge bg-secondary';
       default:

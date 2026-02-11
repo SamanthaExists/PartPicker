@@ -10,6 +10,8 @@ import { BomTemplatesService } from '../../services/bom-templates.service';
 import { BomParserService, ParsedBOM, ToolMapping, MergedBOMResult } from '../../services/bom-parser.service';
 import { ActivityLogService } from '../../services/activity-log.service';
 import { SettingsService } from '../../services/settings.service';
+import { PartsService } from '../../services/parts.service';
+import { PartRelationshipsService } from '../../services/part-relationships.service';
 import { ImportedOrder, ImportedLineItem, PartConflict, BOMTemplateWithItems } from '../../models';
 import { TemplateSelectDialogComponent } from '../../components/dialogs/template-select-dialog.component';
 import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicate-parts-dialog.component';
@@ -23,6 +25,25 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
       <div class="mb-4">
         <h1 class="h3 fw-bold mb-1">Import Order</h1>
         <p class="text-muted mb-0">Upload an Excel or CSV file to import a sales order</p>
+      </div>
+
+      <!-- Unclassified Parts Alert -->
+      <div class="alert alert-warning alert-dismissible fade show d-flex align-items-center justify-content-between"
+           *ngIf="showUnclassifiedAlert && unclassifiedPartsCount > 0">
+        <div class="d-flex align-items-start">
+          <i class="bi bi-tag me-2"></i>
+          <div>
+            <strong>Unclassified Parts Found</strong>
+            <div>{{ unclassifiedPartsCount }} part{{ unclassifiedPartsCount !== 1 ? 's' : '' }}
+                 {{ unclassifiedPartsCount !== 1 ? 'were' : 'was' }} imported without classification.</div>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-outline-warning" (click)="navigateToClassifyParts()">
+            Classify Now
+          </button>
+          <button type="button" class="btn-close" (click)="showUnclassifiedAlert = false"></button>
+        </div>
       </div>
 
       <!-- Tabs -->
@@ -230,12 +251,16 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
             <button class="btn btn-outline-secondary" (click)="downloadTemplate('single')">
               <i class="bi bi-download me-1"></i> Single Tool Type
             </button>
+            <button class="btn btn-outline-secondary" (click)="downloadTemplate('single-bom')">
+              <i class="bi bi-download me-1"></i> Single Tool Type (BOM)
+            </button>
             <button class="btn btn-outline-secondary" (click)="downloadTemplate('multi')">
               <i class="bi bi-download me-1"></i> Multiple Tool Types
             </button>
           </div>
           <p class="small text-muted mt-3 mb-0">
             <strong>Single Tool Type:</strong> All tools share the same parts list.<br>
+            <strong>Single Tool Type (BOM):</strong> Multi-level BOM with hierarchy (Level column).<br>
             <strong>Multiple Tool Types:</strong> Different tools have different BOMs.
           </p>
         </div>
@@ -469,7 +494,7 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
                   <tbody>
                     <tr *ngFor="let mergedItem of bomParseResult.merged.lineItems.slice(0, 100); let i = index">
                       <td class="font-mono">{{ mergedItem.partNumber }}</td>
-                      <td class="text-muted">{{ bomParseResult.order.line_items[i]?.description || mergedItem.description || '-' }}</td>
+                      <td class="text-muted">{{ bomParseResult.order.line_items[i].description || mergedItem.description || '-' }}</td>
                       <td class="font-mono small text-muted">{{ mergedItem.assemblyGroup || '-' }}</td>
                       <td class="text-center">
                         <span *ngIf="mergedItem.isShared" class="badge bg-success-subtle text-success border border-success">Shared</span>
@@ -478,7 +503,7 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
                         </span>
                       </td>
                       <td class="text-center">{{ mergedItem.qtyPerUnit }}</td>
-                      <td class="text-center">{{ bomParseResult.order.line_items[i]?.total_qty_needed || '-' }}</td>
+                      <td class="text-center">{{ bomParseResult.order.line_items[i].total_qty_needed || '-' }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -583,6 +608,10 @@ export class ImportComponent implements OnInit, OnDestroy {
   useLegacyFormat = false;
   toolCount = 1;
 
+  // Unclassified notification
+  unclassifiedPartsCount = 0;
+  showUnclassifiedAlert = false;
+
   // File reference for re-parsing
   private currentFile: File | null = null;
 
@@ -615,7 +644,9 @@ export class ImportComponent implements OnInit, OnDestroy {
     private bomTemplatesService: BomTemplatesService,
     private bomParserService: BomParserService,
     private activityLogService: ActivityLogService,
-    private settingsService: SettingsService
+    private settingsService: SettingsService,
+    private partsService: PartsService,
+    private partRelationshipsService: PartRelationshipsService
   ) {}
 
   ngOnInit(): void {
@@ -625,6 +656,10 @@ export class ImportComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.subscriptions.forEach(sub => sub.unsubscribe());
+  }
+
+  navigateToClassifyParts(): void {
+    this.router.navigate(['/parts'], { queryParams: { filter: 'unclassified' } });
   }
 
   onDragOver(event: DragEvent): void {
@@ -767,39 +802,123 @@ export class ImportComponent implements OnInit, OnDestroy {
 
     this.isImporting = true;
 
-    // Save new parts to catalog if enabled
-    if (this.saveToCatalog) {
-      await this.partsCatalogService.savePartsFromImport(
-        this.parseResult.order.line_items,
-        true // Skip existing parts
+    try {
+      // Process parts with classification and assembly relationships
+      let unclassifiedCount = 0;
+      if (this.saveToCatalog) {
+        const processResult = await this.processPartsAndRelationships(this.parseResult.order.line_items);
+        unclassifiedCount = processResult.unclassifiedCount;
+      }
+
+      // Import the order
+      const result = await this.ordersService.importOrder(this.parseResult.order);
+
+      if (result) {
+        const toolNumbers = this.parseResult.order.tools.map(t => t.tool_number);
+        await this.activityLogService.logActivity({
+          type: 'order_imported',
+          order_id: result.id,
+          so_number: this.parseResult.order.so_number,
+          description: `Order SO-${this.parseResult.order.so_number} imported with ${this.parseResult.order.line_items.length} parts and ${this.parseResult.order.tools.length} tools`,
+          performed_by: this.settingsService.getUserName(),
+          details: {
+            part_count: this.parseResult.order.line_items.length,
+            tool_count: this.parseResult.order.tools.length,
+            tool_numbers: toolNumbers,
+          },
+        });
+
+        // Auto-extract template
+        const toolModel = this.parseResult.order.tools[0]?.tool_model || null;
+        await this.bomTemplatesService.autoExtractTemplate(this.parseResult.order.line_items, toolModel, this.parseResult.order.so_number);
+
+        // Show unclassified parts notification if needed
+        if (unclassifiedCount > 0) {
+          this.unclassifiedPartsCount = unclassifiedCount;
+          this.showUnclassifiedAlert = true;
+          // Auto-dismiss after 2 seconds
+          setTimeout(() => {
+            this.showUnclassifiedAlert = false;
+          }, 2000);
+        }
+
+        this.router.navigate(['/orders', result.id]);
+      }
+    } catch (error) {
+      console.error('Import failed:', error);
+    } finally {
+      this.isImporting = false;
+    }
+  }
+
+  /**
+   * Process imported line items to create/update parts with classifications
+   * and set up assembly relationships based on assembly_group
+   */
+  private async processPartsAndRelationships(lineItems: ImportedLineItem[]): Promise<{ unclassifiedCount: number; warnings: string[] }> {
+    const warnings: string[] = [];
+    let unclassifiedCount = 0;
+
+    // Step 1: Create/update all parts with classifications
+    const partMap = new Map<string, string>(); // part_number -> part_id
+
+    for (const item of lineItems) {
+      const part = await this.partsService.findOrCreatePart(
+        item.part_number,
+        item.description,
+        item.location,
+        item.classification_type || null
       );
+      partMap.set(item.part_number, part.id);
+
+      if (!part.classification_type) {
+        unclassifiedCount++;
+      }
     }
 
-    // Import the order
-    const result = await this.ordersService.importOrder(this.parseResult.order);
-    this.isImporting = false;
+    // Step 2: Group by assembly_group and create relationships
+    const assemblyGroups = new Map<string, ImportedLineItem[]>();
 
-    if (result) {
-      const toolNumbers = this.parseResult.order.tools.map(t => t.tool_number);
-      await this.activityLogService.logActivity({
-        type: 'order_imported',
-        order_id: result.id,
-        so_number: this.parseResult.order.so_number,
-        description: `Order SO-${this.parseResult.order.so_number} imported with ${this.parseResult.order.line_items.length} parts and ${this.parseResult.order.tools.length} tools`,
-        performed_by: this.settingsService.getUserName(),
-        details: {
-          part_count: this.parseResult.order.line_items.length,
-          tool_count: this.parseResult.order.tools.length,
-          tool_numbers: toolNumbers,
-        },
-      });
-
-      // Auto-extract template
-      const toolModel = this.parseResult.order.tools[0]?.tool_model || null;
-      await this.bomTemplatesService.autoExtractTemplate(this.parseResult.order.line_items, toolModel, this.parseResult.order.so_number);
-
-      this.router.navigate(['/orders', result.id]);
+    for (const item of lineItems) {
+      if (item.assembly_group) {
+        const group = assemblyGroups.get(item.assembly_group) || [];
+        group.push(item);
+        assemblyGroups.set(item.assembly_group, group);
+      }
     }
+
+    // Step 3: For each assembly group, create parent assembly and relationships
+    for (const [assemblyName, members] of assemblyGroups) {
+      try {
+        // Create/update the assembly part itself
+        const assemblyPart = await this.partsService.findOrCreatePart(
+          assemblyName,
+          `Assembly: ${assemblyName}`,
+          null,
+          'assembly'
+        );
+
+        // Create relationships for all component parts
+        const relationships = members
+          .filter(m => m.part_number !== assemblyName) // Don't link assembly to itself
+          .map(m => ({
+            childId: partMap.get(m.part_number)!,
+            quantity: m.qty_per_unit,
+          }))
+          .filter(r => r.childId); // Only include parts that were successfully created
+
+        if (relationships.length > 0) {
+          await this.partRelationshipsService.bulkCreateRelationships(assemblyPart.id, relationships, {
+            skipCircularCheck: true, // Skip for performance during bulk import
+          });
+        }
+      } catch (error) {
+        console.error(`Failed to create assembly relationships for ${assemblyName}:`, error);
+        warnings.push(`Could not link assembly "${assemblyName}"`);
+      }
+    }
+
+    return { unclassifiedCount, warnings };
   }
 
   clearResult(): void {
@@ -810,7 +929,7 @@ export class ImportComponent implements OnInit, OnDestroy {
     this.currentFile = null;
   }
 
-  async downloadTemplate(type: 'single' | 'multi'): Promise<void> {
+  async downloadTemplate(type: 'single' | 'multi' | 'single-bom'): Promise<void> {
     await this.excelService.downloadImportTemplate(type);
   }
 
@@ -933,37 +1052,51 @@ export class ImportComponent implements OnInit, OnDestroy {
 
     this.isImporting = true;
 
-    // Save new parts to catalog if enabled
-    if (this.saveToCatalog) {
-      await this.partsCatalogService.savePartsFromImport(
-        this.bomParseResult.order.line_items,
-        true
-      );
-    }
+    try {
+      // Process parts with classification and assembly relationships
+      let unclassifiedCount = 0;
+      if (this.saveToCatalog) {
+        const processResult = await this.processPartsAndRelationships(this.bomParseResult.order.line_items);
+        unclassifiedCount = processResult.unclassifiedCount;
+      }
 
-    const result = await this.ordersService.importOrder(this.bomParseResult.order);
-    this.isImporting = false;
+      const result = await this.ordersService.importOrder(this.bomParseResult.order);
 
-    if (result) {
-      const toolNumbers = this.bomParseResult.order.tools.map(t => t.tool_number);
-      await this.activityLogService.logActivity({
-        type: 'order_imported',
-        order_id: result.id,
-        so_number: this.bomParseResult.order.so_number,
-        description: `Order SO-${this.bomParseResult.order.so_number} imported with ${this.bomParseResult.order.line_items.length} parts and ${this.bomParseResult.order.tools.length} tools`,
-        performed_by: this.settingsService.getUserName(),
-        details: {
-          part_count: this.bomParseResult.order.line_items.length,
-          tool_count: this.bomParseResult.order.tools.length,
-          tool_numbers: toolNumbers,
-        },
-      });
+      if (result) {
+        const toolNumbers = this.bomParseResult.order.tools.map(t => t.tool_number);
+        await this.activityLogService.logActivity({
+          type: 'order_imported',
+          order_id: result.id,
+          so_number: this.bomParseResult.order.so_number,
+          description: `Order SO-${this.bomParseResult.order.so_number} imported with ${this.bomParseResult.order.line_items.length} parts and ${this.bomParseResult.order.tools.length} tools`,
+          performed_by: this.settingsService.getUserName(),
+          details: {
+            part_count: this.bomParseResult.order.line_items.length,
+            tool_count: this.bomParseResult.order.tools.length,
+            tool_numbers: toolNumbers,
+          },
+        });
 
-      // Auto-extract template
-      const toolModel = this.bomParseResult.order.tools[0]?.tool_model || null;
-      await this.bomTemplatesService.autoExtractTemplate(this.bomParseResult.order.line_items, toolModel, this.bomParseResult.order.so_number);
+        // Auto-extract template
+        const toolModel = this.bomParseResult.order.tools[0]?.tool_model || null;
+        await this.bomTemplatesService.autoExtractTemplate(this.bomParseResult.order.line_items, toolModel, this.bomParseResult.order.so_number);
 
-      this.router.navigate(['/orders', result.id]);
+        // Show unclassified parts notification if needed
+        if (unclassifiedCount > 0) {
+          this.unclassifiedPartsCount = unclassifiedCount;
+          this.showUnclassifiedAlert = true;
+          // Auto-dismiss after 2 seconds
+          setTimeout(() => {
+            this.showUnclassifiedAlert = false;
+          }, 2000);
+        }
+
+        this.router.navigate(['/orders', result.id]);
+      }
+    } catch (error) {
+      console.error('BOM import failed:', error);
+    } finally {
+      this.isImporting = false;
     }
   }
 

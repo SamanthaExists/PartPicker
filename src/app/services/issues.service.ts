@@ -150,13 +150,14 @@ export class IssuesService implements OnDestroy {
     }
   }
 
-  async resolveIssue(issueId: string, resolvedBy?: string): Promise<boolean> {
+  async resolveIssue(issueId: string, resolvedBy?: string, resolutionNotes?: string): Promise<boolean> {
     try {
       const { error } = await this.supabase.from('issues')
         .update({
           status: 'resolved' as IssueStatus,
           resolved_at: new Date().toISOString(),
           resolved_by: resolvedBy || null,
+          resolution_notes: resolutionNotes || null,
         })
         .eq('id', issueId);
 

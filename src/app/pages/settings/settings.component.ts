@@ -158,13 +158,26 @@ import { UserSettings } from '../../models';
               </span>
             </div>
             <div class="card-body">
-              <p class="mb-2"><strong>Tool Pick List Tracker</strong></p>
+              <p class="mb-2"><strong>Tool Pick List Tracker v1.0.0</strong></p>
               <p class="text-muted small mb-2">
                 A comprehensive application for managing pick lists and tracking picking progress for sales orders.
               </p>
-              <p class="text-muted small mb-0">
+              <p class="text-muted small mb-3">
                 Built with Angular and Bootstrap. Data stored in Supabase.
               </p>
+              <button class="btn btn-sm btn-outline-secondary" (click)="showSchema = !showSchema">
+                <i class="bi me-1" [class]="showSchema ? 'bi-chevron-up' : 'bi-code-square'"></i>
+                {{ showSchema ? 'Hide' : 'Show' }} Database Schema
+              </button>
+              <div *ngIf="showSchema" class="mt-3">
+                <div class="d-flex justify-content-end mb-2">
+                  <button class="btn btn-sm btn-outline-secondary" (click)="copySchema()">
+                    <i class="bi me-1" [class]="schemaCopied ? 'bi-check-lg' : 'bi-clipboard'"></i>
+                    {{ schemaCopied ? 'Copied!' : 'Copy to Clipboard' }}
+                  </button>
+                </div>
+                <pre class="bg-body-secondary p-3 rounded small" style="max-height: 400px; overflow-y: auto; white-space: pre-wrap;">{{ schemaSql }}</pre>
+              </div>
             </div>
           </div>
         </div>
@@ -485,6 +498,86 @@ export class SettingsComponent implements OnInit, OnDestroy {
     return this.apiPassword === this.API_SYNC_PASSWORD;
   }
 
+  // Schema viewer
+  showSchema = false;
+  schemaCopied = false;
+  readonly schemaSql = `-- Sales Orders
+CREATE TABLE IF NOT EXISTS orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  so_number TEXT NOT NULL UNIQUE,
+  po_number TEXT,
+  customer_name TEXT,
+  order_date DATE,
+  due_date DATE,
+  estimated_ship_date DATE,
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'complete', 'cancelled')),
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Tools (units being built within an order)
+CREATE TABLE IF NOT EXISTS tools (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+  tool_number TEXT NOT NULL,
+  serial_number TEXT,
+  tool_model TEXT,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'in-progress', 'complete')),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Line Items (parts to pick)
+CREATE TABLE IF NOT EXISTS line_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+  part_number TEXT NOT NULL,
+  description TEXT,
+  location TEXT,
+  qty_per_unit INTEGER NOT NULL,
+  total_qty_needed INTEGER NOT NULL,
+  qty_available INTEGER,
+  tool_ids UUID[],
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Pick Records (actual picks - append-only for conflict-free sync)
+CREATE TABLE IF NOT EXISTS picks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  line_item_id UUID REFERENCES line_items(id) ON DELETE CASCADE,
+  tool_id UUID REFERENCES tools(id) ON DELETE CASCADE,
+  qty_picked INTEGER NOT NULL,
+  picked_by TEXT,
+  notes TEXT,
+  picked_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable Row Level Security (allow all for now - can be tightened later)
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tools ENABLE ROW LEVEL SECURITY;
+ALTER TABLE line_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE picks ENABLE ROW LEVEL SECURITY;
+
+-- Policies for anonymous access (development)
+CREATE POLICY "Allow all operations on orders" ON orders FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations on tools" ON tools FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations on line_items" ON line_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations on picks" ON picks FOR ALL USING (true) WITH CHECK (true);
+
+-- Enable realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE orders;
+ALTER PUBLICATION supabase_realtime ADD TABLE tools;
+ALTER PUBLICATION supabase_realtime ADD TABLE line_items;
+ALTER PUBLICATION supabase_realtime ADD TABLE picks;
+
+-- Index for performance
+CREATE INDEX IF NOT EXISTS idx_tools_order_id ON tools(order_id);
+CREATE INDEX IF NOT EXISTS idx_line_items_order_id ON line_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_picks_line_item_id ON picks(line_item_id);
+CREATE INDEX IF NOT EXISTS idx_picks_tool_id ON picks(tool_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_line_items_part_number ON line_items(part_number);`;
+
   // Backup
   exportingBackup = false;
   backupExported = false;
@@ -613,6 +706,17 @@ export class SettingsComponent implements OnInit, OnDestroy {
       console.error('Failed to export backup:', error);
     } finally {
       this.exportingBackup = false;
+    }
+  }
+
+  // Copy Schema
+  async copySchema(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.schemaSql);
+      this.schemaCopied = true;
+      setTimeout(() => this.schemaCopied = false, 2000);
+    } catch (err) {
+      console.error('Failed to copy schema:', err);
     }
   }
 

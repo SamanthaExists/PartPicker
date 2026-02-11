@@ -2,8 +2,12 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { BomTemplatesService } from '../../services/bom-templates.service';
+import { PartsService, Part } from '../../services/parts.service';
 import { BOMTemplate, BOMTemplateItem, BOMTemplateWithItems } from '../../models';
+import { ClassificationBadgeComponent } from '../../components/parts/classification-badge.component';
+import { ExplodedBOMDialogComponent } from '../../components/parts/exploded-bom-dialog.component';
 
 interface AssemblyGroup {
   name: string;
@@ -14,7 +18,7 @@ interface AssemblyGroup {
 @Component({
   selector: 'app-templates',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ClassificationBadgeComponent, ExplodedBOMDialogComponent],
   template: `
     <!-- Detail View -->
     <div *ngIf="selectedTemplate; else listView">
@@ -149,6 +153,7 @@ interface AssemblyGroup {
               <thead class="table-light">
                 <tr>
                   <th>Part Number</th>
+                  <th>Type</th>
                   <th>Description</th>
                   <th>Location</th>
                   <th *ngIf="selectedAssemblyFilter === null || !hasMultipleAssemblies">Assembly Group</th>
@@ -161,7 +166,7 @@ interface AssemblyGroup {
                   <!-- Assembly Group Header Row (All Items view with multiple assemblies) -->
                   <tr *ngIf="selectedAssemblyFilter === null && hasMultipleAssemblies && shouldShowAssemblyHeader(item, idx)"
                       class="assembly-group-header">
-                    <td [attr.colspan]="selectedAssemblyFilter === null || !hasMultipleAssemblies ? 6 : 5" class="py-2">
+                    <td [attr.colspan]="selectedAssemblyFilter === null || !hasMultipleAssemblies ? 7 : 6" class="py-2">
                       <div class="d-flex align-items-center gap-2">
                         <i class="bi" [ngClass]="item.assembly_group ? 'bi-box-seam text-purple' : 'bi-puzzle text-muted'"></i>
                         <strong>{{ item.assembly_group || 'Loose Parts' }}</strong>
@@ -173,11 +178,25 @@ interface AssemblyGroup {
                   <!-- Item Row -->
                   <tr>
                     <td class="font-mono">{{ item.part_number }}</td>
+                    <td>
+                      <app-classification-badge
+                        [classification]="getPartClassification(item.part_number)"
+                        [size]="'sm'"
+                      ></app-classification-badge>
+                    </td>
                     <td class="text-muted">{{ item.description || '-' }}</td>
                     <td>{{ item.location || '-' }}</td>
                     <td *ngIf="selectedAssemblyFilter === null || !hasMultipleAssemblies" class="font-mono small text-muted">{{ item.assembly_group || '-' }}</td>
                     <td class="text-center">{{ item.qty_per_unit }}</td>
                     <td class="text-end">
+                      <button
+                        *ngIf="isAssemblyPart(item.part_number)"
+                        class="btn btn-sm btn-outline-secondary me-1"
+                        (click)="openBOMDialog(item)"
+                        title="View exploded BOM"
+                      >
+                        <i class="bi bi-eye"></i>
+                      </button>
                       <button class="btn btn-sm btn-outline-secondary me-1" (click)="openEditItem(item)">
                         <i class="bi bi-pencil"></i>
                       </button>
@@ -214,7 +233,7 @@ interface AssemblyGroup {
 
       <!-- Stats -->
       <div class="row g-3 mb-4">
-        <div class="col-6">
+        <div class="col-6 col-lg-3">
           <div class="card">
             <div class="card-body">
               <div class="h4 fw-bold mb-0">{{ templates.length }}</div>
@@ -222,7 +241,23 @@ interface AssemblyGroup {
             </div>
           </div>
         </div>
-        <div class="col-6">
+        <div class="col-6 col-lg-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="h4 fw-bold mb-0">{{ bomCount }}</div>
+              <small class="text-muted">BOM</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="h4 fw-bold mb-0">{{ assemblyCount }}</div>
+              <small class="text-muted">Assembly</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
           <div class="card">
             <div class="card-body">
               <div class="h4 fw-bold mb-0">{{ uniqueModels.length }}</div>
@@ -230,6 +265,31 @@ interface AssemblyGroup {
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Type Filter Tabs -->
+      <div class="d-flex gap-2 mb-4">
+        <button class="btn btn-sm"
+                [class.btn-primary]="typeFilter === 'all'"
+                [class.btn-outline-secondary]="typeFilter !== 'all'"
+                (click)="typeFilter = 'all'">
+          All
+          <span class="badge ms-1" [ngClass]="typeFilter === 'all' ? 'bg-light text-primary' : 'bg-secondary'">{{ templates.length }}</span>
+        </button>
+        <button class="btn btn-sm"
+                [class.btn-primary]="typeFilter === 'bom'"
+                [class.btn-outline-secondary]="typeFilter !== 'bom'"
+                (click)="typeFilter = 'bom'">
+          BOM
+          <span class="badge ms-1" [ngClass]="typeFilter === 'bom' ? 'bg-light text-primary' : 'bg-secondary'">{{ bomCount }}</span>
+        </button>
+        <button class="btn btn-sm"
+                [class.btn-primary]="typeFilter === 'assembly'"
+                [class.btn-outline-secondary]="typeFilter !== 'assembly'"
+                (click)="typeFilter = 'assembly'">
+          Assembly
+          <span class="badge ms-1" [ngClass]="typeFilter === 'assembly' ? 'bg-light text-primary' : 'bg-secondary'">{{ assemblyCount }}</span>
+        </button>
       </div>
 
       <!-- Filters -->
@@ -313,6 +373,26 @@ interface AssemblyGroup {
             <div class="mb-3">
               <label class="form-label">Template Name *</label>
               <input type="text" class="form-control" [(ngModel)]="templateForm.name" placeholder="e.g., 230Q BOM">
+            </div>
+            <div class="mb-3">
+              <label class="form-label d-block">Template Type</label>
+              <div class="d-flex gap-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="templateType" id="typeBom" value="bom" [(ngModel)]="templateForm.template_type">
+                  <label class="form-check-label" for="typeBom">
+                    BOM (Bill of Materials)
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="templateType" id="typeAssembly" value="assembly" [(ngModel)]="templateForm.template_type">
+                  <label class="form-check-label" for="typeAssembly">
+                    Assembly
+                  </label>
+                </div>
+              </div>
+              <small class="text-muted">
+                {{ templateForm.template_type === 'bom' ? 'Full bill of materials for a complete tool/product' : 'Component assembly template (e.g., Main Frame, Motor Assembly)' }}
+              </small>
             </div>
             <div class="mb-3">
               <label class="form-label">Tool Model</label>
@@ -552,6 +632,7 @@ export class TemplatesComponent implements OnInit, OnDestroy {
   // Filters
   search = '';
   modelFilter = 'all';
+  typeFilter: 'all' | 'bom' | 'assembly' = 'all';
 
   // Assembly navigation
   selectedAssemblyFilter: string | null = null;  // null="All", '__unassigned__'=loose parts, or assembly name
@@ -560,7 +641,7 @@ export class TemplatesComponent implements OnInit, OnDestroy {
   // Template dialog
   showTemplateDialog = false;
   editingTemplate: BOMTemplate | null = null;
-  templateForm = { name: '', tool_model: '' };
+  templateForm = { name: '', tool_model: '', template_type: 'bom' as 'bom' | 'assembly' };
 
   // Item dialog
   showItemDialog = false;
@@ -576,15 +657,25 @@ export class TemplatesComponent implements OnInit, OnDestroy {
   extracting = false;
   extractResult: { created: number; skipped: number; errors: string[] } | null = null;
 
+  // Parts data
+  partsMap = new Map<string, Part>();
+
   private subscriptions: Subscription[] = [];
 
-  constructor(private bomTemplatesService: BomTemplatesService) {}
+  constructor(
+    private bomTemplatesService: BomTemplatesService,
+    private partsService: PartsService,
+    private modalService: NgbModal
+  ) {}
 
   ngOnInit(): void {
     this.subscriptions.push(
       this.bomTemplatesService.templates$.subscribe(t => this.templates = t),
       this.bomTemplatesService.loading$.subscribe(l => this.isLoading = l),
-      this.bomTemplatesService.error$.subscribe(e => this.errorMsg = e)
+      this.bomTemplatesService.error$.subscribe(e => this.errorMsg = e),
+      this.partsService.parts$.subscribe(parts => {
+        this.partsMap = new Map(parts.map(p => [p.part_number, p]));
+      })
     );
   }
 
@@ -701,13 +792,24 @@ export class TemplatesComponent implements OnInit, OnDestroy {
     return Array.from(models).sort();
   }
 
+  get bomCount(): number {
+    return this.templates.filter(t => !t.template_type || t.template_type === 'bom').length;
+  }
+
+  get assemblyCount(): number {
+    return this.templates.filter(t => t.template_type === 'assembly').length;
+  }
+
   get filteredTemplates(): BOMTemplate[] {
     return this.templates.filter(t => {
       const matchesSearch = !this.search ||
         t.name.toLowerCase().includes(this.search.toLowerCase()) ||
         (t.tool_model && t.tool_model.toLowerCase().includes(this.search.toLowerCase()));
       const matchesModel = this.modelFilter === 'all' || t.tool_model === this.modelFilter;
-      return matchesSearch && matchesModel;
+      const matchesType = this.typeFilter === 'all' ||
+        (this.typeFilter === 'bom' && (!t.template_type || t.template_type === 'bom')) ||
+        (this.typeFilter === 'assembly' && t.template_type === 'assembly');
+      return matchesSearch && matchesModel && matchesType;
     });
   }
 
@@ -728,13 +830,13 @@ export class TemplatesComponent implements OnInit, OnDestroy {
   // Template CRUD
   openCreateTemplate(): void {
     this.editingTemplate = null;
-    this.templateForm = { name: '', tool_model: '' };
+    this.templateForm = { name: '', tool_model: '', template_type: 'bom' };
     this.showTemplateDialog = true;
   }
 
   openEditTemplate(t: BOMTemplate): void {
     this.editingTemplate = t;
-    this.templateForm = { name: t.name, tool_model: t.tool_model || '' };
+    this.templateForm = { name: t.name, tool_model: t.tool_model || '', template_type: t.template_type || 'bom' };
     this.showTemplateDialog = true;
   }
 
@@ -752,7 +854,8 @@ export class TemplatesComponent implements OnInit, OnDestroy {
     } else {
       await this.bomTemplatesService.createTemplate(
         this.templateForm.name.trim(),
-        this.templateForm.tool_model.trim() || undefined
+        this.templateForm.tool_model.trim() || undefined,
+        this.templateForm.template_type
       );
     }
 
@@ -846,5 +949,27 @@ export class TemplatesComponent implements OnInit, OnDestroy {
     this.extractResult = null;
     this.extractResult = await this.bomTemplatesService.extractTemplatesFromOrders();
     this.extracting = false;
+  }
+
+  // Parts integration methods
+  getPartClassification(partNumber: string) {
+    return this.partsMap.get(partNumber)?.classification_type || null;
+  }
+
+  isAssemblyPart(partNumber: string): boolean {
+    return this.partsMap.get(partNumber)?.classification_type === 'assembly';
+  }
+
+  openBOMDialog(item: BOMTemplateItem): void {
+    const part = this.partsMap.get(item.part_number);
+    if (part) {
+      const modalRef = this.modalService.open(ExplodedBOMDialogComponent, {
+        size: 'lg',
+        scrollable: true
+      });
+      modalRef.componentInstance.partId = part.id;
+      modalRef.componentInstance.partNumber = item.part_number;
+      modalRef.componentInstance.partDescription = item.description;
+    }
   }
 }

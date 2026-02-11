@@ -7,6 +7,8 @@ import { ConsolidatedPart } from '../../models';
 interface OrderAllocation {
   orderId: string;
   soNumber: string;
+  toolId: string;
+  toolNumber: string;
   lineItemId: string;
   needed: number;
   picked: number;
@@ -66,12 +68,12 @@ interface OrderAllocation {
 
             <hr>
 
-            <h6>Allocate to Orders</h6>
+            <h6>Allocate to Tools</h6>
             <div class="d-flex flex-column gap-2">
               <div *ngFor="let alloc of allocations" class="d-flex align-items-center gap-2 p-2 border rounded">
                 <div class="flex-grow-1">
                   <a [routerLink]="['/orders', alloc.orderId]" class="text-decoration-none fw-medium">
-                    SO-{{ alloc.soNumber }}
+                    SO-{{ alloc.soNumber }} - {{ alloc.toolNumber }}
                   </a>
                   <span class="small text-muted ms-2">
                     ({{ alloc.picked }}/{{ alloc.needed }} picked)
@@ -165,7 +167,7 @@ export class MultiOrderPickDialogComponent implements OnChanges {
   @Input() part: ConsolidatedPart | null = null;
 
   @Output() showChange = new EventEmitter<boolean>();
-  @Output() pick = new EventEmitter<{ lineItemId: string; qty: number }[]>();
+  @Output() pick = new EventEmitter<{ lineItemId: string; toolId: string; qty: number }[]>();
 
   allocations: OrderAllocation[] = [];
   availableToPick = 0;
@@ -185,6 +187,8 @@ export class MultiOrderPickDialogComponent implements OnChanges {
     this.allocations = this.part.orders.map(order => ({
       orderId: order.order_id,
       soNumber: order.so_number,
+      toolId: order.tool_id,
+      toolNumber: order.tool_number,
       lineItemId: order.line_item_id,
       needed: order.needed,
       picked: order.picked,
@@ -274,7 +278,7 @@ export class MultiOrderPickDialogComponent implements OnChanges {
 
     const picksToApply = this.allocations
       .filter(a => a.allocatedQty > 0)
-      .map(a => ({ lineItemId: a.lineItemId, qty: a.allocatedQty }));
+      .map(a => ({ lineItemId: a.lineItemId, toolId: a.toolId, qty: a.allocatedQty }));
 
     this.pick.emit(picksToApply);
 

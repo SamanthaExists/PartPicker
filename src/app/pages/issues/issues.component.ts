@@ -2,11 +2,28 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Subscription } from 'rxjs';
+import { Subscription, combineLatest } from 'rxjs';
 import { IssuesService } from '../../services/issues.service';
+import { PartIssuesService } from '../../services/part-issues.service';
 import { SettingsService } from '../../services/settings.service';
 import { UtilsService } from '../../services/utils.service';
-import { IssueWithDetails, IssueStatus } from '../../models';
+import { IssueWithDetails, PartIssue } from '../../models';
+
+interface UnifiedIssue {
+  id: string;
+  source: 'order' | 'part';
+  issue_type: string;
+  description: string | null;
+  reported_by: string | null;
+  status: 'open' | 'resolved';
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_notes: string | null;
+  part_number: string | null;
+  so_number: string | null;
+  order_id: string | null;
+}
 
 @Component({
   selector: 'app-issues',
@@ -94,17 +111,17 @@ import { IssueWithDetails, IssueStatus } from '../../models';
                     {{ utils.getIssueTypeLabel(issue.issue_type) }}
                   </span>
                   <span class="badge" [ngClass]="issue.status === 'open' ? 'bg-danger' : 'bg-success'">
-                    {{ issue.status | titlecase }}
+                    {{ issue.status === 'open' ? 'Open' : 'Resolved' }}
                   </span>
-                  <a [routerLink]="['/orders', issue.order_id]" class="text-decoration-none small">
-                    SO-{{ issue.order?.so_number }}
+                  <span class="badge" [ngClass]="issue.source === 'order' ? 'bg-primary-subtle text-primary border border-primary-subtle' : 'bg-info-subtle text-info border border-info-subtle'">
+                    {{ issue.source === 'order' ? 'Order' : 'Part' }}
+                  </span>
+                  <a *ngIf="issue.source === 'order' && issue.order_id" [routerLink]="['/orders', issue.order_id]" class="text-decoration-none small">
+                    SO-{{ issue.so_number }}
                   </a>
                 </div>
-                <p class="fw-medium mb-1" *ngIf="issue.line_item">
-                  {{ issue.line_item.part_number }}
-                  <span class="text-muted fw-normal" *ngIf="issue.line_item.description">
-                    - {{ issue.line_item.description }}
-                  </span>
+                <p class="fw-medium mb-1" *ngIf="issue.part_number">
+                  {{ issue.part_number }}
                 </p>
                 <p class="text-muted mb-2" *ngIf="issue.description">{{ issue.description }}</p>
                 <div class="small text-muted">
@@ -118,12 +135,12 @@ import { IssueWithDetails, IssueStatus } from '../../models';
               <div>
                 <button *ngIf="issue.status === 'open'"
                         class="btn btn-sm btn-success"
-                        (click)="handleResolveIssue(issue.id)">
+                        (click)="handleResolveIssue(issue)">
                   <i class="bi bi-check-lg me-1"></i> Resolve
                 </button>
                 <button *ngIf="issue.status === 'resolved'"
                         class="btn btn-sm btn-outline-warning"
-                        (click)="handleReopenIssue(issue.id)">
+                        (click)="handleReopenIssue(issue)">
                   <i class="bi bi-arrow-counterclockwise me-1"></i> Reopen
                 </button>
               </div>
@@ -131,31 +148,115 @@ import { IssueWithDetails, IssueStatus } from '../../models';
           </div>
         </div>
       </div>
+
+      <!-- Resolve Issue Confirmation Modal -->
+      <div class="modal fade" [class.show]="showResolveModal" [style.display]="showResolveModal ? 'block' : 'none'" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Resolve Issue</h5>
+              <button type="button" class="btn-close" (click)="showResolveModal = false"></button>
+            </div>
+            <div class="modal-body" *ngIf="resolveTarget">
+              <p>Are you sure you want to resolve this issue?</p>
+              <div class="mb-3">
+                <strong>Part:</strong> {{ resolveTarget.part_number || 'N/A' }}
+              </div>
+              <div class="mb-3" *ngIf="resolveTarget.so_number">
+                <strong>SO:</strong> {{ resolveTarget.so_number }}
+              </div>
+              <div class="mb-3">
+                <strong>Issue:</strong> {{ utils.getIssueTypeLabel(resolveTarget.issue_type) }}
+              </div>
+              <div class="mb-3">
+                <label for="resolutionNotes" class="form-label">Resolution Explanation</label>
+                <textarea
+                  id="resolutionNotes"
+                  class="form-control"
+                  rows="3"
+                  [(ngModel)]="resolutionNotes"
+                  placeholder="Enter explanation (optional)"></textarea>
+                <small class="text-muted">Describe how the issue was resolved</small>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" (click)="showResolveModal = false">Cancel</button>
+              <button type="button" class="btn btn-success" (click)="confirmResolveIssue()">
+                <i class="bi bi-check-lg me-1"></i> Resolve Issue
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-backdrop fade show" *ngIf="showResolveModal"></div>
     </div>
   `
 })
 export class IssuesComponent implements OnInit, OnDestroy {
-  issues: IssueWithDetails[] = [];
+  unifiedIssues: UnifiedIssue[] = [];
   loading = true;
   statusFilter: 'all' | 'open' | 'resolved' = 'open';
+  showResolveModal = false;
+  resolveTarget: UnifiedIssue | null = null;
+  resolutionNotes = '';
 
   private subscriptions: Subscription[] = [];
 
   constructor(
     private issuesService: IssuesService,
+    private partIssuesService: PartIssuesService,
     private settingsService: SettingsService,
     public utils: UtilsService
   ) {}
 
   ngOnInit(): void {
     this.issuesService.loadAllIssues();
+    this.partIssuesService.initialize();
 
     this.subscriptions.push(
-      this.issuesService.issues$.subscribe(issues => {
-        this.issues = issues;
-      }),
-      this.issuesService.loading$.subscribe(loading => {
-        this.loading = loading;
+      combineLatest([
+        this.issuesService.issues$,
+        this.partIssuesService.issues$,
+        this.issuesService.loading$,
+        this.partIssuesService.loading$,
+      ]).subscribe(([orderIssues, partIssues, orderLoading, partLoading]) => {
+        this.loading = orderLoading || partLoading;
+
+        const mappedOrder: UnifiedIssue[] = orderIssues.map(i => ({
+          id: i.id,
+          source: 'order' as const,
+          issue_type: i.issue_type,
+          description: i.description,
+          reported_by: i.reported_by,
+          status: i.status,
+          created_at: i.created_at,
+          resolved_at: i.resolved_at,
+          resolved_by: i.resolved_by,
+          resolution_notes: i.resolution_notes,
+          part_number: i.line_item?.part_number || null,
+          so_number: i.order?.so_number || null,
+          order_id: i.order_id,
+        }));
+
+        const mappedPart: UnifiedIssue[] = partIssues.map(i => ({
+          id: i.id,
+          source: 'part' as const,
+          issue_type: i.issue_type,
+          description: i.description,
+          reported_by: i.reported_by,
+          status: i.status,
+          created_at: i.created_at,
+          resolved_at: i.resolved_at,
+          resolved_by: i.resolved_by,
+          resolution_notes: i.resolution_notes,
+          part_number: i.part_number,
+          so_number: null,
+          order_id: null,
+        }));
+
+        const combined = [...mappedOrder, ...mappedPart];
+        combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        this.unifiedIssues = combined;
       })
     );
   }
@@ -164,25 +265,47 @@ export class IssuesComponent implements OnInit, OnDestroy {
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
 
-  get filteredIssues(): IssueWithDetails[] {
-    if (this.statusFilter === 'all') return this.issues;
-    return this.issues.filter(i => i.status === this.statusFilter);
+  get filteredIssues(): UnifiedIssue[] {
+    if (this.statusFilter === 'all') return this.unifiedIssues;
+    return this.unifiedIssues.filter(i => i.status === this.statusFilter);
   }
 
   get openIssuesCount(): number {
-    return this.issues.filter(i => i.status === 'open').length;
+    return this.unifiedIssues.filter(i => i.status === 'open').length;
   }
 
   get resolvedIssuesCount(): number {
-    return this.issues.filter(i => i.status === 'resolved').length;
+    return this.unifiedIssues.filter(i => i.status === 'resolved').length;
   }
 
-  async handleResolveIssue(issueId: string): Promise<void> {
+  handleResolveIssue(issue: UnifiedIssue): void {
+    this.resolveTarget = issue;
+    this.resolutionNotes = '';
+    this.showResolveModal = true;
+  }
+
+  async confirmResolveIssue(): Promise<void> {
+    if (!this.resolveTarget) return;
+
     const userName = this.settingsService.getUserName();
-    await this.issuesService.resolveIssue(issueId, userName);
+    const notes = this.resolutionNotes.trim() || undefined;
+
+    if (this.resolveTarget.source === 'order') {
+      await this.issuesService.resolveIssue(this.resolveTarget.id, userName, notes);
+    } else {
+      await this.partIssuesService.resolveIssue(this.resolveTarget.id, userName, notes);
+    }
+
+    this.showResolveModal = false;
+    this.resolveTarget = null;
+    this.resolutionNotes = '';
   }
 
-  async handleReopenIssue(issueId: string): Promise<void> {
-    await this.issuesService.reopenIssue(issueId);
+  async handleReopenIssue(issue: UnifiedIssue): Promise<void> {
+    if (issue.source === 'order') {
+      await this.issuesService.reopenIssue(issue.id);
+    } else {
+      await this.partIssuesService.reopenIssue(issue.id);
+    }
   }
 }

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { OrdersService } from '../../services/orders.service';
 import { PicksService } from '../../services/picks.service';
 import { LineItemsService } from '../../services/line-items.service';
@@ -12,11 +13,15 @@ import { ExcelService } from '../../services/excel.service';
 import { UtilsService } from '../../services/utils.service';
 import { BomTemplatesService } from '../../services/bom-templates.service';
 import { ActivityLogService } from '../../services/activity-log.service';
+import { PartsService, Part } from '../../services/parts.service';
 import { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '../../models';
 import { SaveAsTemplateDialogComponent } from '../../components/dialogs/save-as-template-dialog.component';
 import { PrintPickListComponent } from '../../components/picking/print-pick-list.component';
 import { PrintTagDialogComponent, TagData } from '../../components/picking/print-tag-dialog.component';
 import { DistributeInventoryDialogComponent } from '../../components/dialogs/distribute-inventory-dialog.component';
+import { ClassificationBadgeComponent } from '../../components/parts/classification-badge.component';
+import { ExplodedBOMDialogComponent } from '../../components/parts/exploded-bom-dialog.component';
+import { PartDetailComponent } from '../../components/parts/part-detail.component';
 
 type SortMode = 'part_number' | 'location' | 'assembly';
 
@@ -28,7 +33,7 @@ interface PickHistoryItem {
 @Component({
   selector: 'app-order-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, SaveAsTemplateDialogComponent, PrintPickListComponent, PrintTagDialogComponent, DistributeInventoryDialogComponent],
+  imports: [CommonModule, RouterModule, FormsModule, SaveAsTemplateDialogComponent, PrintPickListComponent, PrintTagDialogComponent, DistributeInventoryDialogComponent, ClassificationBadgeComponent, PartDetailComponent],
   template: `
     <div *ngIf="loading" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
@@ -361,12 +366,12 @@ interface PickHistoryItem {
                   <tr class="table-secondary">
                     <th style="width: 30px;"></th>
                     <th>Part Number</th>
+                    <th style="width: 100px;">Type</th>
                     <th>Description</th>
                     <th>Location</th>
                     <th class="text-center" style="width: 60px;">Stock</th>
-                    <th *ngIf="tools.length > 1">Tools</th>
                     <th class="text-center" style="width: 80px;">Total</th>
-                    <th style="width: 150px;">Actions</th>
+                    <th style="width: 180px;">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -422,7 +427,7 @@ interface PickHistoryItem {
                       </td>
                       <!-- Part Number -->
                       <td>
-                        <span class="font-monospace fw-medium">{{ item.part_number }}</span>
+                        <span class="font-monospace fw-medium text-primary" style="cursor: pointer;" (click)="openPartDetail(item.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ item.part_number }}</span>
                         <span class="badge bg-danger ms-1" *ngIf="hasOpenIssue(item.id)">
                           <i class="bi bi-exclamation-triangle-fill"></i> Issue
                         </span>
@@ -430,53 +435,62 @@ interface PickHistoryItem {
                               *ngIf="item.tool_ids && item.tool_ids.length > 0 && item.tool_ids.length < tools.length">
                           {{ item.tool_ids.length }} of {{ tools.length }} tools
                         </span>
-                        <span class="text-muted small d-block" *ngIf="item.assembly_group && sortMode !== 'assembly'">
+                        <span class="small d-block" *ngIf="item.assembly_group && sortMode !== 'assembly'"
+                              [ngClass]="{
+                                'text-success-emphasis': isItemComplete(item),
+                                'text-warning-emphasis': isItemPartial(item) && !hasOpenIssue(item.id),
+                                'text-danger-emphasis': hasOpenIssue(item.id),
+                                'text-muted': !isItemComplete(item) && !isItemPartial(item) && !hasOpenIssue(item.id)
+                              }">
                           Assy: {{ item.assembly_group }}
                         </span>
                       </td>
+                      <!-- Type -->
+                      <td>
+                        <app-classification-badge
+                          [classification]="getPartClassification(item.part_number)"
+                          [size]="'sm'"
+                        ></app-classification-badge>
+                      </td>
                       <!-- Description -->
-                      <td class="text-muted small">{{ item.description || '-' }}</td>
+                      <td class="small"
+                          [ngClass]="{
+                            'text-success-emphasis': isItemComplete(item),
+                            'text-warning-emphasis': isItemPartial(item) && !hasOpenIssue(item.id),
+                            'text-danger-emphasis': hasOpenIssue(item.id),
+                            'text-muted': !isItemComplete(item) && !isItemPartial(item) && !hasOpenIssue(item.id)
+                          }">
+                        {{ item.description || '-' }}
+                      </td>
                       <!-- Location -->
                       <td>
                         <span class="badge bg-body-secondary text-body border" *ngIf="item.location">
                           <i class="bi bi-geo-alt me-1"></i>{{ item.location }}
                         </span>
-                        <span class="text-muted" *ngIf="!item.location">-</span>
+                        <span *ngIf="!item.location"
+                              [ngClass]="isItemComplete(item) ? 'text-success-emphasis' : 'text-muted'">-</span>
                       </td>
                       <!-- Stock -->
                       <td class="text-center">
                         <span *ngIf="item.qty_available !== null && item.qty_available !== undefined"
                               [ngClass]="{
-                                'text-warning fw-bold': item.qty_available < item.total_qty_needed,
-                                'text-success': item.qty_available >= item.total_qty_needed
+                                'text-warning-emphasis fw-bold': item.qty_available < item.total_qty_needed && isItemPartial(item) && !hasOpenIssue(item.id),
+                                'text-danger-emphasis fw-bold': hasOpenIssue(item.id),
+                                'text-success-emphasis': isItemComplete(item),
+                                'text-warning fw-bold': item.qty_available < item.total_qty_needed && !isItemComplete(item) && !isItemPartial(item) && !hasOpenIssue(item.id),
+                                'text-success': item.qty_available >= item.total_qty_needed && !isItemComplete(item) && !isItemPartial(item) && !hasOpenIssue(item.id)
                               }">
                           {{ item.qty_available }}
                         </span>
-                        <span *ngIf="item.qty_available === null || item.qty_available === undefined" class="text-muted">-</span>
+                        <span *ngIf="item.qty_available === null || item.qty_available === undefined"
+                              [ngClass]="{
+                                'text-success-emphasis': isItemComplete(item),
+                                'text-warning-emphasis': isItemPartial(item) && !hasOpenIssue(item.id),
+                                'text-danger-emphasis': hasOpenIssue(item.id),
+                                'text-muted': !isItemComplete(item) && !isItemPartial(item) && !hasOpenIssue(item.id)
+                              }">-</span>
                       </td>
-                      <!-- Tool Checkboxes (multi-tool view) -->
-                      <td *ngIf="tools.length > 1">
-                        <div class="d-flex gap-1 flex-wrap align-items-center">
-                          <button *ngFor="let tool of tools"
-                                  class="btn btn-sm tool-checkbox"
-                                  [ngClass]="getToolButtonClass(item, tool)"
-                                  [title]="getToolButtonTitle(item, tool)"
-                                  [disabled]="isSubmitting === item.id"
-                                  (click)="handleToolClick(item, tool)">
-                            <ng-container *ngIf="isToolComplete(item, tool)">
-                              <i class="bi bi-check"></i>
-                            </ng-container>
-                            <ng-container *ngIf="isToolPartial(item, tool)">
-                              {{ getToolPicked(item, tool) }}/{{ item.qty_per_unit }}
-                            </ng-container>
-                            <ng-container *ngIf="!isToolComplete(item, tool) && !isToolPartial(item, tool)">
-                              {{ getToolLabel(tool) }}
-                            </ng-container>
-                          </button>
-                          <span class="small text-muted ms-1">{{ item.total_picked }}/{{ item.total_qty_needed }}</span>
-                        </div>
-                      </td>
-                      <!-- Total (single tool or summary) -->
+                      <!-- Total -->
                       <td class="text-center">
                         <span class="badge" [ngClass]="isItemComplete(item) ? 'bg-success' : (isItemPartial(item) ? 'bg-warning text-dark' : 'bg-secondary')">
                           {{ item.total_picked }}/{{ item.total_qty_needed }}
@@ -485,6 +499,13 @@ interface PickHistoryItem {
                       <!-- Actions -->
                       <td>
                         <div class="d-flex gap-1">
+                          <!-- View BOM (for assembly parts) -->
+                          <button class="btn btn-sm btn-outline-secondary"
+                                  *ngIf="isAssemblyPart(item.part_number)"
+                                  (click)="openBOMDialog(item)"
+                                  title="View exploded BOM">
+                            <i class="bi bi-eye"></i>
+                          </button>
                           <!-- Undo Last Pick -->
                           <button class="btn btn-sm btn-outline-secondary"
                                   *ngIf="getPickHistoryForItem(item.id).length > 0"
@@ -493,31 +514,20 @@ interface PickHistoryItem {
                                   title="Undo last pick">
                             <i class="bi bi-arrow-counterclockwise"></i>
                           </button>
-                          <!-- Pick All Remaining (for single tool orders OR pick remaining tools) -->
-                          <button class="btn btn-sm btn-success"
-                                  *ngIf="!isItemComplete(item)"
-                                  (click)="tools.length === 1 ? handleQuickPick(item, tools[0]) : handlePickAllTools(item)"
-                                  [disabled]="isSubmitting === item.id"
-                                  [title]="tools.length === 1 ? 'Pick ' + getRemainingForTool(item, tools[0]) : 'Pick all remaining tools'">
-                            <i class="bi bi-check-lg me-1"></i>
-                            <span *ngIf="tools.length === 1">{{ getRemainingForTool(item, tools[0]) }}</span>
-                            <span *ngIf="tools.length > 1">All ({{ getRemainingToolsCount(item) }})</span>
-                          </button>
                           <!-- Edit Picks (when item is fully picked) -->
                           <button class="btn btn-sm btn-outline-success"
                                   *ngIf="isItemComplete(item)"
                                   (click)="openDistributeDialog(item)"
                                   [disabled]="isSubmitting === item.id"
                                   title="Edit pick allocations">
-                            <i class="bi bi-pencil me-1"></i>
-                            Edit Picks
+                            <i class="bi bi-pencil"></i>
                           </button>
-                          <!-- Partial Pick Button (for items with qty > 1) -->
+                          <!-- Pick Button -->
                           <button class="btn btn-sm btn-outline-primary"
-                                  *ngIf="!isItemComplete(item) && item.qty_per_unit > 1"
+                                  *ngIf="!isItemComplete(item)"
                                   (click)="openPartialPickModal(item)"
                                   [disabled]="isSubmitting === item.id"
-                                  title="Set custom quantity">
+                                  title="Make picks for this item">
                             <i class="bi bi-plus-slash-minus"></i>
                           </button>
                           <!-- Report Issue -->
@@ -542,7 +552,7 @@ interface PickHistoryItem {
 
                     <!-- Pick History Panel (expandable) -->
                     <tr *ngIf="expandedItems.has(item.id)" class="table-secondary">
-                      <td colspan="8" class="p-3">
+                      <td colspan="7" class="p-3">
                         <div class="small">
                           <div class="d-flex align-items-center gap-2 mb-2">
                             <i class="bi bi-clock-history text-muted"></i>
@@ -612,7 +622,7 @@ interface PickHistoryItem {
               <div class="mb-3">
                 <label class="form-label">Tool Model</label>
                 <input type="text" class="form-control" [(ngModel)]="newToolModel"
-                       [placeholder]="order?.tool_model || ''">
+                       [placeholder]="order.tool_model || ''">
               </div>
               <div class="mb-3">
                 <label class="form-label">Serial Number (optional)</label>
@@ -664,7 +674,7 @@ interface PickHistoryItem {
                 </div>
                 <div class="col-3">
                   <input type="text" class="form-control form-control-sm" [(ngModel)]="newToolModel"
-                         [placeholder]="order?.tool_model || 'Model'">
+                         [placeholder]="order.tool_model || 'Model'">
                 </div>
                 <div class="col-2">
                   <input type="text" class="form-control form-control-sm" [(ngModel)]="newToolSerial"
@@ -877,11 +887,34 @@ interface PickHistoryItem {
       </div>
       <div class="modal-backdrop fade show" *ngIf="showDeleteLineItemModal"></div>
 
+      <!-- Undo Pick Confirmation Modal -->
+      <div class="modal fade" [class.show]="showUndoPickModal" [style.display]="showUndoPickModal ? 'block' : 'none'" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Undo Last Pick</h5>
+              <button type="button" class="btn-close" (click)="showUndoPickModal = false"></button>
+            </div>
+            <div class="modal-body" *ngIf="undoPickTarget">
+              <p>Are you sure you want to undo the last pick for <strong>{{ undoPickTarget.part_number }}</strong>?</p>
+              <p class="text-muted small mb-0">This will remove the most recent pick from this item.</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" (click)="showUndoPickModal = false">Cancel</button>
+              <button type="button" class="btn btn-warning" (click)="confirmUndoPick()">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Undo Pick
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-backdrop fade show" *ngIf="showUndoPickModal"></div>
+
       <!-- Save as Template Dialog -->
       <app-save-as-template-dialog
         [(show)]="showSaveTemplateModal"
         [lineItemsCount]="lineItems.length"
-        [defaultToolModel]="order?.tool_model || null"
+        [defaultToolModel]="order.tool_model || null"
         (saveTemplate)="handleSaveAsTemplate($event)"
       ></app-save-as-template-dialog>
 
@@ -968,10 +1001,11 @@ interface PickHistoryItem {
     .table-danger { background-color: rgba(220, 53, 69, 0.1) !important; }
     .table-info { background-color: rgba(13, 202, 240, 0.15) !important; }
 
-    :host-context([data-bs-theme="dark"]) .table-success { background-color: rgba(25, 135, 84, 0.2) !important; }
-    :host-context([data-bs-theme="dark"]) .table-warning { background-color: rgba(255, 193, 7, 0.15) !important; }
-    :host-context([data-bs-theme="dark"]) .table-danger { background-color: rgba(220, 53, 69, 0.15) !important; }
-    :host-context([data-bs-theme="dark"]) .table-info { background-color: rgba(13, 202, 240, 0.1) !important; }
+    [data-bs-theme="dark"] .table-success { background-color: rgba(25, 135, 84, 0.35) !important; }
+    [data-bs-theme="dark"] .table-warning { background-color: rgba(255, 193, 7, 0.25) !important; }
+    [data-bs-theme="dark"] .table-danger { background-color: rgba(220, 53, 69, 0.25) !important; }
+    [data-bs-theme="dark"] .table-info { background-color: rgba(13, 202, 240, 0.2) !important; }
+    [data-bs-theme="dark"] .table-secondary { background-color: rgba(108, 117, 125, 0.2) !important; color: rgba(255, 255, 255, 0.75) !important; }
 
     .assembly-group-header td {
       background-color: rgba(111, 66, 193, 0.08) !important;
@@ -1024,6 +1058,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   showPrintModal = false;
   showDistributeModal = false;
   showDeleteLineItemModal = false;
+  showUndoPickModal = false;
 
   sortMode: SortMode = 'part_number';
   hideCompleted = false;
@@ -1035,8 +1070,12 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   keyboardSelectedIndex = -1;
   distributeItem: LineItemWithPicks | null = null;
   deleteLineItemTarget: LineItemWithPicks | null = null;
+  undoPickTarget: LineItemWithPicks | null = null;
   overPickWarning: string | null = null;
   scrollToItemId: string | null = null;
+
+  // Parts data
+  partsMap = new Map<string, Part>();
 
   // Tag printing
   showPrintTagDialog = false;
@@ -1092,6 +1131,8 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     private excelService: ExcelService,
     private bomTemplatesService: BomTemplatesService,
     private activityLogService: ActivityLogService,
+    private partsService: PartsService,
+    private modalService: NgbModal,
     public utils: UtilsService
   ) {
     // Bind getToolPicked for child component
@@ -1114,7 +1155,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     if (this.showPartialPickModal || this.showUndoToolModal || this.showReportIssueModal ||
         this.showSaveTemplateModal || this.showPrintModal || this.showDistributeModal ||
         this.showAddToolModal || this.showManageToolsModal || this.showAddLineItemModal ||
-        this.showDeleteLineItemModal) {
+        this.showDeleteLineItemModal || this.showUndoPickModal) {
       return;
     }
 
@@ -1256,6 +1297,9 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
         this.openIssues = new Set(
           issues.filter(i => i.status === 'open').map(i => i.line_item_id)
         );
+      }),
+      this.partsService.parts$.subscribe(parts => {
+        this.partsMap = new Map(parts.map(p => [p.part_number, p]));
       })
     );
   }
@@ -1687,13 +1731,26 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     this.isSubmitting = null;
   }
 
-  async handleUndoLastPick(item: LineItemWithPicks): Promise<void> {
+  handleUndoLastPick(item: LineItemWithPicks): void {
     const history = this.getPickHistoryForItem(item.id);
     if (history.length === 0) return;
 
-    this.isSubmitting = item.id;
+    this.undoPickTarget = item;
+    this.showUndoPickModal = true;
+  }
+
+  async confirmUndoPick(): Promise<void> {
+    if (!this.undoPickTarget) return;
+
+    const history = this.getPickHistoryForItem(this.undoPickTarget.id);
+    if (history.length === 0) return;
+
+    this.isSubmitting = this.undoPickTarget.id;
     await this.picksService.undoPick(history[0].pick.id, this.settingsService.getUserName());
     this.isSubmitting = null;
+
+    this.showUndoPickModal = false;
+    this.undoPickTarget = null;
   }
 
   async handleDeletePick(pick: Pick): Promise<void> {
@@ -2032,5 +2089,39 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   closePrintTagDialog(): void {
     this.showPrintTagDialog = false;
     this.printTagData = null;
+  }
+
+  // Parts integration methods
+  getPartClassification(partNumber: string) {
+    return this.partsMap.get(partNumber)?.classification_type || null;
+  }
+
+  isAssemblyPart(partNumber: string): boolean {
+    return this.partsMap.get(partNumber)?.classification_type === 'assembly';
+  }
+
+  openBOMDialog(item: LineItemWithPicks): void {
+    const part = this.partsMap.get(item.part_number);
+    if (part) {
+      const modalRef = this.modalService.open(ExplodedBOMDialogComponent, {
+        size: 'lg',
+        scrollable: true
+      });
+      modalRef.componentInstance.partId = part.id;
+      modalRef.componentInstance.partNumber = item.part_number;
+      modalRef.componentInstance.partDescription = item.description;
+    }
+  }
+
+  async openPartDetail(partNumber: string, event?: Event): Promise<void> {
+    event?.stopPropagation();
+    const part = await this.partsService.getPartByPartNumber(partNumber);
+    if (part) {
+      const modalRef = this.modalService.open(PartDetailComponent, {
+        size: 'lg',
+        scrollable: true
+      });
+      modalRef.componentInstance.partId = part.id;
+    }
   }
 }

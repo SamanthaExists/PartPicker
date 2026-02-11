@@ -3,32 +3,40 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ConsolidatedPartsService } from '../../services/consolidated-parts.service';
 import { PicksService } from '../../services/picks.service';
 import { SettingsService } from '../../services/settings.service';
 import { PartIssuesService } from '../../services/part-issues.service';
+import { PartsService } from '../../services/parts.service';
 import { UtilsService } from '../../services/utils.service';
+import { ExcelService } from '../../services/excel.service';
 import { ConsolidatedPart, PartIssueType } from '../../models';
 import { MultiOrderPickDialogComponent } from '../../components/dialogs/multi-order-pick-dialog.component';
 import { ReportPartIssueDialogComponent } from '../../components/dialogs/report-part-issue-dialog.component';
+import { PartDetailComponent } from '../../components/parts/part-detail.component';
 
 type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock' | 'has_issues';
 
 @Component({
   selector: 'app-consolidated-parts',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, MultiOrderPickDialogComponent, ReportPartIssueDialogComponent],
+  imports: [CommonModule, RouterModule, FormsModule, MultiOrderPickDialogComponent, ReportPartIssueDialogComponent, PartDetailComponent],
   template: `
     <div>
       <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
         <div>
-          <h1 class="h3 fw-bold mb-1">Consolidated Parts</h1>
+          <h1 class="h3 fw-bold mb-1">Part Picker</h1>
           <p class="text-muted mb-0">View all parts needed across active orders</p>
         </div>
-        <div>
+        <div class="d-flex gap-2">
           <button class="btn btn-outline-primary" (click)="copyPartNumbers()" [disabled]="filteredParts.length === 0">
             <i class="bi bi-clipboard me-1"></i>
             Copy Part Numbers
+          </button>
+          <button class="btn btn-outline-secondary" (click)="exportPartNumbers()" [disabled]="filteredParts.length === 0">
+            <i class="bi bi-download me-1"></i>
+            Export Part #s
           </button>
         </div>
       </div>
@@ -40,6 +48,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
             <div class="card-body">
               <p class="text-muted small mb-1">Total Parts</p>
               <h3 class="mb-0 fw-bold">{{ filteredParts.length }}</h3>
+              <small class="text-muted">&nbsp;</small>
             </div>
           </div>
         </div>
@@ -152,6 +161,20 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                     <span *ngIf="totalOutOfStockCount > 0" class="badge bg-secondary ms-1">{{ totalOutOfStockCount }}</span>
                   </label>
                 </div>
+                <div class="form-check ms-3">
+                  <input class="form-check-input" type="checkbox" id="hideIssues"
+                         [(ngModel)]="hideIssues">
+                  <label class="form-check-label" for="hideIssues">
+                    Hide issues
+                    <span *ngIf="issueCount > 0" class="badge bg-secondary ms-1">{{ issueCount }}</span>
+                  </label>
+                </div>
+                <select class="form-select form-select-sm ms-3" style="width: auto;"
+                        [(ngModel)]="sortMode">
+                  <option value="part_number">Sort: Part Number</option>
+                  <option value="location">Sort: Location</option>
+                  <option value="assembly">Sort: Assembly</option>
+                </select>
               </div>
             </div>
           </div>
@@ -197,27 +220,79 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let part of filteredParts; let idx = index"
-                  [id]="'part-row-' + idx"
+              <ng-container *ngFor="let part of sortedParts; let idx = index">
+                <!-- Location Group Header -->
+                <tr *ngIf="sortMode === 'location' && shouldShowLocationHeader(part, idx)" class="location-group-header">
+                  <td colspan="9" class="py-2">
+                    <div class="d-flex align-items-center gap-2">
+                      <i class="bi bi-geo-alt text-primary"></i>
+                      <strong>{{ getLocationPrefix(part.location) || 'No Location' }}</strong>
+                      <span class="badge bg-secondary">{{ getLocationGroupCount(part) }} parts</span>
+                    </div>
+                  </td>
+                </tr>
+                <!-- Assembly Group Header -->
+                <tr *ngIf="sortMode === 'assembly' && shouldShowAssemblyGroupHeader(part, idx)" class="assembly-group-header">
+                  <td colspan="9" class="py-2">
+                    <div class="d-flex align-items-center gap-2">
+                      <i class="bi bi-box-seam text-purple"></i>
+                      <strong>{{ getPartAssemblyName(part) || 'Unassigned' }}</strong>
+                      <span class="badge bg-secondary">{{ getAssemblyGroupCount(part) }} parts</span>
+                    </div>
+                  </td>
+                </tr>
+              <tr [id]="'part-row-' + idx"
                   [class.table-success]="part.remaining === 0"
                   [class.table-warning]="part.total_picked > 0 && part.remaining > 0"
                   [class.table-danger]="getQtyAvailable(part) === 0 && part.remaining > 0">
                 <td class="font-mono fw-medium">
-                  {{ part.part_number }}
+                  <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(part.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ part.part_number }}</span>
                   <span class="badge bg-danger ms-1" *ngIf="hasPartIssue(part.part_number)">
                     <i class="bi bi-exclamation-triangle-fill"></i> Issue
                   </span>
+                  <div *ngIf="getPartAssemblies(part).length > 0" class="d-flex flex-wrap gap-1 mt-1">
+                    <span *ngFor="let asm of getPartAssemblies(part)" class="badge small"
+                          [ngClass]="{
+                            'bg-success-subtle text-success-emphasis border-success': part.remaining === 0,
+                            'bg-warning-subtle text-warning-emphasis border-warning': part.total_picked > 0 && part.remaining > 0,
+                            'bg-danger-subtle text-danger-emphasis border-danger': getQtyAvailable(part) === 0 && part.remaining > 0,
+                            'bg-purple-subtle text-purple border-purple': part.total_picked === 0 && !(getQtyAvailable(part) === 0 && part.remaining > 0)
+                          }">
+                      {{ asm }}
+                    </span>
+                  </div>
                 </td>
-                <td class="text-muted">{{ part.description || '-' }}</td>
-                <td>{{ part.location || '-' }}</td>
+                <td [ngClass]="{
+                      'text-success-emphasis': part.remaining === 0,
+                      'text-warning-emphasis': part.total_picked > 0 && part.remaining > 0 && !(getQtyAvailable(part) === 0 && part.remaining > 0),
+                      'text-danger-emphasis': getQtyAvailable(part) === 0 && part.remaining > 0,
+                      'text-muted': part.total_picked === 0 && !(getQtyAvailable(part) === 0 && part.remaining > 0)
+                    }">{{ part.description || '-' }}</td>
+                <td [ngClass]="{
+                      'text-success-emphasis': part.remaining === 0,
+                      'text-warning-emphasis': part.total_picked > 0 && part.remaining > 0 && !(getQtyAvailable(part) === 0 && part.remaining > 0),
+                      'text-danger-emphasis': getQtyAvailable(part) === 0 && part.remaining > 0
+                    }">{{ part.location || '-' }}</td>
                 <td class="text-center">
-                  <span [class.text-danger]="getQtyAvailable(part) !== null && getQtyAvailable(part)! < part.remaining"
-                        [class.fw-bold]="getQtyAvailable(part) !== null && getQtyAvailable(part)! < part.remaining">
+                  <span [ngClass]="{
+                          'text-danger-emphasis': getQtyAvailable(part) === 0 && part.remaining > 0,
+                          'fw-bold': getQtyAvailable(part) !== null && getQtyAvailable(part)! < part.remaining && part.remaining !== 0,
+                          'text-warning-emphasis': part.total_picked > 0 && part.remaining > 0 && !(getQtyAvailable(part) === 0 && part.remaining > 0),
+                          'text-success-emphasis': part.remaining === 0
+                        }">
                     {{ getQtyAvailable(part) ?? '-' }}
                   </span>
                 </td>
-                <td class="text-center">{{ part.total_needed }}</td>
-                <td class="text-center">{{ part.total_picked }}</td>
+                <td class="text-center" [ngClass]="{
+                      'text-success-emphasis': part.remaining === 0,
+                      'text-warning-emphasis': part.total_picked > 0 && part.remaining > 0 && !(getQtyAvailable(part) === 0 && part.remaining > 0),
+                      'text-danger-emphasis': getQtyAvailable(part) === 0 && part.remaining > 0
+                    }">{{ part.total_needed }}</td>
+                <td class="text-center" [ngClass]="{
+                      'text-success-emphasis': part.remaining === 0,
+                      'text-warning-emphasis': part.total_picked > 0 && part.remaining > 0 && !(getQtyAvailable(part) === 0 && part.remaining > 0),
+                      'text-danger-emphasis': getQtyAvailable(part) === 0 && part.remaining > 0
+                    }">{{ part.total_picked }}</td>
                 <td class="text-center">
                   <span class="badge" [ngClass]="part.remaining === 0 ? 'bg-success' : 'bg-warning text-dark'">
                     {{ part.remaining }}
@@ -227,9 +302,11 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                   <div class="d-flex flex-wrap gap-1">
                     <a *ngFor="let order of part.orders"
                        [routerLink]="['/orders', order.order_id]"
-                       class="badge bg-body-secondary text-body border text-decoration-none">
-                      SO-{{ order.so_number }}
-                      <span class="text-muted">({{ order.picked }}/{{ order.needed }})</span>
+                       class="badge border text-decoration-none"
+                       [ngClass]="part.remaining === 0 ? 'bg-success-subtle text-success-emphasis border-success' : 'bg-body-secondary text-body'"
+                       [title]="'SO-' + order.so_number + ' - ' + order.tool_number">
+                      SO-{{ order.so_number }}-{{ order.tool_number }}
+                      <span [ngClass]="part.remaining === 0 ? 'text-success' : 'text-muted'">({{ order.picked }}/{{ order.needed }})</span>
                     </a>
                   </div>
                 </td>
@@ -254,6 +331,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                   </div>
                 </td>
               </tr>
+              </ng-container>
             </tbody>
           </table>
         </div>
@@ -286,6 +364,23 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
     .cursor-pointer:hover {
       border-color: var(--bs-primary) !important;
     }
+    .location-group-header td {
+      background-color: rgba(13, 110, 253, 0.08) !important;
+      border-left: 3px solid #0d6efd;
+    }
+    :host-context([data-bs-theme="dark"]) .location-group-header td {
+      background-color: rgba(13, 110, 253, 0.15) !important;
+    }
+    .assembly-group-header td {
+      background-color: rgba(111, 66, 193, 0.08) !important;
+      border-left: 3px solid #6f42c1;
+    }
+    :host-context([data-bs-theme="dark"]) .assembly-group-header td {
+      background-color: rgba(111, 66, 193, 0.15) !important;
+    }
+    .text-purple { color: #6f42c1; }
+    .bg-purple-subtle { background-color: rgba(111, 66, 193, 0.1); }
+    .border-purple { border-color: #6f42c1 !important; }
   `]
 })
 export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
@@ -297,6 +392,8 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   copyMessage = '';
   hideOutOfStock = false;
   showOutOfStockOnly = false;
+  hideIssues = false;
+  sortMode: 'part_number' | 'location' | 'assembly' = 'part_number';
   selectedAssemblies = new Set<string>();
 
   // Multi-order pick dialog
@@ -308,9 +405,6 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   showReportIssue = false;
   selectedPartForIssue: ConsolidatedPart | null = null;
 
-  // Track qty_available per part (may need to fetch from line_items)
-  private qtyAvailableMap: Map<string, number | null> = new Map();
-
   private subscriptions: Subscription[] = [];
 
   constructor(
@@ -319,8 +413,11 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     private settingsService: SettingsService,
     public partIssuesService: PartIssuesService,
     public utils: UtilsService,
+    private excelService: ExcelService,
     private route: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private catalogPartsService: PartsService,
+    private modalService: NgbModal
   ) {}
 
   ngOnInit(): void {
@@ -337,13 +434,6 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     this.subscriptions.push(
       this.partsService.parts$.subscribe(parts => {
         this.parts = parts;
-        // Extract qty_available from first order's line item if available
-        parts.forEach(p => {
-          // We'll need to track this - for now using null
-          if (!this.qtyAvailableMap.has(p.part_number)) {
-            this.qtyAvailableMap.set(p.part_number, null);
-          }
-        });
         // Scroll to tracked part after data refresh
         if (this.scrollToPartNumber) {
           this.scrollToPartByNumber();
@@ -428,7 +518,8 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   }
 
   getQtyAvailable(part: ConsolidatedPart): number | null {
-    return this.qtyAvailableMap.get(part.part_number) ?? null;
+    // Return qty_available directly from the part object instead of the map
+    return part.qty_available;
   }
 
   get filteredParts(): ConsolidatedPart[] {
@@ -468,7 +559,10 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
       const matchesAssembly = this.selectedAssemblies.size === 0 ||
         part.orders.some(o => !!o.tool_model && this.selectedAssemblies.has(o.tool_model));
 
-      return matchesSearch && matchesFilter && matchesStock && matchesOutOfStockOnly && matchesAssembly;
+      // Hide issues filter
+      const matchesIssues = !this.hideIssues || !this.partIssuesService.hasOpenIssue(part.part_number);
+
+      return matchesSearch && matchesFilter && matchesStock && matchesOutOfStockOnly && matchesAssembly && matchesIssues;
     });
   }
 
@@ -525,7 +619,7 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     this.showMultiOrderPick = true;
   }
 
-  async handleMultiOrderPick(picks: { lineItemId: string; qty: number }[]): Promise<void> {
+  async handleMultiOrderPick(picks: { lineItemId: string; toolId: string; qty: number }[]): Promise<void> {
     const settings = this.settingsService.getSettings();
     const userName = settings.user_name || 'Unknown';
 
@@ -535,15 +629,9 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     }
 
     for (const pick of picks) {
-      // Find the order info for this line item
-      const orderInfo = this.selectedPart?.orders.find(o => o.line_item_id === pick.lineItemId);
-      if (!orderInfo) continue;
-
-      // We need to get the tool_id for this order to record the pick
-      // For consolidated picks, we'll pick for the first tool of the order
-      // This is a simplified approach - in production you might want to specify the tool
-      await this.picksService.recordPickForLineItem(
+      await this.picksService.recordPick(
         pick.lineItemId,
+        pick.toolId,
         pick.qty,
         userName
       );
@@ -551,6 +639,84 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
 
     // Refresh the parts list
     this.partsService.fetchParts();
+  }
+
+  // Sorting and grouping
+  get sortedParts(): ConsolidatedPart[] {
+    const parts = [...this.filteredParts];
+    if (this.sortMode === 'location') {
+      parts.sort((a, b) => {
+        const aLoc = this.getLocationPrefix(a.location) || 'zzz';
+        const bLoc = this.getLocationPrefix(b.location) || 'zzz';
+        const locCompare = aLoc.localeCompare(bLoc, undefined, { numeric: true });
+        if (locCompare !== 0) return locCompare;
+        return a.part_number.localeCompare(b.part_number, undefined, { numeric: true });
+      });
+    } else if (this.sortMode === 'assembly') {
+      parts.sort((a, b) => {
+        const aAsm = this.getPartAssemblyName(a) || 'zzz';
+        const bAsm = this.getPartAssemblyName(b) || 'zzz';
+        const asmCompare = aAsm.localeCompare(bAsm, undefined, { numeric: true });
+        if (asmCompare !== 0) return asmCompare;
+        return a.part_number.localeCompare(b.part_number, undefined, { numeric: true });
+      });
+    } else {
+      parts.sort((a, b) => a.part_number.localeCompare(b.part_number, undefined, { numeric: true }));
+    }
+    return parts;
+  }
+
+  getLocationPrefix(location: string | null | undefined): string {
+    if (!location) return '';
+    const parts = location.split('-');
+    if (parts.length >= 2) return parts.slice(0, 2).join('-');
+    return parts[0];
+  }
+
+  getPartAssemblyName(part: ConsolidatedPart): string {
+    const models = new Set<string>();
+    part.orders.forEach(o => {
+      if (o.tool_model) models.add(o.tool_model);
+    });
+    return Array.from(models).sort().join(', ');
+  }
+
+  getPartAssemblies(part: ConsolidatedPart): string[] {
+    const models = new Set<string>();
+    part.orders.forEach(o => {
+      if (o.tool_model) models.add(o.tool_model);
+    });
+    return Array.from(models).sort();
+  }
+
+  shouldShowLocationHeader(part: ConsolidatedPart, index: number): boolean {
+    if (index === 0) return true;
+    const sorted = this.sortedParts;
+    const prevPart = sorted[index - 1];
+    return this.getLocationPrefix(part.location) !== this.getLocationPrefix(prevPart.location);
+  }
+
+  shouldShowAssemblyGroupHeader(part: ConsolidatedPart, index: number): boolean {
+    if (index === 0) return true;
+    const sorted = this.sortedParts;
+    const prevPart = sorted[index - 1];
+    return this.getPartAssemblyName(part) !== this.getPartAssemblyName(prevPart);
+  }
+
+  getLocationGroupCount(part: ConsolidatedPart): number {
+    const prefix = this.getLocationPrefix(part.location);
+    return this.sortedParts.filter(p => this.getLocationPrefix(p.location) === prefix).length;
+  }
+
+  getAssemblyGroupCount(part: ConsolidatedPart): number {
+    const name = this.getPartAssemblyName(part);
+    return this.sortedParts.filter(p => this.getPartAssemblyName(p) === name).length;
+  }
+
+  // Export part numbers to Excel
+  async exportPartNumbers(): Promise<void> {
+    const partNumbers = this.filteredParts.map(p => p.part_number);
+    await this.excelService.exportPartNumbersToExcel(partNumbers);
   }
 
   // Part Issues
@@ -585,5 +751,17 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     await this.partIssuesService.resolveIssue(issueId, userName || undefined);
     this.showReportIssue = false;
     this.selectedPartForIssue = null;
+  }
+
+  async openPartDetail(partNumber: string, event?: Event): Promise<void> {
+    event?.stopPropagation();
+    const part = await this.catalogPartsService.getPartByPartNumber(partNumber);
+    if (part) {
+      const modalRef = this.modalService.open(PartDetailComponent, {
+        size: 'lg',
+        scrollable: true
+      });
+      modalRef.componentInstance.partId = part.id;
+    }
   }
 }

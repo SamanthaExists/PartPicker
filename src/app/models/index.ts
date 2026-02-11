@@ -67,6 +67,7 @@ export interface Issue {
   created_at: string;
   resolved_at: string | null;
   resolved_by: string | null;
+  resolution_notes: string | null;
 }
 
 export interface IssueWithDetails extends Issue {
@@ -111,6 +112,8 @@ export interface ConsolidatedPart {
     so_number: string;
     order_date: string | null;
     tool_model: string | null;
+    tool_id: string;
+    tool_number: string;
     needed: number;
     picked: number;
     line_item_id: string;
@@ -163,6 +166,7 @@ export interface ImportedLineItem {
   total_qty_needed: number;
   tool_ids?: string[];
   assembly_group?: string;
+  classification_type?: 'purchased' | 'manufactured' | 'assembly' | 'modified' | null;
 }
 
 // Pick Undo audit trail
@@ -232,6 +236,7 @@ export interface BOMTemplate {
   id: string;
   name: string;
   tool_model: string | null;
+  template_type?: 'bom' | 'assembly';
   created_at: string;
   updated_at: string;
 }
@@ -274,6 +279,7 @@ export interface PartIssue {
   created_at: string;
   resolved_at: string | null;
   resolved_by: string | null;
+  resolution_notes: string | null;
 }
 
 export function getPartIssueTypeLabel(type: PartIssueType): string {
@@ -306,4 +312,62 @@ export interface LineItemInput {
   qty_available?: number;
   tool_ids?: string[];
   assembly_group?: string;
+}
+
+// Parts Master Catalog - Enhanced part management with classification and relationships
+export type ClassificationType = 'purchased' | 'manufactured' | 'assembly' | 'modified';
+
+export interface Part {
+  id: string;
+  part_number: string;
+  description: string | null;
+  classification_type: ClassificationType | null;
+  default_location: string | null;
+  base_part_id: string | null; // For modified parts: reference to original part
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PartRelationship {
+  id: string;
+  parent_part_id: string;
+  child_part_id: string;
+  quantity: number;
+  reference_designator: string | null;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface PartWithStats extends Part {
+  child_count: number; // How many parts this assembly contains
+  used_in_count: number; // How many assemblies use this part
+}
+
+export interface PartWithRelationships extends Part {
+  children: (PartRelationship & { part: Part })[]; // Parts this assembly contains
+  used_in: (PartRelationship & { part: Part })[]; // Assemblies that use this part
+  base_part?: Part; // For modified parts: the original part
+  modifications?: Part[]; // Parts that are modifications of this one
+}
+
+export interface ExplodedPart {
+  parent_part_id: string;
+  part_id: string;
+  part_number: string;
+  description: string | null;
+  classification_type: ClassificationType | null;
+  total_quantity: number;
+  max_level: number;
+}
+
+export interface ModificationChainItem {
+  part: Part;
+  level: number; // 0 = original, 1+ = modification depth
+}
+
+export interface CircularReferenceWarning {
+  would_cycle: boolean;
+  message: string;
 }

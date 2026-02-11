@@ -156,12 +156,13 @@ export class BomTemplatesService implements OnDestroy {
   /**
    * Create a new empty template
    */
-  async createTemplate(name: string, toolModel?: string): Promise<BOMTemplate | null> {
+  async createTemplate(name: string, toolModel?: string, templateType: 'bom' | 'assembly' = 'bom'): Promise<BOMTemplate | null> {
     try {
       const { data, error: insertError } = await this.supabase.from('bom_templates')
         .insert({
           name,
           tool_model: toolModel || null,
+          template_type: templateType,
         })
         .select()
         .single();

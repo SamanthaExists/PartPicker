@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, RouterOutlet } from '@angular/router';
 import { SettingsService } from './services/settings.service';
 import { GlobalSearchComponent } from './components/layout/global-search.component';
+import { ThemeToggleComponent } from './components/layout/theme-toggle.component';
 import { InstallPromptComponent } from './components/pwa/install-prompt.component';
 import { UpdatePromptComponent } from './components/pwa/update-prompt.component';
 import { OfflineIndicatorComponent } from './components/pwa/offline-indicator.component';
@@ -17,6 +18,7 @@ import { NamePromptComponent } from './components/auth/name-prompt.component';
     RouterModule,
     RouterOutlet,
     GlobalSearchComponent,
+    ThemeToggleComponent,
     InstallPromptComponent,
     UpdatePromptComponent,
     OfflineIndicatorComponent,
@@ -64,6 +66,7 @@ import { NamePromptComponent } from './components/auth/name-prompt.component';
           </button>
           <span class="fw-bold">Tool Pick List</span>
           <div class="ms-auto d-flex align-items-center gap-2">
+            <app-theme-toggle buttonClass="btn-outline-secondary"></app-theme-toggle>
             <app-global-search></app-global-search>
             <span class="online-indicator" [class.online]="isOnline" [class.offline]="!isOnline"></span>
           </div>
@@ -110,7 +113,8 @@ import { NamePromptComponent } from './components/auth/name-prompt.component';
         <!-- Desktop Header -->
         <header class="d-none d-lg-flex align-items-center justify-content-between p-3 border-bottom bg-body" style="height: 56px;">
           <app-global-search></app-global-search>
-          <div class="d-flex align-items-center">
+          <div class="d-flex align-items-center gap-2">
+            <app-theme-toggle buttonClass="btn-outline-secondary"></app-theme-toggle>
             <span class="online-indicator me-2" [class.online]="isOnline" [class.offline]="!isOnline"></span>
             <span class="text-muted small">{{ isOnline ? 'Online' : 'Offline' }}</span>
           </div>
@@ -154,7 +158,8 @@ export class AppComponent implements OnInit {
   navItems = [
     { path: '/', label: 'Dashboard', icon: 'bi-speedometer2' },
     { path: '/orders', label: 'Orders', icon: 'bi-clipboard-data' },
-    { path: '/parts', label: 'Parts', icon: 'bi-box-seam' },
+    { path: '/parts', label: 'Part Picker', icon: 'bi-box-seam' },
+    { path: '/parts-catalog', label: 'Catalog', icon: 'bi-journal-text' },
     { path: '/items-to-order', label: 'Items to Order', icon: 'bi-cart' },
     { path: '/issues', label: 'Issues', icon: 'bi-exclamation-triangle' },
     { path: '/activity', label: 'Activity History', icon: 'bi-clock-history' },

@@ -67,6 +67,19 @@ export class ConsolidatedPartsService implements OnDestroy {
         return;
       }
 
+      // Fetch tools for active orders
+      const { data: toolsData, error: toolsError } = await this.supabase.from('tools')
+        .select('id, order_id, tool_number, tool_model')
+        .in('order_id', activeOrderIds);
+
+      console.log('[ConsolidatedParts] Tools query result:', { count: toolsData?.length, error: toolsError });
+      if (toolsError) throw toolsError;
+
+      const toolMap = new Map<string, { order_id: string; tool_number: string; tool_model: string | null }>();
+      for (const tool of toolsData || []) {
+        toolMap.set(tool.id, { order_id: tool.order_id, tool_number: tool.tool_number, tool_model: tool.tool_model });
+      }
+
       // Fetch line items for active orders with pagination
       let lineItemsData: any[] = [];
       {
@@ -107,8 +120,9 @@ export class ConsolidatedPartsService implements OnDestroy {
         const batchResults = await Promise.all(
           batches.map(batch =>
             this.supabase.from('picks')
-              .select('line_item_id, qty_picked')
+              .select('line_item_id, tool_id, qty_picked')
               .in('line_item_id', batch)
+              .is('undone_at', null) // Exclude undone picks
           )
         );
 
@@ -120,54 +134,75 @@ export class ConsolidatedPartsService implements OnDestroy {
         }
       }
 
-      // Calculate picks by line item
-      const picksByLineItem = new Map<string, number>();
+      // Calculate picks by line item AND tool
+      const picksByLineItemAndTool = new Map<string, number>();
       for (const pick of picksData) {
-        const current = picksByLineItem.get(pick.line_item_id) || 0;
-        picksByLineItem.set(pick.line_item_id, current + pick.qty_picked);
+        const key = `${pick.line_item_id}:${pick.tool_id}`;
+        const current = picksByLineItemAndTool.get(key) || 0;
+        picksByLineItemAndTool.set(key, current + pick.qty_picked);
       }
 
-      // Group by part number
+      // Group by part number, breaking down by individual tools
       const partMap = new Map<string, ConsolidatedPart>();
 
       for (const item of lineItemsData || []) {
-        const pickedQty = picksByLineItem.get(item.id) || 0;
-        const existing = partMap.get(item.part_number);
-
         const orderInfo = orderMap.get(item.order_id);
-        if (existing) {
-          existing.total_needed += item.total_qty_needed;
-          existing.total_picked += pickedQty;
-          existing.remaining = existing.total_needed - existing.total_picked;
-          existing.orders.push({
-            order_id: item.order_id,
-            so_number: orderInfo?.so_number || 'Unknown',
-            order_date: orderInfo?.order_date || null,
-            tool_model: orderInfo?.tool_model || null,
-            needed: item.total_qty_needed,
-            picked: pickedQty,
-            line_item_id: item.id,
-          });
-        } else {
-          partMap.set(item.part_number, {
-            part_number: item.part_number,
-            description: item.description,
-            location: item.location,
-            qty_available: item.qty_available ?? null,
-            qty_on_order: item.qty_on_order ?? null,
-            total_needed: item.total_qty_needed,
-            total_picked: pickedQty,
-            remaining: item.total_qty_needed - pickedQty,
-            orders: [{
+
+        // Get all tools for this order
+        const toolsForOrder = Array.from(toolMap.entries())
+          .filter(([_, toolInfo]) => toolInfo.order_id === item.order_id)
+          .map(([toolId, toolInfo]) => ({ toolId, ...toolInfo }));
+
+        // If line item has specific tool_ids, filter to those
+        const relevantTools = item.tool_ids && item.tool_ids.length > 0
+          ? toolsForOrder.filter(t => item.tool_ids.includes(t.toolId))
+          : toolsForOrder;
+
+        // For each tool, add a separate entry
+        for (const tool of relevantTools) {
+          const key = `${item.id}:${tool.toolId}`;
+          const pickedQty = picksByLineItemAndTool.get(key) || 0;
+
+          const existing = partMap.get(item.part_number);
+
+          if (existing) {
+            existing.total_needed += item.qty_per_unit;
+            existing.total_picked += pickedQty;
+            existing.remaining = existing.total_needed - existing.total_picked;
+            existing.orders.push({
               order_id: item.order_id,
               so_number: orderInfo?.so_number || 'Unknown',
               order_date: orderInfo?.order_date || null,
-              tool_model: orderInfo?.tool_model || null,
-              needed: item.total_qty_needed,
+              tool_model: tool.tool_model || orderInfo?.tool_model || null,
+              tool_id: tool.toolId,
+              tool_number: tool.tool_number,
+              needed: item.qty_per_unit,
               picked: pickedQty,
               line_item_id: item.id,
-            }],
-          });
+            });
+          } else {
+            partMap.set(item.part_number, {
+              part_number: item.part_number,
+              description: item.description,
+              location: item.location,
+              qty_available: item.qty_available ?? null,
+              qty_on_order: item.qty_on_order ?? null,
+              total_needed: item.qty_per_unit,
+              total_picked: pickedQty,
+              remaining: item.qty_per_unit - pickedQty,
+              orders: [{
+                order_id: item.order_id,
+                so_number: orderInfo?.so_number || 'Unknown',
+                order_date: orderInfo?.order_date || null,
+                tool_model: tool.tool_model || orderInfo?.tool_model || null,
+                tool_id: tool.toolId,
+                tool_number: tool.tool_number,
+                needed: item.qty_per_unit,
+                picked: pickedQty,
+                line_item_id: item.id,
+              }],
+            });
+          }
         }
       }
 

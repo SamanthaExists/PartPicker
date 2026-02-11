@@ -182,6 +182,15 @@ const PAGE_SIZE = 50;
         </div>
       </div>
 
+      <!-- Error Banner -->
+      <div *ngIf="error" class="alert alert-danger d-flex align-items-start gap-2" role="alert">
+        <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+        <div>
+          <strong>Error loading data</strong>
+          <p class="mb-0 small">{{ error }}</p>
+        </div>
+      </div>
+
       <!-- Results -->
       <ng-container *ngIf="hasSearched">
         <!-- Summary Stats (filter-reactive via summaryStats) -->
@@ -460,6 +469,7 @@ export class PickHistoryComponent implements OnInit {
   totalActivityLogCount = 0;
   hasSearched = false;
   exporting = false;
+  error: string | null = null;
 
   // Activity type filters
   showPicks = true;
@@ -682,6 +692,8 @@ export class PickHistoryComponent implements OnInit {
     try {
       this.loading = true;
       this.hasSearched = true;
+      this.error = null;
+      const errors: string[] = [];
 
       const startISO = new Date(this.startDate).toISOString();
       const endISO = new Date(this.endDate).toISOString();
@@ -716,6 +728,7 @@ export class PickHistoryComponent implements OnInit {
 
       if (picksError) {
         console.error('Error fetching picks:', picksError);
+        errors.push(`Picks: ${picksError.message}`);
       }
 
       // Transform picks
@@ -798,6 +811,7 @@ export class PickHistoryComponent implements OnInit {
 
         if (issuesError) {
           console.error('Error fetching issues:', issuesError);
+          errors.push(`Issues: ${issuesError.message}`);
         }
 
         const transformedIssues: IssueRecord[] = [];
@@ -852,6 +866,7 @@ export class PickHistoryComponent implements OnInit {
 
         if (undoError) {
           console.error('Error fetching undos:', undoError);
+          errors.push(`Undos: ${undoError.message}`);
         }
 
         this.undos = (undoData || []).map((undo: any) => ({
@@ -880,6 +895,7 @@ export class PickHistoryComponent implements OnInit {
 
         if (activityLogError) {
           console.error('Error fetching activity logs:', activityLogError);
+          errors.push(`Activity Log: ${activityLogError.message}`);
         }
 
         this.activityLogs = (activityLogData || []).map((log: any) => ({
@@ -895,8 +911,13 @@ export class PickHistoryComponent implements OnInit {
         }));
         this.totalActivityLogCount = this.activityLogs.length;
       }
+
+      if (errors.length > 0) {
+        this.error = errors.join(' | ');
+      }
     } catch (err) {
       console.error('Error fetching data:', err);
+      this.error = err instanceof Error ? err.message : 'An unexpected error occurred while fetching data';
       this.picks = [];
       this.issues = [];
       this.undos = [];

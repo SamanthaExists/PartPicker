@@ -149,7 +149,6 @@ type SortOption = 'created' | 'due-date' | 'so-number';
                   </span>
                 </div>
                 <div class="d-flex flex-wrap gap-3 small text-muted">
-                  <span *ngIf="order.tool_model" class="fw-medium">{{ order.tool_model }}</span>
                   <span *ngIf="order.customer_name">{{ order.customer_name }}</span>
                   <span *ngIf="order.po_number">PO: {{ order.po_number }}</span>
                   <span *ngIf="order.due_date" [class.text-danger]="order.status === 'active' && utils.getDueDateStatus(order.due_date).status === 'overdue'">
@@ -211,10 +210,6 @@ type SortOption = 'created' | 'due-date' | 'so-number';
                   <input type="text" class="form-control" placeholder="Customer name" [(ngModel)]="newOrder.customer_name">
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">Tool Model</label>
-                  <input type="text" class="form-control" placeholder="e.g., 230Q, NG1" [(ngModel)]="newOrder.tool_model">
-                </div>
-                <div class="col-md-6">
                   <label class="form-label">Quantity (# of Tools)</label>
                   <input type="number" class="form-control" min="1" placeholder="1" [(ngModel)]="newOrder.quantity">
                 </div>
@@ -259,7 +254,6 @@ export class OrdersComponent implements OnInit, OnDestroy {
     so_number: '',
     po_number: '',
     customer_name: '',
-    tool_model: '',
     quantity: 1,
     order_date: '',
     due_date: '',
@@ -299,7 +293,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
       const matchesStatus = this.statusFilter === 'all' || order.status === this.statusFilter;
       const matchesHideCompleted = !this.hideCompleted || order.status !== 'complete';
       const matchesAssembly = this.selectedAssemblies.size === 0 ||
-        (!!order.tool_model && this.selectedAssemblies.has(order.tool_model));
+        order.tools.some(tool => tool.tool_model && this.selectedAssemblies.has(tool.tool_model));
 
       return matchesSearch && matchesStatus && matchesHideCompleted && matchesAssembly;
     });
@@ -323,7 +317,9 @@ export class OrdersComponent implements OnInit, OnDestroy {
   get uniqueAssemblies(): string[] {
     const models = new Set<string>();
     this.orders.forEach(o => {
-      if (o.tool_model) models.add(o.tool_model);
+      o.tools.forEach(tool => {
+        if (tool.tool_model) models.add(tool.tool_model);
+      });
     });
     return Array.from(models).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }
@@ -358,7 +354,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
       so_number: this.newOrder.so_number.trim(),
       po_number: this.newOrder.po_number.trim() || null,
       customer_name: this.newOrder.customer_name.trim() || null,
-      tool_model: this.newOrder.tool_model.trim() || null,
+      tool_model: null,
       quantity: this.newOrder.quantity || 1,
       order_date: this.newOrder.order_date || null,
       due_date: this.newOrder.due_date || null,
@@ -390,7 +386,6 @@ export class OrdersComponent implements OnInit, OnDestroy {
       so_number: '',
       po_number: '',
       customer_name: '',
-      tool_model: '',
       quantity: 1,
       order_date: '',
       due_date: '',

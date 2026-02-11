@@ -171,10 +171,6 @@ interface PickHistoryItem {
               <p class="fw-medium mb-0">{{ order.po_number || '-' }}</p>
             </div>
             <div class="col-6 col-md-3">
-              <p class="text-muted small mb-1">Tool Model</p>
-              <p class="fw-medium mb-0">{{ order.tool_model || '-' }}</p>
-            </div>
-            <div class="col-6 col-md-3">
               <p class="text-muted small mb-1">Tools</p>
               <p class="fw-medium mb-0">{{ tools.length }} tool(s)</p>
             </div>
@@ -204,10 +200,6 @@ interface PickHistoryItem {
             <div class="col-md-3">
               <label class="form-label small">PO Number</label>
               <input type="text" class="form-control form-control-sm" [(ngModel)]="editForm.po_number">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label small">Tool Model</label>
-              <input type="text" class="form-control form-control-sm" [(ngModel)]="editForm.tool_model">
             </div>
             <div class="col-md-3">
               <label class="form-label small">Order Date</label>
@@ -622,7 +614,7 @@ interface PickHistoryItem {
               <div class="mb-3">
                 <label class="form-label">Tool Model</label>
                 <input type="text" class="form-control" [(ngModel)]="newToolModel"
-                       [placeholder]="order.tool_model || ''">
+                       placeholder="e.g., 230Q">
               </div>
               <div class="mb-3">
                 <label class="form-label">Serial Number (optional)</label>
@@ -674,7 +666,7 @@ interface PickHistoryItem {
                 </div>
                 <div class="col-3">
                   <input type="text" class="form-control form-control-sm" [(ngModel)]="newToolModel"
-                         [placeholder]="order.tool_model || 'Model'">
+                         placeholder="Model">
                 </div>
                 <div class="col-2">
                   <input type="text" class="form-control form-control-sm" [(ngModel)]="newToolSerial"
@@ -914,7 +906,7 @@ interface PickHistoryItem {
       <app-save-as-template-dialog
         [(show)]="showSaveTemplateModal"
         [lineItemsCount]="lineItems.length"
-        [defaultToolModel]="order.tool_model || null"
+        [defaultToolModel]="null"
         (saveTemplate)="handleSaveAsTemplate($event)"
       ></app-save-as-template-dialog>
 
@@ -1085,7 +1077,6 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     so_number: '',
     po_number: '',
     customer_name: '',
-    tool_model: '',
     order_date: '',
     due_date: '',
     notes: '',
@@ -1854,7 +1845,6 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     const parts = [
       this.order.customer_name,
       this.order.po_number ? 'PO: ' + this.order.po_number : null,
-      this.order.tool_model,
       this.order.due_date ? 'Due: ' + this.utils.formatDate(this.order.due_date) : null
     ].filter(x => x != null);
     return parts.length > 0 ? parts.join(' • ') : 'No details';
@@ -1877,7 +1867,6 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
       so_number: this.order.so_number || '',
       po_number: this.order.po_number || '',
       customer_name: this.order.customer_name || '',
-      tool_model: this.order.tool_model || '',
       order_date: this.order.order_date || '',
       due_date: this.order.due_date || '',
       notes: this.order.notes || '',
@@ -1896,7 +1885,6 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
       so_number: this.editForm.so_number || this.order.so_number,
       po_number: this.editForm.po_number || null,
       customer_name: this.editForm.customer_name || null,
-      tool_model: this.editForm.tool_model || null,
       order_date: this.editForm.order_date || null,
       due_date: this.editForm.due_date || null,
       notes: this.editForm.notes || null,

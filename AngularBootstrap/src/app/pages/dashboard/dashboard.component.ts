@@ -63,7 +63,7 @@ import { OrderWithProgress, RecentActivity, ConsolidatedPart, ItemToOrder } from
                   {{ utils.getDueDateStatus(order.due_date).label }}
                 </span>
                 <div class="small text-muted">
-                  {{ order.customer_name || order.tool_model || (order.tools.length + ' tool(s)') }}
+                  {{ order.customer_name || (order.tools.length + ' tool(s)') }}
                   <span *ngIf="order.due_date"> - Due: {{ utils.formatDate(order.due_date) }}</span>
                 </div>
               </div>

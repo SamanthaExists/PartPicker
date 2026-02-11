@@ -171,9 +171,55 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     this.settingsService.initializeTheme();
+    this.cleanupOldServiceWorkers();
 
     window.addEventListener('online', () => this.isOnline = true);
     window.addEventListener('offline', () => this.isOnline = false);
+  }
+
+  /**
+   * Detects and removes old service workers from the previous React app.
+   * This ensures users always get the latest Angular app without cached stale content.
+   */
+  private async cleanupOldServiceWorkers(): Promise<void> {
+    if (!('serviceWorker' in navigator)) {
+      return; // Service workers not supported
+    }
+
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+
+      for (const registration of registrations) {
+        const swUrl = registration.active?.scriptURL || '';
+
+        // Only unregister if it's NOT the Angular service worker
+        // Angular service worker is named 'ngsw-worker.js'
+        if (!swUrl.includes('ngsw-worker.js')) {
+          console.log('Removing old service worker:', swUrl);
+          await registration.unregister();
+
+          // Clear all caches associated with the old service worker
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(
+              cacheNames.map(cacheName => {
+                // Only clear non-Angular caches (Angular caches are prefixed with 'ngsw:')
+                if (!cacheName.startsWith('ngsw:')) {
+                  console.log('Clearing old cache:', cacheName);
+                  return caches.delete(cacheName);
+                }
+                return Promise.resolve();
+              })
+            );
+          }
+
+          console.log('Old service worker cleaned up successfully');
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to cleanup old service workers:', error);
+      // Don't throw - this is a best-effort cleanup
+    }
   }
 
   toggleSidebar(): void {

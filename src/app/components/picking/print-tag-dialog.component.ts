@@ -10,6 +10,7 @@ export interface TagData {
   qtyPicked: number;
   pickedBy: string;
   pickedAt: Date;
+  assembly?: string | null;
 }
 
 @Component({
@@ -41,7 +42,10 @@ export interface TagData {
                      style="width: 340px; height: 66px; font-size: 10px; font-family: Arial, sans-serif; margin: 0 auto;">
                   <div class="flex-grow-1 d-flex flex-column justify-content-between overflow-hidden">
                     <div class="d-flex justify-content-between align-items-baseline gap-1">
-                      <span class="fw-bold font-monospace text-truncate" style="font-size: 11px;">{{ firstTag?.partNumber }}</span>
+                      <div class="d-flex align-items-baseline gap-1 text-truncate">
+                        <span class="fw-bold font-monospace" style="font-size: 11px;">{{ firstTag?.partNumber }}</span>
+                        <span *ngIf="firstTag?.assembly" class="text-muted" style="font-size: 9px;">{{ formatAssemblyPath(firstTag?.assembly) }}</span>
+                      </div>
                       <span class="text-muted fw-medium flex-shrink-0" style="font-size: 9px;">Qty: {{ firstTag?.qtyPicked }}</span>
                     </div>
                     <div class="text-truncate text-secondary" style="font-size: 8px;">{{ firstTag?.location || 'N/A' }}</div>
@@ -129,6 +133,13 @@ export class PrintTagDialogComponent {
     return `${d.getMonth() + 1}/${d.getDate()}`;
   }
 
+  formatAssemblyPath(assembly: string | null | undefined): string {
+    if (!assembly) return '';
+    const parts = assembly.split(' > ');
+    parts.reverse();
+    return ' < ' + parts.join(' < ');
+  }
+
   onSkip(): void {
     this.close.emit();
   }
@@ -162,16 +173,20 @@ export class PrintTagDialogComponent {
 
   private generateTagsHTML(): string {
     const tags = this.tagsArray.map((tag, index) => {
-      const { partNumber, description, location, soNumber, toolNumber, qtyPicked, pickedBy, pickedAt } = tag;
+      const { partNumber, description, location, soNumber, toolNumber, qtyPicked, pickedBy, pickedAt, assembly } = tag;
       const date = new Date(pickedAt);
       const shortDate = `${date.getMonth() + 1}/${date.getDate()}`;
+      const assemblyPath = this.formatAssemblyPath(assembly);
 
       return `
         <div class="tag">
           <div class="tag-content">
             <div class="tag-text">
               <div class="tag-row-top">
-                <span class="part-number">${this.escapeHtml(partNumber)}</span>
+                <div class="part-number-container">
+                  <span class="part-number">${this.escapeHtml(partNumber)}</span>
+                  ${assemblyPath ? `<span class="assembly-path">${this.escapeHtml(assemblyPath)}</span>` : ''}
+                </div>
                 <span class="tag-count">Qty: ${qtyPicked}</span>
               </div>
               <div class="tag-row-location">
@@ -263,6 +278,21 @@ export class PrintTagDialogComponent {
             gap: 0.05in;
           }
 
+          .part-number-container {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            min-width: 0;
+            flex: 1;
+            overflow: hidden;
+          }
+
+          .assembly-path {
+            font-size: 9px;
+            color: #444;
+            white-space: nowrap;
+          }
+
           .tag-row-location {
             font-size: 8px;
             overflow: hidden;
@@ -289,12 +319,9 @@ export class PrintTagDialogComponent {
             font-weight: 900;
             font-family: 'Courier New', monospace;
             font-size: 11px;
-            overflow: hidden;
-            text-overflow: ellipsis;
             white-space: nowrap;
-            min-width: 0;
-            flex: 1;
           }
+
 
           .location {
             color: #444;

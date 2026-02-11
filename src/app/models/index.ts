@@ -117,6 +117,7 @@ export interface ConsolidatedPart {
     needed: number;
     picked: number;
     line_item_id: string;
+    assembly_group: string | null;
   }[];
 }
 

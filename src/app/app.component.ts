@@ -30,7 +30,7 @@ import { NamePromptComponent } from './components/auth/name-prompt.component';
     <app-name-prompt></app-name-prompt>
     <div class="d-flex min-vh-100">
       <!-- Sidebar -->
-      <aside class="sidebar d-none d-lg-flex flex-column" style="width: 260px;">
+      <aside class="sidebar d-none d-lg-flex flex-column">
         <div class="d-flex align-items-center p-3 border-bottom">
           <i class="bi bi-clipboard-check text-primary fs-4 me-2"></i>
           <span class="fw-bold">Pick List Tracker</span>

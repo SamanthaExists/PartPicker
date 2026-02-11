@@ -175,11 +175,8 @@ export class TemplateSelectDialogComponent implements OnInit, OnDestroy {
   }
 
   async selectTemplate(template: BOMTemplate): Promise<void> {
+    // If already selected, do nothing (no deselection on second click)
     if (this.selectedTemplateId === template.id) {
-      // Deselect
-      this.selectedTemplateId = null;
-      this.selectedTemplate = null;
-      this.selectedItemsCount = 0;
       return;
     }
 

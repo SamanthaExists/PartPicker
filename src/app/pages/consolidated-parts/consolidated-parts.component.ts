@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -11,17 +11,19 @@ import { PartIssuesService } from '../../services/part-issues.service';
 import { PartsService } from '../../services/parts.service';
 import { UtilsService } from '../../services/utils.service';
 import { ExcelService } from '../../services/excel.service';
+import { SupabaseService } from '../../services/supabase.service';
 import { ConsolidatedPart, PartIssueType } from '../../models';
 import { MultiOrderPickDialogComponent } from '../../components/dialogs/multi-order-pick-dialog.component';
 import { ReportPartIssueDialogComponent } from '../../components/dialogs/report-part-issue-dialog.component';
 import { PartDetailComponent } from '../../components/parts/part-detail.component';
+import { PrintTagDialogComponent, TagData } from '../../components/picking/print-tag-dialog.component';
 
 type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock' | 'has_issues';
 
 @Component({
   selector: 'app-consolidated-parts',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, MultiOrderPickDialogComponent, ReportPartIssueDialogComponent, PartDetailComponent],
+  imports: [CommonModule, RouterModule, FormsModule, MultiOrderPickDialogComponent, ReportPartIssueDialogComponent, PartDetailComponent, PrintTagDialogComponent],
   template: `
     <div>
       <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
@@ -245,18 +247,20 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                   [class.table-success]="part.remaining === 0"
                   [class.table-warning]="part.total_picked > 0 && part.remaining > 0"
                   [class.table-danger]="getQtyAvailable(part) === 0 && part.remaining > 0">
-                <td class="font-mono fw-medium">
-                  <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(part.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ part.part_number }}</span>
-                  <span class="badge bg-danger ms-1" *ngIf="hasPartIssue(part.part_number)">
-                    <i class="bi bi-exclamation-triangle-fill"></i> Issue
-                  </span>
-                  <div *ngIf="getPartAssemblies(part).length > 0" class="d-flex flex-wrap gap-1 mt-1">
-                    <span *ngFor="let asm of getPartAssemblies(part)" class="badge small"
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(part.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ part.part_number }}</span>
+                    <button class="btn btn-sm btn-ghost p-0 text-muted" (click)="copyPartNumber(part.part_number, $event)" title="Copy Part Number">
+                      <i class="bi" [ngClass]="copiedPartNumber === part.part_number ? 'bi-check-lg text-success' : 'bi-copy'"></i>
+                    </button>
+                    <span class="badge bg-danger" *ngIf="hasPartIssue(part.part_number)">
+                      <i class="bi bi-exclamation-triangle-fill"></i> Issue
+                    </span>
+                  </div>
+                  <div *ngIf="getPartAssemblies(part).length > 0" class="d-flex flex-direction-column gap-1 mt-1">
+                    <span *ngFor="let asm of getPartAssemblies(part)" class="badge small text-start fw-normal font-monospace"
+                          style="white-space: pre-wrap;"
                           [ngClass]="{
-                            'bg-success-subtle text-success-emphasis border-success': part.remaining === 0,
-                            'bg-warning-subtle text-warning-emphasis border-warning': part.total_picked > 0 && part.remaining > 0,
-                            'bg-danger-subtle text-danger-emphasis border-danger': getQtyAvailable(part) === 0 && part.remaining > 0,
-                            'bg-purple-subtle text-purple border-purple': part.total_picked === 0 && !(getQtyAvailable(part) === 0 && part.remaining > 0)
+                            'bg-light text-dark border': true
                           }">
                       {{ asm }}
                     </span>
@@ -299,32 +303,47 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                   </span>
                 </td>
                 <td>
-                  <div class="d-flex flex-wrap gap-1">
-                    <a *ngFor="let order of part.orders"
-                       [routerLink]="['/orders', order.order_id]"
-                       class="badge border text-decoration-none"
-                       [ngClass]="part.remaining === 0 ? 'bg-success-subtle text-success-emphasis border-success' : 'bg-body-secondary text-body'"
-                       [title]="'SO-' + order.so_number + ' - ' + order.tool_number">
-                      SO-{{ order.so_number }}-{{ order.tool_number }}
-                      <span [ngClass]="part.remaining === 0 ? 'text-success' : 'text-muted'">({{ order.picked }}/{{ order.needed }})</span>
-                    </a>
+                  <div class="position-relative order-hover-container">
+                    <span class="badge rounded-pill bg-light text-dark border cursor-pointer">
+                      {{ part.orders.length }} Order{{ part.orders.length !== 1 ? 's' : '' }}
+                      <i class="bi bi-chevron-down ms-1" style="font-size: 0.7em;"></i>
+                    </span>
+                    <div class="order-details-popover shadow border rounded p-2 bg-white position-absolute start-0 top-100 mt-1" style="z-index: 1050; width: 280px; display: none;">
+                      <div class="d-flex flex-column gap-1">
+                        <a *ngFor="let order of part.orders"
+                           [routerLink]="['/orders', order.order_id]"
+                           class="badge border text-decoration-none text-start p-2 d-block"
+                           [ngClass]="part.remaining === 0 ? 'bg-success-subtle text-success-emphasis border-success' : 'bg-body-secondary text-body'"
+                           [title]="'SO-' + order.so_number + ' - ' + order.tool_number">
+                          <div class="d-flex justify-content-between">
+                            <strong>SO-{{ order.so_number }}</strong>
+                            <span>{{ order.tool_number }}</span>
+                          </div>
+                          <div class="small mt-1" [ngClass]="part.remaining === 0 ? 'text-success' : 'text-muted'">
+                            Picked: {{ order.picked }} / {{ order.needed }}
+                            <span *ngIf="order.tool_model" class="d-block text-truncate mt-1 fst-italic">{{ order.tool_model }}</span>
+                          </div>
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 </td>
                 <td class="text-center">
                   <div class="d-flex gap-1 justify-content-center">
                     <button
-                      class="btn btn-sm btn-outline-primary"
+                      class="btn btn-outline-primary"
                       (click)="openMultiOrderPick(part)"
-                      [disabled]="part.remaining === 0"
                       title="Pick across orders"
+                      style="width: 40px; height: 38px;"
                     >
                       <i class="bi bi-box-arrow-in-down"></i>
                     </button>
                     <button
-                      class="btn btn-sm"
+                      class="btn"
                       [ngClass]="hasPartIssue(part.part_number) ? 'btn-danger' : 'btn-outline-warning'"
                       (click)="openReportIssue(part)"
                       title="Report issue"
+                      style="width: 40px; height: 38px;"
                     >
                       <i class="bi bi-exclamation-triangle"></i>
                     </button>
@@ -355,6 +374,13 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
       (submitIssue)="handleSubmitIssue($event)"
       (resolveIssue)="handleResolveIssue($event)"
     ></app-report-part-issue-dialog>
+
+    <!-- Print Tag Dialog -->
+    <app-print-tag-dialog
+      [isOpen]="showPrintTagDialog"
+      [tags]="printTagData || []"
+      (close)="closePrintTagDialog()"
+    ></app-print-tag-dialog>
   `,
   styles: [`
     .cursor-pointer {
@@ -381,6 +407,9 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
     .text-purple { color: #6f42c1; }
     .bg-purple-subtle { background-color: rgba(111, 66, 193, 0.1); }
     .border-purple { border-color: #6f42c1 !important; }
+    .order-hover-container:hover .order-details-popover {
+      display: block !important;
+    }
   `]
 })
 export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
@@ -397,6 +426,7 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   selectedAssemblies = new Set<string>();
 
   // Multi-order pick dialog
+  @ViewChild(MultiOrderPickDialogComponent) multiOrderPickDialog?: MultiOrderPickDialogComponent;
   showMultiOrderPick = false;
   selectedPart: ConsolidatedPart | null = null;
   scrollToPartNumber: string | null = null;
@@ -404,6 +434,12 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   // Part issue dialog
   showReportIssue = false;
   selectedPartForIssue: ConsolidatedPart | null = null;
+
+  // Print Tag Dialog
+  showPrintTagDialog = false;
+  printTagData: TagData[] | null = null;
+
+  copiedPartNumber: string | null = null;
 
   private subscriptions: Subscription[] = [];
 
@@ -417,8 +453,9 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private catalogPartsService: PartsService,
-    private modalService: NgbModal
-  ) {}
+    private modalService: NgbModal,
+    private supabase: SupabaseService
+  ) { }
 
   ngOnInit(): void {
     // Read URL search parameter on init
@@ -614,6 +651,19 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     }
   }
 
+  async copyPartNumber(partNumber: string, event: Event): Promise<void> {
+    event.stopPropagation();
+    const success = await this.utils.copyToClipboard(partNumber);
+    if (success) {
+      this.copiedPartNumber = partNumber;
+      setTimeout(() => {
+        if (this.copiedPartNumber === partNumber) {
+          this.copiedPartNumber = null;
+        }
+      }, 2000);
+    }
+  }
+
   openMultiOrderPick(part: ConsolidatedPart): void {
     this.selectedPart = part;
     this.showMultiOrderPick = true;
@@ -622,23 +672,133 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   async handleMultiOrderPick(picks: { lineItemId: string; toolId: string; qty: number }[]): Promise<void> {
     const settings = this.settingsService.getSettings();
     const userName = settings.user_name || 'Unknown';
+    const pickedAt = new Date();
 
     // Track part for scroll after refresh
     if (this.selectedPart) {
       this.scrollToPartNumber = this.selectedPart.part_number;
     }
 
-    for (const pick of picks) {
-      await this.picksService.recordPick(
-        pick.lineItemId,
-        pick.toolId,
-        pick.qty,
-        userName
-      );
+    const successfulPicks: { lineItemId: string; toolId: string; qty: number }[] = [];
+
+    try {
+      // Process each pick (positive = add, negative = undo)
+      for (const pick of picks) {
+        if (pick.qty > 0) {
+          // Positive quantity: record a new pick
+          const result = await this.picksService.recordPick(
+            pick.lineItemId,
+            pick.toolId,
+            pick.qty,
+            userName
+          );
+          if (result) {
+            successfulPicks.push(pick);
+          }
+        } else if (pick.qty < 0) {
+          // Negative quantity: undo recent picks
+          await this.undoPicksByQuantity(
+            pick.lineItemId,
+            pick.toolId,
+            Math.abs(pick.qty),
+            userName
+          );
+        }
+      }
+
+      // Wait for the parts list to refresh completely before proceeding
+      await this.partsService.fetchParts();
+
+      // Trigger tag printing dialog if enabled and positive picks were made
+      // This ensures we DO NOT show the dialog for negative picks (corrections/reductions)
+      if (successfulPicks.length > 0 && this.selectedPart && this.settingsService.isTagPrintingEnabled()) {
+        const tags: TagData[] = successfulPicks.map(pick => {
+          // Since we don't have direct access to tool number/SO number here easily without re-fetching,
+          // we can rely on the part.orders data which should have this info.
+          // Or we can construct it if available.
+          // However, consolidated part has array of orders.
+          const orderInfo = this.selectedPart?.orders.find(o => o.line_item_id === pick.lineItemId && o.tool_id === pick.toolId);
+
+          return {
+            partNumber: this.selectedPart!.part_number,
+            description: this.selectedPart!.description,
+            location: this.selectedPart!.location,
+            soNumber: orderInfo?.so_number || 'Unknown',
+            toolNumber: orderInfo?.tool_number || 'Unknown',
+            qtyPicked: pick.qty,
+            pickedBy: userName,
+            pickedAt: pickedAt,
+            assembly: orderInfo?.assembly_group
+          };
+        });
+
+        this.printTagData = tags;
+        this.showPrintTagDialog = true;
+      }
+
+      // Give Angular a moment to update the view
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } catch (error) {
+      console.error('Error recording picks:', error);
+    } finally {
+      // Notify the dialog that the operation is complete
+      this.multiOrderPickDialog?.completePick();
+    }
+  }
+
+  closePrintTagDialog(): void {
+    this.showPrintTagDialog = false;
+    this.printTagData = null;
+  }
+
+  private async undoPicksByQuantity(
+    lineItemId: string,
+    toolId: string,
+    qtyToUndo: number,
+    undoneBy: string
+  ): Promise<void> {
+    // Fetch all active picks for this line item and tool, sorted by most recent first
+    const { data: picks, error } = await this.supabase.from('picks')
+      .select('id, qty_picked')
+      .eq('line_item_id', lineItemId)
+      .eq('tool_id', toolId)
+      .is('undone_at', null)
+      .order('picked_at', { ascending: false });
+
+    if (error || !picks) {
+      console.error('Error fetching picks to undo:', error);
+      return;
     }
 
-    // Refresh the parts list
-    this.partsService.fetchParts();
+    let remainingToUndo = qtyToUndo;
+
+    // Undo picks starting from most recent until we've undone the requested quantity
+    for (const pick of picks) {
+      if (remainingToUndo <= 0) break;
+
+      if (pick.qty_picked <= remainingToUndo) {
+        // Undo the entire pick
+        await this.picksService.undoPick(pick.id, undoneBy);
+        remainingToUndo -= pick.qty_picked;
+      } else {
+        // This pick has more than we need to undo
+        // We can't partially undo a pick, so we'll undo it and re-record the difference
+        await this.picksService.undoPick(pick.id, undoneBy);
+        const difference = pick.qty_picked - remainingToUndo;
+        await this.picksService.recordPick(
+          lineItemId,
+          toolId,
+          difference,
+          undoneBy,
+          'Corrected from partial undo'
+        );
+        remainingToUndo = 0;
+      }
+    }
+
+    if (remainingToUndo > 0) {
+      console.warn(`Could not undo full quantity. ${remainingToUndo} remaining.`);
+    }
   }
 
   // Sorting and grouping
@@ -681,12 +841,26 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     return Array.from(models).sort().join(', ');
   }
 
+
   getPartAssemblies(part: ConsolidatedPart): string[] {
-    const models = new Set<string>();
+    const assemblies = new Set<string>();
     part.orders.forEach(o => {
-      if (o.tool_model) models.add(o.tool_model);
+      if (o.assembly_group) {
+        assemblies.add(this.formatAssemblyPath(o.assembly_group));
+      }
     });
-    return Array.from(models).sort();
+
+    // If no explicit assemblies, use tool models if they look like assemblies (optional, but requested "Below part number... display assembly tree")
+    // If we want to strictly follow "Assembly Tree", we should only show formatted paths.
+    // If the set is empty, we return empty array, so nothing shows.
+    return Array.from(assemblies).sort();
+  }
+
+  formatAssemblyPath(assembly: string | null | undefined): string {
+    if (!assembly) return '';
+    const parts = assembly.split(' > ');
+    parts.reverse();
+    return ' < ' + parts.join(' < ');
   }
 
   shouldShowLocationHeader(part: ConsolidatedPart, index: number): boolean {

@@ -7,6 +7,7 @@ import { NgbModal, NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { PartsService, Part, PartWithStats, ClassificationType } from '../../services/parts.service';
 import { PartDetailComponent } from '../../components/parts/part-detail.component';
 import { SupabaseService } from '../../services/supabase.service';
+import { UtilsService } from '../../services/utils.service';
 
 type PartSortOption = 'part-number' | 'description' | 'classification' | 'location';
 
@@ -110,7 +111,12 @@ type PartSortOption = 'part-number' | 'description' | 'classification' | 'locati
               <div class="row g-3 align-items-center">
                 <!-- Part Number & Classification -->
                 <div class="col-12 col-sm-3 col-lg-2">
-                  <div class="font-monospace fw-semibold">{{ part.part_number }}</div>
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="font-monospace fw-semibold">{{ part.part_number }}</div>
+                    <button class="btn btn-sm btn-ghost-secondary p-0" (click)="copyPartNumber(part.part_number, $event)" title="Copy Part Number">
+                      <i class="bi" [ngClass]="copiedPartNumber === part.part_number ? 'bi-check-lg text-success' : 'bi-copy'"></i>
+                    </button>
+                  </div>
                   <span *ngIf="part.classification_type" [class]="getClassificationBadgeClass(part.classification_type) + ' mt-1'">
                     {{ getClassificationLabel(part.classification_type) }}
                   </span>
@@ -213,13 +219,16 @@ export class PartsCatalogComponent implements OnInit, OnDestroy {
     created_relationships: number;
   }> | null = null;
 
+  copiedPartNumber: string | null = null;
+
   private subscription?: Subscription;
 
   constructor(
     private partsService: PartsService,
     private modalService: NgbModal,
-    private supabaseService: SupabaseService
-  ) {}
+    private supabaseService: SupabaseService,
+    private utils: UtilsService
+  ) { }
 
   ngOnInit(): void {
     this.subscription = this.partsService.parts$.subscribe((parts) => {
@@ -329,6 +338,19 @@ export class PartsCatalogComponent implements OnInit, OnDestroy {
       this.autoDetecting = false;
     }
   }
+
+  async copyPartNumber(partNumber: string, event: Event): Promise<void> {
+    event.stopPropagation();
+    const success = await this.utils.copyToClipboard(partNumber);
+    if (success) {
+      this.copiedPartNumber = partNumber;
+      setTimeout(() => {
+        if (this.copiedPartNumber === partNumber) {
+          this.copiedPartNumber = null;
+        }
+      }, 2000);
+    }
+  }
 }
 
 // Auto-Detect Results Modal Component
@@ -374,5 +396,5 @@ class AutoDetectResultsModal {
     created_relationships: number;
   }> | null = null;
 
-  constructor(public activeModal: NgbActiveModal) {}
+  constructor(public activeModal: NgbActiveModal) { }
 }

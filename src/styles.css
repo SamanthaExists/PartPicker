@@ -17,8 +17,10 @@ body {
 /* Sidebar styles */
 .sidebar {
   min-height: 100vh;
+  width: 260px;
   background-color: #fff;
   border-right: 1px solid #dee2e6;
+  flex-shrink: 0;
 }
 
 .sidebar .nav-link {

@@ -427,7 +427,12 @@ interface PickHistoryItem {
                       </td>
                       <!-- Part Number -->
                       <td>
-                        <span class="font-monospace fw-medium text-primary" style="cursor: pointer;" (click)="openPartDetail(item.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ item.part_number }}</span>
+                        <div class="d-flex align-items-center gap-2">
+                          <span class="font-monospace fw-medium text-primary" style="cursor: pointer;" (click)="openPartDetail(item.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ item.part_number }}</span>
+                          <button class="btn btn-sm btn-ghost p-0 text-muted" (click)="copyPartNumber(item.part_number, $event)" title="Copy Part Number">
+                            <i class="bi" [ngClass]="copiedPartNumber === item.part_number ? 'bi-check-lg text-success' : 'bi-copy'"></i>
+                          </button>
+                        </div>
                         <span class="badge bg-danger ms-1" *ngIf="hasOpenIssue(item.id)">
                           <i class="bi bi-exclamation-triangle-fill"></i> Issue
                         </span>
@@ -1117,6 +1122,8 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   issueType: IssueType = 'out_of_stock';
   issueDescription: string = '';
 
+  copiedPartNumber: string | null = null;
+
   private orderId: string | null = null;
   private subscriptions: Subscription[] = [];
   private allToolsPicksMap: Map<string, Map<string, number>> = new Map();
@@ -1153,9 +1160,9 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
 
     // Ignore if any modal is open
     if (this.showPartialPickModal || this.showUndoToolModal || this.showReportIssueModal ||
-        this.showSaveTemplateModal || this.showPrintModal || this.showDistributeModal ||
-        this.showAddToolModal || this.showManageToolsModal || this.showAddLineItemModal ||
-        this.showDeleteLineItemModal || this.showUndoPickModal) {
+      this.showSaveTemplateModal || this.showPrintModal || this.showDistributeModal ||
+      this.showAddToolModal || this.showManageToolsModal || this.showAddLineItemModal ||
+      this.showDeleteLineItemModal || this.showUndoPickModal) {
       return;
     }
 
@@ -2009,6 +2016,19 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
 
     this.showDeleteLineItemModal = false;
     this.deleteLineItemTarget = null;
+  }
+
+  async copyPartNumber(partNumber: string, event: Event): Promise<void> {
+    event.stopPropagation();
+    const success = await this.utils.copyToClipboard(partNumber);
+    if (success) {
+      this.copiedPartNumber = partNumber;
+      setTimeout(() => {
+        if (this.copiedPartNumber === partNumber) {
+          this.copiedPartNumber = null;
+        }
+      }, 2000);
+    }
   }
 
   // Save as Template

@@ -63,7 +63,12 @@ interface OrderAllocation {
                 [min]="0"
                 (change)="onAvailableChange()"
               >
-              <div class="form-text">Enter the quantity you have available to distribute across orders</div>
+              <div class="form-text">
+                <span *ngIf="part.remaining > 0">Enter the quantity you have available to distribute across orders</span>
+                <span *ngIf="part.remaining === 0" class="text-success">
+                  <i class="bi bi-check-circle me-1"></i>This part is complete. You can still adjust allocations for corrections.
+                </span>
+              </div>
             </div>
 
             <hr>
@@ -85,7 +90,7 @@ interface OrderAllocation {
                     class="btn btn-outline-secondary btn-sm"
                     type="button"
                     (click)="decrementAllocation(alloc)"
-                    [disabled]="alloc.allocatedQty <= 0"
+                    [disabled]="alloc.allocatedQty <= -alloc.picked"
                   >
                     <i class="bi bi-dash"></i>
                   </button>
@@ -93,15 +98,14 @@ interface OrderAllocation {
                     type="number"
                     class="form-control form-control-sm text-center"
                     [(ngModel)]="alloc.allocatedQty"
-                    [min]="0"
+                    [min]="-alloc.picked"
                     [max]="alloc.remaining"
-                    [disabled]="alloc.remaining === 0"
                   >
                   <button
                     class="btn btn-outline-secondary btn-sm"
                     type="button"
                     (click)="incrementAllocation(alloc)"
-                    [disabled]="alloc.allocatedQty >= alloc.remaining || totalAllocated >= availableToPick"
+                    [disabled]="alloc.allocatedQty >= alloc.remaining || (totalAllocated >= availableToPick && alloc.remaining > 0)"
                   >
                     <i class="bi bi-plus"></i>
                   </button>
@@ -123,13 +127,18 @@ interface OrderAllocation {
               </div>
               <div class="text-end">
                 <span class="small text-muted">Allocated:</span>
-                <strong class="ms-1" [class.text-danger]="totalAllocated > availableToPick">
+                <strong class="ms-1" [class.text-danger]="totalAllocated > availableToPick" [class.text-warning]="totalAllocated < 0">
                   {{ totalAllocated }}/{{ availableToPick }}
                 </strong>
               </div>
             </div>
 
-            <div *ngIf="totalAllocated > availableToPick" class="alert alert-danger small mt-3 mb-0">
+            <div *ngIf="totalAllocated < 0" class="alert alert-warning small mt-3 mb-0">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>
+              Negative values will undo previous picks (correction mode)
+            </div>
+
+            <div *ngIf="totalAllocated > availableToPick && hasPositiveAllocations" class="alert alert-danger small mt-3 mb-0">
               <i class="bi bi-exclamation-triangle me-1"></i>
               Allocated quantity exceeds available inventory!
             </div>
@@ -172,6 +181,7 @@ export class MultiOrderPickDialogComponent implements OnChanges {
   allocations: OrderAllocation[] = [];
   availableToPick = 0;
   saving = false;
+  private pickResolve: (() => void) | null = null;
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['show'] && this.show && this.part) {
@@ -199,6 +209,10 @@ export class MultiOrderPickDialogComponent implements OnChanges {
 
   get totalAllocated(): number {
     return this.allocations.reduce((sum, a) => sum + a.allocatedQty, 0);
+  }
+
+  get hasPositiveAllocations(): boolean {
+    return this.allocations.some(a => a.allocatedQty > 0);
   }
 
   onAvailableChange(): void {
@@ -271,20 +285,46 @@ export class MultiOrderPickDialogComponent implements OnChanges {
     this.showChange.emit(false);
   }
 
-  save(): void {
-    if (this.totalAllocated === 0 || this.totalAllocated > this.availableToPick) return;
+  async save(): Promise<void> {
+    // Allow saving if there are any non-zero allocations (positive or negative)
+    const hasChanges = this.allocations.some(a => a.allocatedQty !== 0);
+    if (!hasChanges) return;
+
+    // For positive allocations, check against available
+    if (this.totalAllocated > this.availableToPick) {
+      // Don't block if we're only reducing (all allocations are negative)
+      const hasPositive = this.allocations.some(a => a.allocatedQty > 0);
+      if (hasPositive) return;
+    }
 
     this.saving = true;
 
     const picksToApply = this.allocations
-      .filter(a => a.allocatedQty > 0)
+      .filter(a => a.allocatedQty !== 0)
       .map(a => ({ lineItemId: a.lineItemId, toolId: a.toolId, qty: a.allocatedQty }));
 
     this.pick.emit(picksToApply);
 
-    setTimeout(() => {
-      this.saving = false;
-      this.close();
-    }, 500);
+    // Wait for parent to complete the pick operation
+    await new Promise<void>(resolve => {
+      this.pickResolve = resolve;
+      // Safety timeout in case parent doesn't call completePick
+      setTimeout(() => {
+        if (this.pickResolve) {
+          this.pickResolve();
+          this.pickResolve = null;
+        }
+      }, 3000);
+    });
+
+    this.saving = false;
+    this.close();
+  }
+
+  completePick(): void {
+    if (this.pickResolve) {
+      this.pickResolve();
+      this.pickResolve = null;
+    }
   }
 }

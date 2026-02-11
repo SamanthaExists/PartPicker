@@ -95,7 +95,12 @@ import { OrderWithProgress, RecentActivity, ConsolidatedPart, ItemToOrder } from
             <div *ngFor="let item of itemsToOrder.slice(0, 5)"
                  class="list-group-item d-flex justify-content-between align-items-center">
               <div class="text-truncate">
-                <span class="font-mono fw-medium">{{ item.part_number }}</span>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="font-mono fw-medium">{{ item.part_number }}</span>
+                  <button class="btn btn-sm btn-ghost p-0 text-muted" (click)="copyPartNumber(item.part_number, $event)" title="Copy Part Number">
+                    <i class="bi" [ngClass]="copiedPartNumber === item.part_number ? 'bi-check-lg text-success' : 'bi-copy'"></i>
+                  </button>
+                </div>
                 <div class="small text-muted text-truncate" *ngIf="item.description">{{ item.description }}</div>
               </div>
               <span class="badge bg-warning text-dark rounded-pill ms-2">{{ item.remaining }} needed</span>
@@ -189,6 +194,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   stats: any[] = [];
 
+  copiedPartNumber: string | null = null;
+
   private subscriptions: Subscription[] = [];
 
   constructor(
@@ -197,7 +204,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private partsService: ConsolidatedPartsService,
     private itemsToOrderService: ItemsToOrderService,
     public utils: UtilsService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.subscriptions.push(
@@ -251,6 +258,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   get overdueCount(): number {
     return this.dueSoonOrders.filter(o => this.utils.getDueDateStatus(o.due_date).status === 'overdue').length;
+  }
+
+  async copyPartNumber(partNumber: string, event: Event): Promise<void> {
+    event.stopPropagation();
+    const success = await this.utils.copyToClipboard(partNumber);
+    if (success) {
+      this.copiedPartNumber = partNumber;
+      setTimeout(() => {
+        if (this.copiedPartNumber === partNumber) {
+          this.copiedPartNumber = null;
+        }
+      }, 2000);
+    }
   }
 
   private updateStats(): void {

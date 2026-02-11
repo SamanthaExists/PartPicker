@@ -179,6 +179,7 @@ export class ConsolidatedPartsService implements OnDestroy {
               needed: item.qty_per_unit,
               picked: pickedQty,
               line_item_id: item.id,
+              assembly_group: item.assembly_group,
             });
           } else {
             partMap.set(item.part_number, {
@@ -200,6 +201,7 @@ export class ConsolidatedPartsService implements OnDestroy {
                 needed: item.qty_per_unit,
                 picked: pickedQty,
                 line_item_id: item.id,
+                assembly_group: item.assembly_group,
               }],
             });
           }

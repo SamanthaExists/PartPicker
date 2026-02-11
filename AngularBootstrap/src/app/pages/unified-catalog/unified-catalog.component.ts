@@ -1,14 +1,16 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { Subscription, combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { NgbModal, NgbDropdownModule } from '@ng-bootstrap/ng-bootstrap';
 import { BomBridgeService } from '../../services/bom-bridge.service';
 import { BomTemplatesService } from '../../services/bom-templates.service';
 import { PartsService } from '../../services/parts.service';
 import { UnifiedListItem, ClassificationType } from '../../models';
 import { UnifiedDetailComponent } from '../../components/parts/unified-detail.component';
+import { PartDetailComponent } from '../../components/parts/part-detail.component';
 
 type ViewTab = 'all' | 'templates' | 'assemblies' | 'parts';
 type SortOption = 'name' | 'type' | 'recent';
@@ -16,7 +18,7 @@ type SortOption = 'name' | 'type' | 'recent';
 @Component({
   selector: 'app-unified-catalog',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NgbDropdownModule],
   templateUrl: './unified-catalog.component.html',
   styleUrls: ['./unified-catalog.component.css']
 })
@@ -48,7 +50,8 @@ export class UnifiedCatalogComponent implements OnInit, OnDestroy {
     private bridge: BomBridgeService,
     private bomTemplates: BomTemplatesService,
     private parts: PartsService,
-    private modalService: NgbModal
+    private modalService: NgbModal,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -196,23 +199,47 @@ export class UnifiedCatalogComponent implements OnInit, OnDestroy {
    * Show new template dialog
    */
   showNewTemplateDialog(): void {
-    // TODO: Implement
-    console.log('New template');
+    this.router.navigate(['/templates']);
   }
 
   /**
    * Show new assembly dialog
    */
   showNewAssemblyDialog(): void {
-    // TODO: Implement
-    console.log('New assembly');
+    const modalRef = this.modalService.open(PartDetailComponent, {
+      size: 'xl',
+      backdrop: 'static'
+    });
+    modalRef.componentInstance.isNew = true;
+    modalRef.componentInstance.initialClassification = 'assembly';
+
+    modalRef.result.then(
+      () => {
+        this.loadData(); // Reload list after creating assembly
+      },
+      () => {
+        // Modal dismissed
+      }
+    );
   }
 
   /**
    * Show new part dialog
    */
   showNewPartDialog(): void {
-    // TODO: Implement
-    console.log('New part');
+    const modalRef = this.modalService.open(PartDetailComponent, {
+      size: 'xl',
+      backdrop: 'static'
+    });
+    modalRef.componentInstance.isNew = true;
+
+    modalRef.result.then(
+      () => {
+        this.loadData(); // Reload list after creating part
+      },
+      () => {
+        // Modal dismissed
+      }
+    );
   }
 }

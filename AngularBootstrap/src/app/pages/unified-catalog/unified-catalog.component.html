@@ -5,11 +5,11 @@
       <h1 class="h3 mb-1">Parts & Templates</h1>
       <p class="text-muted small mb-0">Unified catalog for BOM templates and parts</p>
     </div>
-    <div class="dropdown">
-      <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+    <div ngbDropdown class="dropdown">
+      <button class="btn btn-primary dropdown-toggle" type="button" ngbDropdownToggle>
         <i class="bi bi-plus-lg me-1"></i> New
       </button>
-      <ul class="dropdown-menu dropdown-menu-end">
+      <ul ngbDropdownMenu class="dropdown-menu dropdown-menu-end">
         <li>
           <button class="dropdown-item" (click)="showNewTemplateDialog()">
             <i class="bi bi-file-earmark-text me-2"></i> Template

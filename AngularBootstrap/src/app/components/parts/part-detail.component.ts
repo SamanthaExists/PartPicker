@@ -16,11 +16,12 @@ import { ModificationChainComponent } from './modification-chain.component';
 export class PartDetailComponent implements OnInit {
   @Input() partId?: string;
   @Input() isNew = false;
+  @Input() initialClassification?: ClassificationType;
 
   part: any = null;
   loading = true;
   isEditing = false;
-  
+
   editForm = {
     part_number: '',
     description: '',
@@ -37,6 +38,9 @@ export class PartDetailComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     if (this.isNew) {
       this.isEditing = true;
+      if (this.initialClassification) {
+        this.editForm.classification_type = this.initialClassification;
+      }
       this.loading = false;
     } else if (this.partId) {
       await this.loadPart();

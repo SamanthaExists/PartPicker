@@ -1,6 +1,6 @@
 # Tool Pick List Tracker - React App
 
-> **IMPORTANT: This is a SECONDARY implementation.** The Angular version (`./AngularBootstrap/`) is the PRIMARY implementation deployed to production at https://partpick.netlify.app. This React app serves as an alternative implementation and should be kept feature-identical to the Angular version.
+> **⚠️ DEPRECATED: This implementation is no longer maintained.** The Angular version (`./AngularBootstrap/`) is the PRIMARY implementation deployed to production at https://partpick.netlify.app. All development work should be done on the Angular app.
 
 A warehouse tool picking application built with React, TypeScript, and Supabase.
 

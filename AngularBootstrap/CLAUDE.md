@@ -1,6 +1,6 @@
 # Tool Pick List Tracker - Angular App
 
-> **IMPORTANT: This is the PRIMARY implementation deployed to production.** There is a React version (`../` - outside this folder) that should be kept feature-identical to this Angular app. Any new features, bug fixes, or changes made here should be mirrored to the React version if needed.
+> **This is the PRIMARY and ONLY actively maintained implementation.** Deployed to production at https://partpick.netlify.app. A legacy React version exists in the parent directory but is no longer maintained.
 
 A warehouse tool picking application built with Angular and Bootstrap.
 
@@ -27,8 +27,6 @@ A warehouse tool picking application built with Angular and Bootstrap.
 - **Dashboard**: https://supabase.com/dashboard/project/uewypezgyyyfanltoyfv
 - **Project Ref**: `uewypezgyyyfanltoyfv`
 - **Features Used**: PostgreSQL, Real-time subscriptions, Row Level Security
-
-**Note**: This Angular app shares the same Supabase backend as the React app.
 
 ### Environment Variables
 Required environment variables in `src/environments/environment.ts`:
@@ -261,16 +259,3 @@ The SO spreadsheets (SO-XXXX.xlsx) should contain:
 - Quantities per unit
 - Location information
 - Tool assignments
-
-## Migration from React Version
-
-This Angular version is a complete rewrite of the React application, maintaining the same functionality:
-
-| React | Angular |
-|-------|---------|
-| React Hooks | Angular Services with RxJS |
-| React Router | Angular Router |
-| Tailwind CSS | Bootstrap 5 |
-| Radix UI | Native Bootstrap components |
-| Vite | Angular CLI |
-| Custom hooks (useOrders, etc.) | Services (OrdersService, etc.) |

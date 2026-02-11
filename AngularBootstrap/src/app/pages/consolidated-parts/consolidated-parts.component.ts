@@ -620,7 +620,7 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     this.showMultiOrderPick = true;
   }
 
-  async handleMultiOrderPick(picks: { lineItemId: string; toolId: string; qty: number }[]): Promise<void> {
+  async handleMultiOrderPick(picks: { lineItemId: string; toolId: string; qty: number; picked: number }[]): Promise<void> {
     const settings = this.settingsService.getSettings();
     const userName = settings.user_name || 'Unknown';
 
@@ -630,15 +630,15 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
     }
 
     try {
-      // Record all picks sequentially
-      for (const pick of picks) {
-        await this.picksService.recordPick(
-          pick.lineItemId,
-          pick.toolId,
-          pick.qty,
-          userName
-        );
-      }
+      // Convert to delta format (qty is already the delta from the dialog)
+      const deltas = picks.map(p => ({
+        lineItemId: p.lineItemId,
+        toolId: p.toolId,
+        delta: p.qty
+      }));
+
+      // Apply deltas directly - this fetches fresh data and applies changes
+      await this.picksService.applyPickDeltas(deltas, userName);
 
       // Wait for the parts list to refresh completely before proceeding
       await this.partsService.fetchParts();

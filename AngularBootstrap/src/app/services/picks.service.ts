@@ -331,6 +331,107 @@ export class PicksService implements OnDestroy {
     }
   }
 
+  // Apply pick deltas directly (for multi-order pick dialog)
+  async applyPickDeltas(
+    picks: { lineItemId: string; toolId: string; delta: number }[],
+    pickedBy?: string
+  ): Promise<boolean> {
+    try {
+      // Group by line item for efficient batch processing
+      const picksByLineItem = new Map<string, { toolId: string; delta: number }[]>();
+
+      for (const pick of picks) {
+        if (!picksByLineItem.has(pick.lineItemId)) {
+          picksByLineItem.set(pick.lineItemId, []);
+        }
+        picksByLineItem.get(pick.lineItemId)!.push({ toolId: pick.toolId, delta: pick.delta });
+      }
+
+      // Process each line item
+      for (const [lineItemId, toolDeltas] of picksByLineItem) {
+        // Fetch FRESH picks from database (most recent first for LIFO undo)
+        const { data: currentPicks, error: fetchError } = await this.supabase
+          .from('picks')
+          .select('id, tool_id, qty_picked, undone_at, picked_at, picked_by, notes')
+          .eq('line_item_id', lineItemId)
+          .is('undone_at', null)  // Only active picks
+          .order('picked_at', { ascending: false });  // Most recent first
+
+        if (fetchError) throw fetchError;
+
+        // Group picks by tool
+        const picksByTool = new Map<string, Pick[]>();
+        for (const pick of (currentPicks || []) as Pick[]) {
+          const toolPicks = picksByTool.get(pick.tool_id) || [];
+          toolPicks.push(pick);
+          picksByTool.set(pick.tool_id, toolPicks);
+        }
+
+        // Apply each delta
+        for (const { toolId, delta } of toolDeltas) {
+          if (delta > 0) {
+            // Add picks
+            const { error } = await this.supabase.from('picks').insert({
+              line_item_id: lineItemId,
+              tool_id: toolId,
+              qty_picked: delta,
+              picked_by: pickedBy || null,
+            });
+            if (error) throw error;
+
+          } else if (delta < 0) {
+            // Remove picks
+            const toolPicks = picksByTool.get(toolId) || [];
+            let qtyToRemove = Math.abs(delta);
+
+            for (const pick of toolPicks) {
+              if (qtyToRemove <= 0) break;
+
+              if (pick.qty_picked <= qtyToRemove) {
+                // Mark entire pick as undone
+                const { error } = await this.supabase.from('picks')
+                  .update({
+                    undone_at: new Date().toISOString(),
+                    undone_by: pickedBy || 'System',
+                  })
+                  .eq('id', pick.id);
+                if (error) throw error;
+                qtyToRemove -= pick.qty_picked;
+
+              } else {
+                // Partial: mark as undone and create new with reduced qty
+                const newQty = pick.qty_picked - qtyToRemove;
+
+                const { error: undoError } = await this.supabase.from('picks')
+                  .update({
+                    undone_at: new Date().toISOString(),
+                    undone_by: pickedBy || 'System',
+                  })
+                  .eq('id', pick.id);
+                if (undoError) throw undoError;
+
+                const { error: insertError } = await this.supabase.from('picks').insert({
+                  line_item_id: lineItemId,
+                  tool_id: toolId,
+                  qty_picked: newQty,
+                  picked_by: pick.picked_by,
+                  notes: pick.notes,
+                });
+                if (insertError) throw insertError;
+                qtyToRemove = 0;
+              }
+            }
+          }
+        }
+      }
+
+      return true;
+    } catch (err) {
+      this.errorSubject.next(err instanceof Error ? err.message : 'Failed to apply pick deltas');
+      return false;
+    }
+  }
+
   // Batch update allocations
   async batchUpdateAllocations(
     lineItemId: string,
@@ -339,11 +440,32 @@ export class PicksService implements OnDestroy {
     notes?: string
   ): Promise<boolean> {
     try {
-      const allToolPicks = this.getPicksForAllTools();
+      // Fetch FRESH picks from database to avoid race conditions with cache
+      const { data: currentPicks, error: fetchError } = await this.supabase
+        .from('picks')
+        .select('id, tool_id, qty_picked, undone_at, picked_at, picked_by, notes')
+        .eq('line_item_id', lineItemId)
+        .order('picked_at', { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      // Calculate current quantities per tool (only active picks)
+      const currentQtyByTool = new Map<string, number>();
+      const picksByTool = new Map<string, Pick[]>();
+
+      for (const pick of (currentPicks || []) as Pick[]) {
+        if (!pick.undone_at) {
+          const current = currentQtyByTool.get(pick.tool_id) || 0;
+          currentQtyByTool.set(pick.tool_id, current + pick.qty_picked);
+        }
+        // Group all picks by tool for undo operations
+        const toolPicks = picksByTool.get(pick.tool_id) || [];
+        toolPicks.push(pick);
+        picksByTool.set(pick.tool_id, toolPicks);
+      }
 
       for (const [toolId, targetQty] of newAllocations) {
-        const toolMap = allToolPicks.get(toolId);
-        const currentQty = toolMap?.get(lineItemId) || 0;
+        const currentQty = currentQtyByTool.get(toolId) || 0;
         const delta = targetQty - currentQty;
 
         if (delta > 0) {
@@ -358,9 +480,10 @@ export class PicksService implements OnDestroy {
 
           if (error) throw error;
         } else if (delta < 0) {
-          const pickHistory = this.getPickHistory(lineItemId, toolId);
+          // Use the picks we already fetched (no need to call getPickHistory)
+          const toolPicksList = picksByTool.get(toolId) || [];
           // Only consider active (non-undone) picks for removal
-          const activePicks = pickHistory.filter(p => !p.undone_at);
+          const activePicks = toolPicksList.filter(p => !p.undone_at);
           let qtyToRemove = Math.abs(delta);
 
           for (const pick of activePicks) {

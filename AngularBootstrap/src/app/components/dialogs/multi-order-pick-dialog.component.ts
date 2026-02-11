@@ -63,7 +63,7 @@ interface OrderAllocation {
                 [min]="0"
                 (change)="onAvailableChange()"
               >
-              <div class="form-text">Enter the quantity you have available to distribute across orders</div>
+              <div class="form-text">Total quantity available (including already picked). Adjust if actual inventory differs.</div>
             </div>
 
             <hr>
@@ -94,14 +94,14 @@ interface OrderAllocation {
                     class="form-control form-control-sm text-center"
                     [(ngModel)]="alloc.allocatedQty"
                     [min]="0"
-                    [max]="alloc.remaining"
+                    [max]="alloc.needed"
                     [disabled]="alloc.remaining === 0"
                   >
                   <button
                     class="btn btn-outline-secondary btn-sm"
                     type="button"
                     (click)="incrementAllocation(alloc)"
-                    [disabled]="alloc.allocatedQty >= alloc.remaining || totalAllocated >= availableToPick"
+                    [disabled]="alloc.allocatedQty >= alloc.needed || totalAllocated >= availableToPick"
                   >
                     <i class="bi bi-plus"></i>
                   </button>
@@ -139,7 +139,7 @@ interface OrderAllocation {
             <button
               type="button"
               class="btn btn-primary"
-              [disabled]="totalAllocated === 0 || totalAllocated > availableToPick || saving"
+              [disabled]="!hasChanges || totalAllocated > availableToPick || saving"
               (click)="save()"
             >
               <i class="bi me-1" [class]="saving ? 'bi-arrow-clockwise spin' : 'bi-check-circle'"></i>
@@ -167,7 +167,7 @@ export class MultiOrderPickDialogComponent implements OnChanges {
   @Input() part: ConsolidatedPart | null = null;
 
   @Output() showChange = new EventEmitter<boolean>();
-  @Output() pick = new EventEmitter<{ lineItemId: string; toolId: string; qty: number }[]>();
+  @Output() pick = new EventEmitter<{ lineItemId: string; toolId: string; qty: number; picked: number }[]>();
 
   allocations: OrderAllocation[] = [];
   availableToPick = 0;
@@ -183,7 +183,8 @@ export class MultiOrderPickDialogComponent implements OnChanges {
   private initializeAllocations(): void {
     if (!this.part) return;
 
-    this.availableToPick = this.part.remaining;
+    // Start with remaining + already picked, so user can add/subtract from current state
+    this.availableToPick = this.part.remaining + this.part.total_picked;
 
     this.allocations = this.part.orders.map(order => ({
       orderId: order.order_id,
@@ -194,7 +195,7 @@ export class MultiOrderPickDialogComponent implements OnChanges {
       needed: order.needed,
       picked: order.picked,
       remaining: order.needed - order.picked,
-      allocatedQty: 0
+      allocatedQty: order.picked
     }));
   }
 
@@ -202,16 +203,21 @@ export class MultiOrderPickDialogComponent implements OnChanges {
     return this.allocations.reduce((sum, a) => sum + a.allocatedQty, 0);
   }
 
+  get hasChanges(): boolean {
+    return this.allocations.some(a => a.allocatedQty !== a.picked);
+  }
+
   onAvailableChange(): void {
     if (this.totalAllocated > this.availableToPick) {
-      this.clearAllocations();
+      // Reset allocations to current picked state if user reduces available quantity
+      this.allocations.forEach(a => a.allocatedQty = a.picked);
     }
   }
 
   incrementAllocation(alloc: OrderAllocation): void {
     const remainingAvailable = this.availableToPick - this.totalAllocated;
 
-    if (alloc.allocatedQty < alloc.remaining && remainingAvailable > 0) {
+    if (alloc.allocatedQty < alloc.needed && remainingAvailable > 0) {
       alloc.allocatedQty++;
     }
   }
@@ -223,17 +229,19 @@ export class MultiOrderPickDialogComponent implements OnChanges {
   }
 
   distributeEvenly(): void {
+    // Reset to current picked state first
     this.clearAllocations();
 
     const ordersNeedingPicks = this.allocations.filter(a => a.remaining > 0);
     if (ordersNeedingPicks.length === 0) return;
 
-    let remaining = this.availableToPick;
+    // Distribute only the additional available quantity beyond what's already picked
+    let remaining = this.availableToPick - this.totalAllocated;
     let orderIndex = 0;
 
     while (remaining > 0) {
       const alloc = ordersNeedingPicks[orderIndex];
-      const canAllocate = alloc.remaining - alloc.allocatedQty;
+      const canAllocate = alloc.needed - alloc.allocatedQty;
 
       if (canAllocate > 0) {
         alloc.allocatedQty++;
@@ -243,28 +251,32 @@ export class MultiOrderPickDialogComponent implements OnChanges {
       orderIndex = (orderIndex + 1) % ordersNeedingPicks.length;
 
       const allFull = ordersNeedingPicks.every(a =>
-        a.allocatedQty >= a.remaining
+        a.allocatedQty >= a.needed
       );
       if (allFull) break;
     }
   }
 
   fillInOrder(): void {
+    // Reset to current picked state first
     this.clearAllocations();
 
-    let remaining = this.availableToPick;
+    // Distribute only the additional available quantity beyond what's already picked
+    let remaining = this.availableToPick - this.totalAllocated;
 
     for (const alloc of this.allocations) {
       if (remaining <= 0) break;
 
-      const toAllocate = Math.min(remaining, alloc.remaining);
-      alloc.allocatedQty = toAllocate;
+      const canAllocate = alloc.needed - alloc.allocatedQty;
+      const toAllocate = Math.min(remaining, canAllocate);
+      alloc.allocatedQty += toAllocate;
       remaining -= toAllocate;
     }
   }
 
   clearAllocations(): void {
-    this.allocations.forEach(a => a.allocatedQty = 0);
+    // Reset to current picked state (undo changes)
+    this.allocations.forEach(a => a.allocatedQty = a.picked);
   }
 
   close(): void {
@@ -273,13 +285,17 @@ export class MultiOrderPickDialogComponent implements OnChanges {
   }
 
   async save(): Promise<void> {
-    if (this.totalAllocated === 0 || this.totalAllocated > this.availableToPick) return;
+    if (!this.hasChanges || this.totalAllocated > this.availableToPick) return;
 
     this.saving = true;
 
+    // Calculate deltas (change from current picked state) and only include changes
     const picksToApply = this.allocations
-      .filter(a => a.allocatedQty > 0)
-      .map(a => ({ lineItemId: a.lineItemId, toolId: a.toolId, qty: a.allocatedQty }));
+      .map(a => {
+        const delta = a.allocatedQty - a.picked;
+        return { lineItemId: a.lineItemId, toolId: a.toolId, qty: delta, picked: a.picked };
+      })
+      .filter(p => p.qty !== 0); // Only apply actual changes
 
     this.pick.emit(picksToApply);
 

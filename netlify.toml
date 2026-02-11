@@ -1,3 +1,10 @@
 [build]
-  command = "tsc && vite build"
-  publish = "dist"
+  base = "AngularBootstrap"
+  command = "npm install && npm run build"
+  publish = "dist/tool-pick-list-tracker/browser"
+
+# SPA redirect for Angular router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

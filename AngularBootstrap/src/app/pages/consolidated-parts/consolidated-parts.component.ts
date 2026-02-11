@@ -300,17 +300,10 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                     {{ part.remaining }}
                   </span>
                 </td>
-                <td>
-                  <div class="d-flex flex-wrap gap-1">
-                    <a *ngFor="let order of part.orders"
-                       [routerLink]="['/orders', order.order_id]"
-                       class="badge border text-decoration-none"
-                       [ngClass]="part.remaining === 0 ? 'bg-success-subtle text-success-emphasis border-success' : 'bg-body-secondary text-body'"
-                       [title]="'SO-' + order.so_number + ' - ' + order.tool_number">
-                      SO-{{ order.so_number }}-{{ order.tool_number }}
-                      <span [ngClass]="part.remaining === 0 ? 'text-success' : 'text-muted'">({{ order.picked }}/{{ order.needed }})</span>
-                    </a>
-                  </div>
+                <td class="text-center">
+                  <span class="badge bg-secondary">
+                    {{ part.orders.length }} order{{ part.orders.length !== 1 ? 's' : '' }}
+                  </span>
                 </td>
                 <td class="text-center">
                   <div class="d-flex gap-1 justify-content-center">

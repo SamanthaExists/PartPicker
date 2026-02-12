@@ -16,6 +16,7 @@ import { ConsolidatedPart, PartIssueType } from '../../models';
 import { MultiOrderPickDialogComponent } from '../../components/dialogs/multi-order-pick-dialog.component';
 import { ReportPartIssueDialogComponent } from '../../components/dialogs/report-part-issue-dialog.component';
 import { PartDetailComponent } from '../../components/parts/part-detail.component';
+import { ClassificationBadgeComponent } from '../../components/parts/classification-badge.component';
 import { PrintTagDialogComponent, TagData } from '../../components/picking/print-tag-dialog.component';
 
 type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock' | 'has_issues';
@@ -23,7 +24,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
 @Component({
   selector: 'app-consolidated-parts',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, MultiOrderPickDialogComponent, ReportPartIssueDialogComponent, PartDetailComponent, PrintTagDialogComponent],
+  imports: [CommonModule, RouterModule, FormsModule, MultiOrderPickDialogComponent, ReportPartIssueDialogComponent, PartDetailComponent, ClassificationBadgeComponent, PrintTagDialogComponent],
   template: `
     <div>
       <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
@@ -212,6 +213,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
               <tr class="table-secondary">
                 <th>Part Number</th>
                 <th>Description</th>
+                <th>Type</th>
                 <th>Location</th>
                 <th class="text-center">Available</th>
                 <th class="text-center">Needed</th>
@@ -220,12 +222,11 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                 <th>Orders</th>
                 <th class="text-center">Actions</th>
               </tr>
-            </thead>
-            <tbody>
+            </thead>            <tbody>
               <ng-container *ngFor="let part of sortedParts; let idx = index">
                 <!-- Location Group Header -->
                 <tr *ngIf="sortMode === 'location' && shouldShowLocationHeader(part, idx)" class="location-group-header">
-                  <td colspan="9" class="py-2">
+                  <td colspan="10" class="py-2">
                     <div class="d-flex align-items-center gap-2">
                       <i class="bi bi-geo-alt text-primary"></i>
                       <strong>{{ getLocationPrefix(part.location) || 'No Location' }}</strong>
@@ -235,7 +236,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                 </tr>
                 <!-- Assembly Group Header -->
                 <tr *ngIf="sortMode === 'assembly' && shouldShowAssemblyGroupHeader(part, idx)" class="assembly-group-header">
-                  <td colspan="9" class="py-2">
+                  <td colspan="10" class="py-2">
                     <div class="d-flex align-items-center gap-2">
                       <i class="bi bi-box-seam text-purple"></i>
                       <strong>{{ getPartAssemblyName(part) || 'Unassigned' }}</strong>
@@ -273,6 +274,14 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                       'text-danger-emphasis': getQtyAvailable(part) === 0 && part.remaining > 0,
                       'text-muted': part.total_picked === 0 && !(getQtyAvailable(part) === 0 && part.remaining > 0)
                     }">{{ part.description || '-' }}</td>
+                <td>
+                  <app-classification-badge
+                    [classification]="part.classification_type"
+                    [isAssembly]="part.is_assembly"
+                    [isModified]="part.is_modified"
+                    [showIcon]="false">
+                  </app-classification-badge>
+                </td>
                 <td [ngClass]="{
                       'text-success-emphasis': part.remaining === 0,
                       'text-warning-emphasis': part.total_picked > 0 && part.remaining > 0 && !(getQtyAvailable(part) === 0 && part.remaining > 0),

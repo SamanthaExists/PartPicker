@@ -1,7 +1,7 @@
 # Angular App Deployment Configuration
-# Builds and deploys the Angular application from AngularBootstrap/
+# Builds and deploys the Angular application from ROOT (merged main + angular branches)
 [build]
-  base = "AngularBootstrap"
+  base = "."
   command = "npm install && npm run build"
   publish = "dist/tool-pick-list-tracker/browser"
 

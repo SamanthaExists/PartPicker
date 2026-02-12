@@ -1,0 +1,6 @@
+
+> tool-pick-list-tracker-angular@1.0.0 build
+> ng build
+
+[1m[33mNode packages may not be installed. Try installing with 'npm install'.[39m[22m
+[1m[31mError: Could not find the '@angular-devkit/build-angular:application' builder's node package.[39m[22m

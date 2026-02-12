@@ -4,7 +4,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { SupabaseService } from './supabase.service';
 
 // Part and related types
-export type ClassificationType = 'purchased' | 'manufactured' | 'assembly' | 'modified';
+export type ClassificationType = 'purchased' | 'manufactured';
 
 export interface Part {
   id: string;
@@ -12,6 +12,8 @@ export interface Part {
   description: string | null;
   default_location: string | null;
   classification_type: ClassificationType | null;
+  is_assembly: boolean;
+  is_modified: boolean;
   base_part_id: string | null;
   notes: string | null;
   created_at: string;

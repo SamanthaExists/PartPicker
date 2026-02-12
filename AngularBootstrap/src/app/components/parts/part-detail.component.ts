@@ -27,7 +27,9 @@ export class PartDetailComponent implements OnInit {
     description: '',
     classification_type: '' as ClassificationType | '',
     default_location: '',
-    notes: ''
+    notes: '',
+    is_assembly: false,
+    is_modified: false
   };
 
   constructor(
@@ -57,7 +59,9 @@ export class PartDetailComponent implements OnInit {
           description: this.part.description || '',
           classification_type: this.part.classification_type || '',
           default_location: this.part.default_location || '',
-          notes: this.part.notes || ''
+          notes: this.part.notes || '',
+          is_assembly: this.part.is_assembly || false,
+          is_modified: this.part.is_modified || false
         };
       }
     }
@@ -72,7 +76,9 @@ export class PartDetailComponent implements OnInit {
         classification_type: this.editForm.classification_type || null,
         default_location: this.editForm.default_location.trim() || null,
         base_part_id: null,
-        notes: this.editForm.notes.trim() || null
+        notes: this.editForm.notes.trim() || null,
+        is_assembly: this.editForm.is_assembly,
+        is_modified: this.editForm.is_modified
       });
       this.activeModal.close();
     } else if (this.partId) {
@@ -81,7 +87,9 @@ export class PartDetailComponent implements OnInit {
         description: this.editForm.description.trim() || null,
         classification_type: this.editForm.classification_type || null,
         default_location: this.editForm.default_location.trim() || null,
-        notes: this.editForm.notes.trim() || null
+        notes: this.editForm.notes.trim() || null,
+        is_assembly: this.editForm.is_assembly,
+        is_modified: this.editForm.is_modified
       });
       await this.loadPart();
       this.isEditing = false;
@@ -99,18 +107,32 @@ export class PartDetailComponent implements OnInit {
           description: this.part.description || '',
           classification_type: this.part.classification_type || '',
           default_location: this.part.default_location || '',
-          notes: this.part.notes || ''
+          notes: this.part.notes || '',
+          is_assembly: this.part.is_assembly || false,
+          is_modified: this.part.is_modified || false
         };
       }
     }
   }
 
   get isAssembly(): boolean {
-    return this.part?.classification_type === 'assembly';
+    return this.part?.is_assembly || false;
   }
 
   get isModified(): boolean {
-    return this.part?.classification_type === 'modified';
+    return this.part?.is_modified || false;
+  }
+
+  onAssemblyChange(): void {
+    if (this.editForm.is_assembly && this.editForm.is_modified) {
+      this.editForm.is_modified = false;
+    }
+  }
+
+  onModifiedChange(): void {
+    if (this.editForm.is_modified && this.editForm.is_assembly) {
+      this.editForm.is_assembly = false;
+    }
   }
 
   getClassificationBadgeClass(type: ClassificationType): string {

@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { SettingsService } from '../../services/settings.service';
 import { InventorySyncService, SyncResult as InventorySyncResult } from '../../services/inventory-sync.service';
@@ -13,7 +14,7 @@ import { UserSettings } from '../../models';
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div>
       <div class="mb-4">
@@ -427,6 +428,24 @@ import { UserSettings } from '../../models';
                 <i class="bi bi-check-circle me-2"></i>
                 Backup exported successfully!
               </div>
+            </div>
+          </div>
+
+          <!-- Assembly Verification -->
+          <div class="card mb-4">
+            <div class="card-header">
+              <span class="fw-semibold">
+                <i class="bi bi-diagram-3 me-2"></i>Assembly Migration
+              </span>
+            </div>
+            <div class="card-body">
+              <p class="small text-muted mb-3">
+                Verify assembly structure migration from CSV files to the database. View statistics and check data integrity.
+              </p>
+              <a routerLink="/settings/assembly-verification" class="btn btn-outline-primary w-100">
+                <i class="bi bi-check-circle me-2"></i>
+                Open Assembly Verification Tool
+              </a>
             </div>
           </div>
 

@@ -52,6 +52,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/settings/settings.component').then(m => m.SettingsComponent)
   },
   {
+    path: 'settings/assembly-verification',
+    loadComponent: () => import('./pages/settings/assembly-verification.component').then(m => m.AssemblyVerificationComponent)
+  },
+  {
     path: '**',
     redirectTo: ''
   }

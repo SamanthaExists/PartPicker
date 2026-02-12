@@ -44,9 +44,34 @@
                 <option value="">Select classification</option>
                 <option value="purchased">Purchased</option>
                 <option value="manufactured">Manufactured</option>
-                <option value="assembly">Assembly</option>
-                <option value="modified">Modified</option>
               </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label d-block">Additional Attributes</label>
+              <div class="form-check form-check-inline">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="assemblyCheck"
+                  [(ngModel)]="editForm.is_assembly"
+                  (change)="onAssemblyChange()"
+                />
+                <label class="form-check-label" for="assemblyCheck">
+                  <i class="bi bi-boxes me-1"></i> Assembly
+                </label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="modifiedCheck"
+                  [(ngModel)]="editForm.is_modified"
+                  (change)="onModifiedChange()"
+                />
+                <label class="form-check-label" for="modifiedCheck">
+                  <i class="bi bi-wrench me-1"></i> Modified
+                </label>
+              </div>
             </div>
             <div class="col-12">
               <label class="form-label">Description</label>

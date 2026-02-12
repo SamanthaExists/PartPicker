@@ -113,13 +113,83 @@ src/
 Main tables:
 - `orders` - Sales orders with SO number, customer, dates, status
 - `tools` - Tools within orders (e.g., "3137-1", "3137-2")
-- `line_items` - Parts to pick (part_number, qty_per_unit, location)
+- `line_items` - Parts to pick (part_number, qty_per_unit, location, assembly_group, part_id)
 - `picks` - Pick records (who picked what, when, for which tool, plus undone_at/undone_by for soft-delete)
 - `pick_undos` - Audit trail of undone picks (denormalized snapshots with part_number, tool_number, so_number, undone_by)
 - `issues` - Reported issues (out_of_stock, damaged, wrong_part, other)
-- `parts_catalog` - Master parts list with descriptions/locations
+- `parts_catalog` - Master parts list with descriptions/locations (DEPRECATED - use `parts` table)
 - `bom_templates` - Saved bill of materials templates
 - `bom_template_items` - Items in BOM templates
+- `parts` - **Unified Parts Master Catalog** with classification, assembly flags, and modification tracking
+- `part_relationships` - Parent-child relationships for assemblies (which parts make up an assembly)
+
+## Assembly System
+
+The application supports **structured assemblies** (parts that are made up of other parts):
+
+### Data Model
+
+**Two systems exist for historical reasons:**
+
+1. **Structured System (PREFERRED)**: Uses `parts` and `part_relationships` tables
+   - `parts.is_assembly = true` marks a part as an assembly
+   - `part_relationships` defines parent → child relationships with quantities
+   - `line_items.part_id` links to the structured parts catalog
+
+2. **Legacy System (DEPRECATED)**: Text-based assembly information
+   - `line_items.assembly_group` contains text like "CHILD < PARENT1 < PARENT2"
+   - Kept for audit trail and backward compatibility
+   - New imports auto-populate both `part_id` (structured) and `assembly_group` (legacy)
+
+### Key Services
+
+**AssemblyHelperService** (`services/assembly-helper.service.ts`):
+- Provides unified access to assembly data from both systems
+- `getAssemblyInfo(lineItem)` tries structured system first, falls back to legacy text
+- Returns `AssemblyInfo` with component details and data source indicator
+
+**CsvAssemblyVerifierService** (`services/csv-assembly-verifier.service.ts`):
+- Parses hierarchical CSV files and verifies assembly data against database
+- Compares CSV structure with both legacy text and structured tables
+- Generates discrepancy reports for migration verification
+
+### CSV Import with Assembly Auto-Creation
+
+The BOM parser (`services/bom-parser.service.ts`) automatically creates structured assemblies during CSV import:
+
+1. **Parse hierarchical structure**: Reads Level/Part Number columns from SO-XXXX.xlsx files
+2. **Create parts**: Uses `PartsService.findOrCreatePart()` to create/update parts, marking assemblies with `is_assembly = true`
+3. **Create relationships**: Uses `PartRelationshipsService.createRelationship()` to link parent → child with quantities
+4. **Populate fields**: Line items get both `part_id` (structured foreign key) and `assembly_group` (legacy text)
+
+### UI Display
+
+**Order Detail Page** (`pages/order-detail/order-detail.component.ts`):
+- Shows assembly information with visual indicators
+- Structured assemblies display with a diagram icon (bi-diagram-3)
+- Format: "Assy: PART_NUMBER (X parts)" for structured, "Assy: assembly_group" for legacy
+- Sorting prioritizes structured assembly names over legacy text
+
+### Migration Tracking
+
+- `line_items.assembly_migrated_at` timestamp tracks when legacy data was migrated to structured format
+- Migration `20260213000000_migrate_assembly_groups.sql` parses legacy text and populates structured tables
+- Assembly Verification Admin Tool (`/settings/assembly-verification`) shows migration progress and validates data integrity
+
+### Integrity Checks
+
+Run `supabase/migrations/assembly_integrity_checks.sql` to verify:
+- No orphaned relationships (parent/child parts exist)
+- Assemblies have children
+- No circular references
+- Migration completeness statistics
+
+### Best Practices
+
+- **Always use structured system** for new features (parts + part_relationships)
+- **Keep legacy assembly_group** populated for audit trail during migration period
+- **Use AssemblyHelperService** for reading assembly data (handles both systems gracefully)
+- **Verify imports** using the Assembly Verification Admin Tool after large CSV imports
 
 ## Commands
 

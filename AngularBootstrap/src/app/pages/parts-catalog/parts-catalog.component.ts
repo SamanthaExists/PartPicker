@@ -6,6 +6,7 @@ import { Subscription } from 'rxjs';
 import { NgbModal, NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { PartsService, Part, PartWithStats, ClassificationType } from '../../services/parts.service';
 import { PartDetailComponent } from '../../components/parts/part-detail.component';
+import { ClassificationBadgeComponent } from '../../components/parts/classification-badge.component';
 import { SupabaseService } from '../../services/supabase.service';
 
 type PartSortOption = 'part-number' | 'description' | 'classification' | 'location';
@@ -13,7 +14,7 @@ type PartSortOption = 'part-number' | 'description' | 'classification' | 'locati
 @Component({
   selector: 'app-parts-catalog',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, ClassificationBadgeComponent],
   template: `
     <div class="container-fluid py-3">
       <!-- Header -->
@@ -58,10 +59,14 @@ type PartSortOption = 'part-number' | 'description' | 'classification' | 'locati
             <div class="col-md-4">
               <select class="form-select" [(ngModel)]="classificationFilter" (ngModelChange)="applyFilters()">
                 <option value="all">All Classifications</option>
-                <option value="purchased">Purchased</option>
-                <option value="manufactured">Manufactured</option>
-                <option value="assembly">Assembly</option>
-                <option value="modified">Modified</option>
+                <optgroup label="Base Classification">
+                  <option value="purchased">Purchased</option>
+                  <option value="manufactured">Manufactured</option>
+                </optgroup>
+                <optgroup label="Attributes">
+                  <option value="assembly">Assembly</option>
+                  <option value="modified">Modified</option>
+                </optgroup>
               </select>
             </div>
 
@@ -116,9 +121,13 @@ type PartSortOption = 'part-number' | 'description' | 'classification' | 'locati
                       <i class="bi" [ngClass]="copiedPartNumber === part.part_number ? 'bi-check-lg text-success' : 'bi-clipboard'"></i>
                     </button>
                   </div>
-                  <span *ngIf="part.classification_type" [class]="getClassificationBadgeClass(part.classification_type) + ' mt-1'">
-                    {{ getClassificationLabel(part.classification_type) }}
-                  </span>
+                  <div class="mt-1">
+                    <app-classification-badge
+                      [classification]="part.classification_type"
+                      [isAssembly]="part.is_assembly"
+                      [isModified]="part.is_modified">
+                    </app-classification-badge>
+                  </div>
                 </div>
 
                 <!-- Description -->
@@ -209,7 +218,7 @@ export class PartsCatalogComponent implements OnInit, OnDestroy {
   filteredParts: PartWithStats[] = [];
   loading = true;
   searchQuery = '';
-  classificationFilter: ClassificationType | 'all' = 'all';
+  classificationFilter: ClassificationType | 'assembly' | 'modified' | 'all' = 'all';
   sortBy: PartSortOption = 'part-number';
   autoDetecting = false;
   autoDetectResults: Array<{
@@ -257,7 +266,13 @@ export class PartsCatalogComponent implements OnInit, OnDestroy {
 
     // Classification filter
     if (this.classificationFilter !== 'all') {
-      filtered = filtered.filter((part) => part.classification_type === this.classificationFilter);
+      if (this.classificationFilter === 'assembly') {
+        filtered = filtered.filter((part) => part.is_assembly === true);
+      } else if (this.classificationFilter === 'modified') {
+        filtered = filtered.filter((part) => part.is_modified === true);
+      } else {
+        filtered = filtered.filter((part) => part.classification_type === this.classificationFilter);
+      }
     }
 
     // Sort
@@ -267,8 +282,22 @@ export class PartsCatalogComponent implements OnInit, OnDestroy {
           return a.part_number.localeCompare(b.part_number, undefined, { numeric: true });
         case 'description':
           return (a.description || '').localeCompare(b.description || '');
-        case 'classification':
-          return (a.classification_type || '').localeCompare(b.classification_type || '');
+        case 'classification': {
+          // Sort by base classification first
+          const classCompare = (a.classification_type || '').localeCompare(b.classification_type || '');
+          if (classCompare !== 0) return classCompare;
+
+          // Then by assembly status
+          const aAssembly = a.is_assembly ? 1 : 0;
+          const bAssembly = b.is_assembly ? 1 : 0;
+          const assemblyCompare = bAssembly - aAssembly; // True values first
+          if (assemblyCompare !== 0) return assemblyCompare;
+
+          // Finally by modified status
+          const aModified = a.is_modified ? 1 : 0;
+          const bModified = b.is_modified ? 1 : 0;
+          return bModified - aModified; // True values first
+        }
         case 'location':
           return (a.default_location || '').localeCompare(b.default_location || '');
         default:
@@ -277,26 +306,6 @@ export class PartsCatalogComponent implements OnInit, OnDestroy {
     });
 
     this.filteredParts = filtered;
-  }
-
-  getClassificationLabel(type: ClassificationType): string {
-    const labels: Record<ClassificationType, string> = {
-      purchased: 'Purchased',
-      manufactured: 'Manufactured',
-      assembly: 'Assembly',
-      modified: 'Modified'
-    };
-    return labels[type];
-  }
-
-  getClassificationBadgeClass(type: ClassificationType): string {
-    const classes: Record<ClassificationType, string> = {
-      purchased: 'badge bg-primary',
-      manufactured: 'badge bg-warning text-dark',
-      assembly: 'badge bg-secondary',
-      modified: 'badge bg-info text-dark'
-    };
-    return classes[type];
   }
 
   showNewPartDialog(): void {

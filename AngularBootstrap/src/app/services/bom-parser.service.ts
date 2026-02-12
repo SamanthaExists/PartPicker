@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ImportedOrder, ImportedLineItem, ImportedTool, PartsCatalogItem } from '../models';
+import { PartsService, Part } from './parts.service';
+import { PartRelationshipsService } from './part-relationships.service';
 
 export interface ParsedLeafPart {
   partNumber: string;
@@ -43,6 +45,10 @@ export interface ToolMapping {
   providedIn: 'root'
 })
 export class BomParserService {
+  constructor(
+    private partsService: PartsService,
+    private partRelationshipsService: PartRelationshipsService
+  ) {}
 
   parseBOMCsv(csvText: string, filename: string): ParsedBOM {
     const warnings: string[] = [];
@@ -274,7 +280,7 @@ export class BomParserService {
     };
   }
 
-  buildImportedOrder(
+  async buildImportedOrder(
     mergedResult: MergedBOMResult,
     orderInfo: {
       soNumber: string;
@@ -286,7 +292,7 @@ export class BomParserService {
     },
     toolMappings: ToolMapping[],
     catalogParts?: PartsCatalogItem[]
-  ): ImportedOrder {
+  ): Promise<ImportedOrder> {
     const catalogMap = new Map<string, PartsCatalogItem>();
     if (catalogParts) {
       for (const part of catalogParts) {
@@ -304,10 +310,75 @@ export class BomParserService {
       tool_model: tm.toolModel,
     }));
 
+    // Create a map to track created parts by part number
+    const partsMap = new Map<string, Part>();
+
+    // First pass: Create or find all parts (assemblies and components)
+    for (const item of mergedResult.lineItems) {
+      const catalogEntry = catalogMap.get(item.partNumber);
+      const description = catalogEntry?.description || item.description || null;
+      const location = catalogEntry?.default_location || null;
+
+      // Determine if this part is an assembly (has an assembly_group that matches its own part_number)
+      const isAssembly = item.assemblyGroup === item.partNumber;
+
+      try {
+        const part = await this.partsService.findOrCreatePart(
+          item.partNumber,
+          description,
+          location,
+          null // classification_type will be set later if needed
+        );
+
+        // Mark as assembly if needed
+        if (isAssembly && !part.is_assembly) {
+          await this.partsService.updatePart(part.id, { is_assembly: true });
+          part.is_assembly = true;
+        }
+
+        partsMap.set(item.partNumber, part);
+      } catch (err) {
+        console.error(`Error creating/finding part ${item.partNumber}:`, err);
+      }
+    }
+
+    // Second pass: Create relationships between assemblies and components
+    const relationshipsCreated = new Set<string>(); // Track "parentPN:childPN" to avoid duplicates
+
+    for (const item of mergedResult.lineItems) {
+      const assemblyGroupPN = item.assemblyGroup;
+      if (!assemblyGroupPN || assemblyGroupPN === item.partNumber) {
+        // Skip if no assembly group or if this is the assembly itself
+        continue;
+      }
+
+      const parentPart = partsMap.get(assemblyGroupPN);
+      const childPart = partsMap.get(item.partNumber);
+
+      if (parentPart && childPart && parentPart.id !== childPart.id) {
+        const relationshipKey = `${parentPart.id}:${childPart.id}`;
+        if (!relationshipsCreated.has(relationshipKey)) {
+          try {
+            await this.partRelationshipsService.createRelationship(
+              parentPart.id,
+              childPart.id,
+              item.qtyPerUnit,
+              { skipCircularCheck: true } // Skip circular check for import speed
+            );
+            relationshipsCreated.add(relationshipKey);
+          } catch (err) {
+            console.error(`Error creating relationship ${assemblyGroupPN} -> ${item.partNumber}:`, err);
+          }
+        }
+      }
+    }
+
+    // Third pass: Build line items with part_id populated
     const lineItems: ImportedLineItem[] = mergedResult.lineItems.map(item => {
       const catalogEntry = catalogMap.get(item.partNumber);
       const description = catalogEntry?.description || item.description || undefined;
       const location = catalogEntry?.default_location || undefined;
+      const part = partsMap.get(item.partNumber);
 
       let toolIds: string[] | undefined;
       if (!item.isShared) {
@@ -331,7 +402,8 @@ export class BomParserService {
         qty_per_unit: item.qtyPerUnit,
         total_qty_needed: totalQtyNeeded,
         tool_ids: toolIds,
-        assembly_group: item.assemblyGroup || undefined,
+        assembly_group: item.assemblyGroup || undefined, // Legacy text field for backward compatibility
+        part_id: part?.id, // Structured foreign key to parts table
       };
     });
 

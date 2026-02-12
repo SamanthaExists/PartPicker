@@ -14,6 +14,7 @@ import { UtilsService } from '../../services/utils.service';
 import { BomTemplatesService } from '../../services/bom-templates.service';
 import { ActivityLogService } from '../../services/activity-log.service';
 import { PartsService, Part } from '../../services/parts.service';
+import { AssemblyHelperService } from '../../services/assembly-helper.service';
 import { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '../../models';
 import { SaveAsTemplateDialogComponent } from '../../components/dialogs/save-as-template-dialog.component';
 import { PrintPickListComponent } from '../../components/picking/print-pick-list.component';
@@ -432,14 +433,14 @@ interface PickHistoryItem {
                             {{ item.tool_ids.length }} of {{ tools.length }} tools
                           </span>
                         </div>
-                        <span class="small d-block" *ngIf="item.assembly_group && sortMode !== 'assembly'"
+                        <span class="small d-block" *ngIf="getAssemblyDisplayInfo(item) && sortMode !== 'assembly'"
                               [ngClass]="{
                                 'text-success-emphasis': isItemComplete(item),
                                 'text-warning-emphasis': isItemPartial(item) && !hasOpenIssue(item.id),
                                 'text-danger-emphasis': hasOpenIssue(item.id),
                                 'text-muted': !isItemComplete(item) && !isItemPartial(item) && !hasOpenIssue(item.id)
                               }">
-                          Assy: {{ item.assembly_group }}
+                          <i class="bi bi-diagram-3 me-1" *ngIf="getAssemblyDisplayInfo(item)?.isStructured"></i>{{ getAssemblyDisplayInfo(item)?.text }}
                         </span>
                       </td>
                       <!-- Type -->
@@ -1129,6 +1130,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     private bomTemplatesService: BomTemplatesService,
     private activityLogService: ActivityLogService,
     private partsService: PartsService,
+    private assemblyHelperService: AssemblyHelperService,
     private modalService: NgbModal,
     public utils: UtilsService
   ) {
@@ -1373,8 +1375,13 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
       });
     } else if (this.sortMode === 'assembly') {
       items.sort((a, b) => {
-        const groupA = a.assembly_group || '';
-        const groupB = b.assembly_group || '';
+        // Prioritize structured assembly names (from part_id) over legacy assembly_group text
+        const infoA = this.getAssemblyDisplayInfo(a);
+        const infoB = this.getAssemblyDisplayInfo(b);
+
+        const groupA = infoA?.isStructured ? a.part_number : (a.assembly_group || '');
+        const groupB = infoB?.isStructured ? b.part_number : (b.assembly_group || '');
+
         if (!groupA && groupB) return 1;
         if (groupA && !groupB) return -1;
         if (!groupA && !groupB) return this.alphanumericCompare(a.part_number, b.part_number);
@@ -2094,6 +2101,37 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
 
   isAssemblyPart(partNumber: string): boolean {
     return this.partsMap.get(partNumber)?.classification_type === 'assembly';
+  }
+
+  getAssemblyDisplayInfo(item: LineItem): { text: string; isStructured: boolean; componentCount?: number } | null {
+    // If no assembly information at all, return null
+    if (!item.part_id && !item.assembly_group) {
+      return null;
+    }
+
+    // For structured assemblies (has part_id), try to get part from partsMap
+    if (item.part_id) {
+      const part = this.partsMap.get(item.part_number);
+      if (part && part.classification_type === 'assembly') {
+        // We have structured assembly data
+        // Note: We'd need to fetch relationships to get exact component count
+        // For now, we indicate it's structured with the part number
+        return {
+          text: `Assy: ${item.part_number}`,
+          isStructured: true
+        };
+      }
+    }
+
+    // Fall back to legacy assembly_group text
+    if (item.assembly_group) {
+      return {
+        text: `Assy: ${item.assembly_group}`,
+        isStructured: false
+      };
+    }
+
+    return null;
   }
 
   openBOMDialog(item: LineItemWithPicks): void {

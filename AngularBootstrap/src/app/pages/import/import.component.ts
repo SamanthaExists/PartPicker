@@ -255,13 +255,13 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
               <i class="bi bi-download me-1"></i> Single Tool Type (BOM)
             </button>
             <button class="btn btn-outline-secondary" (click)="downloadTemplate('multi')">
-              <i class="bi bi-download me-1"></i> Multiple Tool Types
+              <i class="bi bi-download me-1"></i> Multiple Tool Types (BOM)
             </button>
           </div>
           <p class="small text-muted mt-3 mb-0">
-            <strong>Single Tool Type:</strong> All tools share the same parts list.<br>
-            <strong>Single Tool Type (BOM):</strong> Multi-level BOM with hierarchy (Level column).<br>
-            <strong>Multiple Tool Types:</strong> Different tools have different BOMs.
+            <strong>Single Tool Type:</strong> All tools share the same parts list (flat).<br>
+            <strong>Single Tool Type (BOM):</strong> Multi-level BOM with hierarchy (includes Level column).<br>
+            <strong>Multiple Tool Types (BOM):</strong> Each tool has its own hierarchical BOM (includes Level column).
           </p>
         </div>
       </div>
@@ -1027,7 +1027,7 @@ export class ImportComponent implements OnInit, OnDestroy {
     const catalogParts = this.partsCatalogService.getCurrentParts();
 
     const merged = this.bomParserService.mergeMultipleBOMs(parsedBOMs, toolMappings);
-    const order = this.bomParserService.buildImportedOrder(
+    const order = await this.bomParserService.buildImportedOrder(
       merged,
       {
         soNumber: this.bomOrderInfo.soNumber,

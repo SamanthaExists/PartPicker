@@ -1,0 +1,10 @@
+{
+  "/api/proxy": {
+    "target": "https://api.andrewstool.com",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/proxy": "/api"
+    }
+  }
+}

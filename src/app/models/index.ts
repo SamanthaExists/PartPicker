@@ -378,3 +378,27 @@ export interface CircularReferenceWarning {
   would_cycle: boolean;
   message: string;
 }
+
+// Unified Catalog - combines templates and parts
+export interface UnifiedListItem {
+  id: string;
+  type: 'template' | 'part';
+  displayName: string;  // template.name OR part.part_number
+  subtitle: string;     // item count OR description
+  badges: {
+    text: string;
+    color: string;
+    icon?: string;
+  }[];
+  icon: string;         // visual indicator (bi- class)
+  stats: {
+    childCount?: number;     // For assembly parts
+    usedInCount?: number;    // For parts used in assemblies
+    itemCount?: number;      // For templates
+  };
+}
+
+export interface UnifiedItem {
+  type: 'template' | 'part';
+  data: BOMTemplateWithItems | PartWithRelationships;
+}

@@ -18,8 +18,18 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/consolidated-parts/consolidated-parts.component').then(m => m.ConsolidatedPartsComponent)
   },
   {
+    path: 'catalog',
+    loadComponent: () => import('./pages/unified-catalog/unified-catalog.component').then(m => m.UnifiedCatalogComponent)
+  },
+  {
     path: 'parts-catalog',
-    loadComponent: () => import('./pages/parts-catalog/parts-catalog.component').then(m => m.PartsCatalogComponent)
+    redirectTo: 'catalog',
+    pathMatch: 'full'
+  },
+  {
+    path: 'templates',
+    redirectTo: 'catalog',
+    pathMatch: 'full'
   },
   {
     path: 'items-to-order',
@@ -28,10 +38,6 @@ export const routes: Routes = [
   {
     path: 'issues',
     loadComponent: () => import('./pages/issues/issues.component').then(m => m.IssuesComponent)
-  },
-  {
-    path: 'templates',
-    loadComponent: () => import('./pages/templates/templates.component').then(m => m.TemplatesComponent)
   },
   {
     path: 'import',

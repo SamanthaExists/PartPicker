@@ -918,6 +918,11 @@ export class ImportComponent implements OnInit, OnDestroy {
           await this.partRelationshipsService.bulkCreateRelationships(assemblyPart.id, relationships, {
             skipCircularCheck: true, // Skip for performance during bulk import
           });
+
+          // Mark as assembly if it has children and isn't already marked
+          if (!assemblyPart.is_assembly) {
+            await this.partsService.updatePart(assemblyPart.id, { is_assembly: true });
+          }
         }
       } catch (error) {
         console.error(`Failed to create assembly relationships for ${assemblyName}:`, error);

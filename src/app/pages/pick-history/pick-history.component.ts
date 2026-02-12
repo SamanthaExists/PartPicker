@@ -654,11 +654,17 @@ export class PickHistoryComponent implements OnInit {
 
     for (const activity of this.filteredActivities) {
       const timestamp = this.getActivityTimestamp(activity);
-      const date = new Date(timestamp).toISOString().split('T')[0];
-      if (!groups[date]) {
-        groups[date] = [];
+      const d = new Date(timestamp);
+      // Use local date components to avoid UTC shift
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
+
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
       }
-      groups[date].push(activity);
+      groups[dateKey].push(activity);
     }
 
     return groups;
@@ -1184,7 +1190,11 @@ export class PickHistoryComponent implements OnInit {
   }
 
   formatDateHeader(date: string): string {
-    const d = new Date(date);
+    // date key is YYYY-MM-DD local time
+    // Parse it components to avoid UTC shift
+    const [year, month, day] = date.split('-').map(Number);
+    const d = new Date(year, month - 1, day);
+
     return d.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',

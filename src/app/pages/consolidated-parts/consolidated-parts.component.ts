@@ -247,6 +247,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                   [class.table-success]="part.remaining === 0"
                   [class.table-warning]="part.total_picked > 0 && part.remaining > 0"
                   [class.table-danger]="getQtyAvailable(part) === 0 && part.remaining > 0">
+                <td>
                   <div class="d-flex align-items-center gap-2">
                     <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(part.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ part.part_number }}</span>
                     <button class="btn btn-sm btn-ghost p-0 text-muted" (click)="copyPartNumber(part.part_number, $event)" title="Copy Part Number">
@@ -303,25 +304,44 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                   </span>
                 </td>
                 <td>
-                  <div class="position-relative order-hover-container">
-                    <span class="badge rounded-pill bg-light text-dark border cursor-pointer">
+                  <div class="position-relative">
+                    <span class="badge rounded-pill bg-light text-dark border cursor-pointer"
+                          (click)="toggleOrderDetails(part.part_number, $event)"
+                          [class.bg-primary-subtle]="activeDetailsPartId === part.part_number"
+                          [class.text-primary-emphasis]="activeDetailsPartId === part.part_number"
+                          [class.border-primary]="activeDetailsPartId === part.part_number">
                       {{ part.orders.length }} Order{{ part.orders.length !== 1 ? 's' : '' }}
-                      <i class="bi bi-chevron-down ms-1" style="font-size: 0.7em;"></i>
+                      <i class="bi" [ngClass]="activeDetailsPartId === part.part_number ? 'bi-chevron-up' : 'bi-chevron-down'" style="font-size: 0.7em;"></i>
                     </span>
-                    <div class="order-details-popover shadow border rounded p-2 bg-white position-absolute start-0 top-100 mt-1" style="z-index: 1050; width: 280px; display: none;">
-                      <div class="d-flex flex-column gap-1">
+                    
+                    <!-- Clickable Popover -->
+                    <div *ngIf="activeDetailsPartId === part.part_number" 
+                         class="order-details-popover shadow border rounded p-2 bg-white position-absolute start-0 top-100 mt-1" 
+                         style="z-index: 1050; width: 320px;"
+                         (click)="$event.stopPropagation()">
+                      <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                        <small class="text-muted fw-bold">Order Details</small>
+                        <button type="button" class="btn-close btn-sm" aria-label="Close" (click)="activeDetailsPartId = null; $event.stopPropagation()"></button>
+                      </div>
+                      <div class="d-flex flex-column gap-1" style="max-height: 300px; overflow-y: auto;">
                         <a *ngFor="let order of part.orders"
                            [routerLink]="['/orders', order.order_id]"
-                           class="badge border text-decoration-none text-start p-2 d-block"
+                           class="badge border text-decoration-none text-start p-2 d-block text-wrap"
                            [ngClass]="part.remaining === 0 ? 'bg-success-subtle text-success-emphasis border-success' : 'bg-body-secondary text-body'"
                            [title]="'SO-' + order.so_number + ' - ' + order.tool_number">
-                          <div class="d-flex justify-content-between">
-                            <strong>SO-{{ order.so_number }}</strong>
-                            <span>{{ order.tool_number }}</span>
+                          <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong class="text-primary">SO-{{ order.so_number }}</strong>
+                            <span class="badge bg-secondary-subtle text-secondary border">{{ order.tool_number }}</span>
                           </div>
-                          <div class="small mt-1" [ngClass]="part.remaining === 0 ? 'text-success' : 'text-muted'">
-                            Picked: {{ order.picked }} / {{ order.needed }}
-                            <span *ngIf="order.tool_model" class="d-block text-truncate mt-1 fst-italic">{{ order.tool_model }}</span>
+                          <div class="d-flex justify-content-between align-items-center small text-muted mb-1">
+                            <span>Qty: {{ order.needed }}</span>
+                            <span [class.text-success]="order.picked >= order.needed">Picked: {{ order.picked }}</span>
+                          </div>
+                          <div *ngIf="order.tool_model" class="small fst-italic text-break border-top pt-1 mt-1 text-muted">
+                            <i class="bi bi-diagram-3 me-1"></i>{{ order.tool_model }}
+                          </div>
+                          <div *ngIf="order.assembly_group" class="small text-break border-top pt-1 mt-1 text-muted">
+                             <i class="bi bi-layers me-1"></i>{{ formatAssemblyPath(order.assembly_group) }}
                           </div>
                         </a>
                       </div>
@@ -378,7 +398,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
     <!-- Print Tag Dialog -->
     <app-print-tag-dialog
       [isOpen]="showPrintTagDialog"
-      [tags]="printTagData || []"
+      [tagData]="printTagData || []"
       (close)="closePrintTagDialog()"
     ></app-print-tag-dialog>
   `,
@@ -407,9 +427,6 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
     .text-purple { color: #6f42c1; }
     .bg-purple-subtle { background-color: rgba(111, 66, 193, 0.1); }
     .border-purple { border-color: #6f42c1 !important; }
-    .order-hover-container:hover .order-details-popover {
-      display: block !important;
-    }
   `]
 })
 export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
@@ -440,6 +457,7 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
   printTagData: TagData[] | null = null;
 
   copiedPartNumber: string | null = null;
+  activeDetailsPartId: string | null = null;
 
   private subscriptions: Subscription[] = [];
 
@@ -661,6 +679,15 @@ export class ConsolidatedPartsComponent implements OnInit, OnDestroy {
           this.copiedPartNumber = null;
         }
       }, 2000);
+    }
+  }
+
+  toggleOrderDetails(partNumber: string, event: Event): void {
+    event.stopPropagation();
+    if (this.activeDetailsPartId === partNumber) {
+      this.activeDetailsPartId = null;
+    } else {
+      this.activeDetailsPartId = partNumber;
     }
   }
 

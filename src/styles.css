@@ -173,6 +173,24 @@ body {
   }
 }
 
+/* Ghost button for copy actions */
+.btn-ghost {
+  background-color: transparent;
+  border: none;
+  color: #6c757d;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-ghost:hover {
+  background-color: rgba(13, 110, 253, 0.1);
+  color: #0d6efd;
+}
+
+.btn-ghost:active {
+  background-color: rgba(13, 110, 253, 0.2);
+  color: #0a58ca;
+}
+
 /* Utility classes */
 .cursor-pointer {
   cursor: pointer;
@@ -181,6 +199,7 @@ body {
 .text-truncate-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -234,6 +253,7 @@ body {
 
 /* Minimum touch target size (48px as per accessibility guidelines) */
 @media (pointer: coarse) {
+
   .btn,
   .nav-link,
   .list-group-item-action,
@@ -354,6 +374,7 @@ body {
 
 /* Active state for touch feedback */
 @media (hover: none) {
+
   .btn:active,
   .list-group-item-action:active,
   .nav-link:active {
@@ -365,9 +386,11 @@ body {
 
 /* Larger inputs on mobile */
 @media (max-width: 576px) {
+
   .form-control,
   .form-select {
-    font-size: 16px; /* Prevents iOS zoom on focus */
+    font-size: 16px;
+    /* Prevents iOS zoom on focus */
     padding: 0.75rem 1rem;
   }
 
@@ -419,9 +442,18 @@ body {
 
 /* Haptic-like visual feedback for picks */
 @keyframes pick-success {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); background-color: rgba(25, 135, 84, 0.2); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+    background-color: rgba(25, 135, 84, 0.2);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 .pick-success-animation {

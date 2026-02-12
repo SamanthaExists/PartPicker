@@ -10,6 +10,7 @@ import { UtilsService } from '../../services/utils.service';
 import { ExcelService } from '../../services/excel.service';
 import { ItemToOrder } from '../../models';
 import { PartDetailComponent } from '../../components/parts/part-detail.component';
+import { ClassificationBadgeComponent } from '../../components/parts/classification-badge.component';
 
 type SortMode = 'remaining' | 'part_number' | 'location';
 
@@ -18,7 +19,7 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
 @Component({
   selector: 'app-items-to-order',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, PartDetailComponent],
+  imports: [CommonModule, RouterModule, FormsModule, PartDetailComponent, ClassificationBadgeComponent],
   template: `
     <div>
       <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
@@ -283,6 +284,7 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
               <tr class="table-secondary">
                 <th>Part Number</th>
                 <th>Description</th>
+                <th>Type</th>
                 <th>Location</th>
                 <th class="text-center">Available</th>
                 <th class="text-center">On Order</th>
@@ -303,6 +305,14 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
                   </div>
                 </td>
                 <td class="text-muted">{{ item.description || '-' }}</td>
+                <td>
+                  <app-classification-badge
+                    [classification]="item.classification_type"
+                    [isAssembly]="item.is_assembly"
+                    [isModified]="item.is_modified"
+                    [showIcon]="false">
+                  </app-classification-badge>
+                </td>
                 <td>{{ item.location || '-' }}</td>
                 <td class="text-center">
                   <span class="badge bg-danger">{{ item.qty_available }}</span>
@@ -361,6 +371,14 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
                   </div>
                 </td>
                 <td class="text-muted">{{ item.description || '-' }}</td>
+                <td>
+                  <app-classification-badge
+                    [classification]="item.classification_type"
+                    [isAssembly]="item.is_assembly"
+                    [isModified]="item.is_modified"
+                    [showIcon]="false">
+                  </app-classification-badge>
+                </td>
                 <td>{{ item.location || '-' }}</td>
                 <td class="text-center">
                   <span class="badge bg-info">{{ item.qty_on_order }}</span>

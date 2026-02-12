@@ -447,6 +447,9 @@ interface PickHistoryItem {
                       <td>
                         <app-classification-badge
                           [classification]="getPartClassification(item.part_number)"
+                          [isAssembly]="isAssemblyPart(item.part_number)"
+                          [isModified]="isModifiedPart(item.part_number)"
+                          [showIcon]="false"
                           [size]="'sm'"
                         ></app-classification-badge>
                       </td>
@@ -2101,6 +2104,10 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
 
   isAssemblyPart(partNumber: string): boolean {
     return this.partsMap.get(partNumber)?.is_assembly === true;
+  }
+
+  isModifiedPart(partNumber: string): boolean {
+    return this.partsMap.get(partNumber)?.is_modified === true;
   }
 
   getAssemblyDisplayInfo(item: LineItem): { text: string; isStructured: boolean; componentCount?: number } | null {

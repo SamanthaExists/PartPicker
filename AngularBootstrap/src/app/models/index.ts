@@ -118,6 +118,9 @@ export interface ConsolidatedPart {
   total_needed: number;
   total_picked: number;
   remaining: number;
+  classification_type: ClassificationType | null;
+  is_assembly: boolean;
+  is_modified: boolean;
   orders: {
     order_id: string;
     so_number: string;
@@ -142,6 +145,9 @@ export interface ItemToOrder {
   total_picked: number;
   remaining: number;
   qty_to_order: number; // remaining - qty_available - qty_on_order
+  classification_type: ClassificationType | null;
+  is_assembly: boolean;
+  is_modified: boolean;
   orders: {
     order_id: string;
     so_number: string;

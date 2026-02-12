@@ -105,6 +105,28 @@ export class ConsolidatedPartsService implements OnDestroy {
         }
       }
 
+      // Fetch parts data for classification information
+      const partIds = [...new Set(lineItemsData.map(item => item.part_id).filter(Boolean))];
+      const partsMap = new Map<string, { classification_type: 'purchased' | 'manufactured' | null; is_assembly: boolean; is_modified: boolean }>();
+
+      if (partIds.length > 0) {
+        const { data: partsData, error: partsError } = await this.supabase.from('parts')
+          .select('id, classification_type, is_assembly, is_modified')
+          .in('id', partIds);
+
+        if (partsError) {
+          console.warn('[ConsolidatedParts] Error fetching parts:', partsError);
+        } else if (partsData) {
+          for (const part of partsData) {
+            partsMap.set(part.id, {
+              classification_type: part.classification_type as 'purchased' | 'manufactured' | null,
+              is_assembly: part.is_assembly || false,
+              is_modified: part.is_modified || false
+            });
+          }
+        }
+      }
+
       // Fetch picks for these line items in batches (to avoid URL length limits)
       const lineItemIds = (lineItemsData || []).map(item => item.id);
       let picksData: any[] = [];
@@ -189,6 +211,7 @@ export class ConsolidatedPartsService implements OnDestroy {
               line_item_id: item.id,
             });
           } else {
+            const partData = item.part_id ? partsMap.get(item.part_id) : null;
             partMap.set(item.part_number, {
               part_number: item.part_number,
               description: item.description,
@@ -198,6 +221,9 @@ export class ConsolidatedPartsService implements OnDestroy {
               total_needed: item.qty_per_unit,
               total_picked: pickedQty,
               remaining: item.qty_per_unit - pickedQty,
+              classification_type: partData?.classification_type ?? null,
+              is_assembly: partData?.is_assembly ?? false,
+              is_modified: partData?.is_modified ?? false,
               orders: [{
                 order_id: item.order_id,
                 so_number: orderInfo?.so_number || 'Unknown',
@@ -331,6 +357,28 @@ export class ItemsToOrderService implements OnDestroy {
         }
       }
 
+      // Fetch parts data for classification information
+      const partIds = [...new Set(lineItemsData.map(item => item.part_id).filter(Boolean))];
+      const partsMap = new Map<string, { classification_type: 'purchased' | 'manufactured' | null; is_assembly: boolean; is_modified: boolean }>();
+
+      if (partIds.length > 0) {
+        const { data: partsData, error: partsError } = await this.supabase.from('parts')
+          .select('id, classification_type, is_assembly, is_modified')
+          .in('id', partIds);
+
+        if (partsError) {
+          console.warn('[ItemsToOrder] Error fetching parts:', partsError);
+        } else if (partsData) {
+          for (const part of partsData) {
+            partsMap.set(part.id, {
+              classification_type: part.classification_type as 'purchased' | 'manufactured' | null,
+              is_assembly: part.is_assembly || false,
+              is_modified: part.is_modified || false
+            });
+          }
+        }
+      }
+
       // Fetch picks for these line items in batches (to avoid URL length limits)
       const lineItemIds = (lineItemsData || []).map(item => item.id);
       let picksData: any[] = [];
@@ -407,6 +455,7 @@ export class ItemsToOrderService implements OnDestroy {
           const qtyOnOrder = item.qty_on_order ?? 0;
           const qtyAvailable = item.qty_available || 0;
           const orderInfo = orderMap.get(item.order_id);
+          const partData = item.part_id ? partsMap.get(item.part_id) : null;
           itemMap.set(item.part_number, {
             part_number: item.part_number,
             description: item.description,
@@ -417,6 +466,9 @@ export class ItemsToOrderService implements OnDestroy {
             total_picked: pickedQty,
             remaining: remaining,
             qty_to_order: Math.max(0, remaining - qtyAvailable - qtyOnOrder),
+            classification_type: partData?.classification_type ?? null,
+            is_assembly: partData?.is_assembly ?? false,
+            is_modified: partData?.is_modified ?? false,
             orders: [{
               order_id: item.order_id,
               so_number: orderInfo?.so_number || 'Unknown',

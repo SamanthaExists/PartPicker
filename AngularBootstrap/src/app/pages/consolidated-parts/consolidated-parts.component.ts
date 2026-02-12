@@ -17,13 +17,14 @@ import { ReportPartIssueDialogComponent } from '../../components/dialogs/report-
 import { PartDetailComponent } from '../../components/parts/part-detail.component';
 import { PrintTagDialogComponent, TagData } from '../../components/picking/print-tag-dialog.component';
 import { OrdersService } from '../../services/orders.service';
+import { ClassificationBadgeComponent } from '../../components/parts/classification-badge.component';
 
 type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock' | 'has_issues';
 
 @Component({
   selector: 'app-consolidated-parts',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, MultiOrderPickDialogComponent, ReportPartIssueDialogComponent, PartDetailComponent, PrintTagDialogComponent],
+  imports: [CommonModule, RouterModule, FormsModule, MultiOrderPickDialogComponent, ReportPartIssueDialogComponent, PartDetailComponent, PrintTagDialogComponent, ClassificationBadgeComponent],
   template: `
     <div>
       <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
@@ -212,6 +213,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
               <tr class="table-secondary">
                 <th>Part Number</th>
                 <th>Description</th>
+                <th>Type</th>
                 <th>Location</th>
                 <th class="text-center">Available</th>
                 <th class="text-center">Needed</th>
@@ -275,6 +277,14 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                       'text-danger-emphasis': getQtyAvailable(part) === 0 && part.remaining > 0,
                       'text-muted': part.total_picked === 0 && !(getQtyAvailable(part) === 0 && part.remaining > 0)
                     }">{{ part.description || '-' }}</td>
+                <td>
+                  <app-classification-badge
+                    [classification]="part.classification_type"
+                    [isAssembly]="part.is_assembly"
+                    [isModified]="part.is_modified"
+                    [showIcon]="false">
+                  </app-classification-badge>
+                </td>
                 <td [ngClass]="{
                       'text-success-emphasis': part.remaining === 0,
                       'text-warning-emphasis': part.total_picked > 0 && part.remaining > 0 && !(getQtyAvailable(part) === 0 && part.remaining > 0),

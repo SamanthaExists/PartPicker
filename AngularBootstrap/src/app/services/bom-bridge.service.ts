@@ -113,7 +113,9 @@ export class BomBridgeService {
     const part = await this.parts.createPart({
       part_number: assemblyPartNumber,
       description: template.name,
+      classification_type: null,
       is_assembly: true,
+      is_modified: false,
       default_location: null,
       base_part_id: null,
       notes: `Converted from template: ${template.name}`

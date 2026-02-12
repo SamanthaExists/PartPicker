@@ -138,9 +138,7 @@ export class PartDetailComponent implements OnInit {
   getClassificationBadgeClass(type: ClassificationType): string {
     const classes: Record<ClassificationType, string> = {
       purchased: 'badge bg-primary',
-      manufactured: 'badge bg-warning text-dark',
-      assembly: 'badge bg-secondary',
-      modified: 'badge bg-info text-dark'
+      manufactured: 'badge bg-warning text-dark'
     };
     return classes[type];
   }

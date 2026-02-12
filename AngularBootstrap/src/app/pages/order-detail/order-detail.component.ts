@@ -2100,7 +2100,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   }
 
   isAssemblyPart(partNumber: string): boolean {
-    return this.partsMap.get(partNumber)?.classification_type === 'assembly';
+    return this.partsMap.get(partNumber)?.is_assembly === true;
   }
 
   getAssemblyDisplayInfo(item: LineItem): { text: string; isStructured: boolean; componentCount?: number } | null {
@@ -2112,7 +2112,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     // For structured assemblies (has part_id), try to get part from partsMap
     if (item.part_id) {
       const part = this.partsMap.get(item.part_number);
-      if (part && part.classification_type === 'assembly') {
+      if (part && part.is_assembly) {
         // We have structured assembly data
         // Note: We'd need to fetch relationships to get exact component count
         // For now, we indicate it's structured with the part number

@@ -350,8 +350,8 @@ export class AssemblyVerificationComponent implements OnInit, OnDestroy {
   stats: MigrationStats | null = null;
   loadingStats = false;
 
-  // Orders list
-  orders: Order[] = [];
+  // Orders list (simplified - only need id, so_number, customer_name for dropdown)
+  orders: Pick<Order, 'id' | 'so_number' | 'customer_name'>[] = [];
   selectedOrderId: string | null = null;
   selectedOrder: Order | null = null;
 

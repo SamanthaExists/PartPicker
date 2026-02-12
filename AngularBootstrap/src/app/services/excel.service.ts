@@ -703,14 +703,13 @@ export class ExcelService {
     return '';
   }
 
-  private parseClassification(value: any): 'purchased' | 'manufactured' | 'assembly' | 'modified' | null {
+  private parseClassification(value: any): 'purchased' | 'manufactured' | null {
     if (!value) return null;
     const normalized = String(value).toLowerCase().trim();
 
     if (normalized === 'purchased' || normalized === 'purchase' || normalized === 'buy') return 'purchased';
     if (normalized === 'manufactured' || normalized === 'manufacture' || normalized === 'make') return 'manufactured';
-    if (normalized === 'assembly' || normalized === 'assy' || normalized === 'asm') return 'assembly';
-    if (normalized === 'modified' || normalized === 'mod') return 'modified';
+    // Note: 'assembly' and 'modified' are handled by is_assembly and is_modified boolean flags, not classification_type
 
     return null;
   }

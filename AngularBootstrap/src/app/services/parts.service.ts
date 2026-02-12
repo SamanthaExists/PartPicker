@@ -184,6 +184,8 @@ export class PartsService implements OnDestroy {
         description: description || null,
         default_location: location || null,
         classification_type: classificationType || null,
+        is_assembly: false,
+        is_modified: false,
         base_part_id: null,
         notes: null
       });

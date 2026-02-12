@@ -895,7 +895,7 @@ export class ImportComponent implements OnInit, OnDestroy {
           assemblyName,
           `Assembly: ${assemblyName}`,
           null,
-          'assembly'
+          null // classification_type is null; is_assembly flag is set separately
         );
 
         // Create relationships for all component parts

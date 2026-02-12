@@ -178,7 +178,7 @@ export interface ImportedLineItem {
   tool_ids?: string[];
   assembly_group?: string; // Legacy text format
   part_id?: string; // Links to structured parts catalog
-  classification_type?: 'purchased' | 'manufactured' | 'assembly' | 'modified' | null;
+  classification_type?: ClassificationType | null;
 }
 
 // Pick Undo audit trail

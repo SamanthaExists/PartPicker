@@ -353,7 +353,7 @@ export class AssemblyVerificationComponent implements OnInit, OnDestroy {
   // Orders list (simplified - only need id, so_number, customer_name for dropdown)
   orders: Pick<Order, 'id' | 'so_number' | 'customer_name'>[] = [];
   selectedOrderId: string | null = null;
-  selectedOrder: Order | null = null;
+  selectedOrder: Pick<Order, 'id' | 'so_number' | 'customer_name'> | null = null;
 
   // CSV verification
   csvFile: File | null = null;

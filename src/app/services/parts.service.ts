@@ -2,26 +2,7 @@ import { Injectable, OnDestroy } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { SupabaseService } from './supabase.service';
-
-// Part and related types
-export type ClassificationType = 'purchased' | 'manufactured' | 'assembly' | 'modified';
-
-export interface Part {
-  id: string;
-  part_number: string;
-  description: string | null;
-  default_location: string | null;
-  classification_type: ClassificationType | null;
-  base_part_id: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PartWithStats extends Part {
-  child_count: number;
-  used_in_count: number;
-}
+import { Part, PartWithStats, ClassificationType } from '../models';
 
 @Injectable({
   providedIn: 'root'
@@ -182,6 +163,8 @@ export class PartsService implements OnDestroy {
         description: description || null,
         default_location: location || null,
         classification_type: classificationType || null,
+        is_assembly: false,
+        is_modified: false,
         base_part_id: null,
         notes: null
       });

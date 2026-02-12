@@ -2,8 +2,9 @@ import { Component, Input, OnInit, EventEmitter, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { PartsService, Part } from '../../services/parts.service';
-import { PartRelationshipsService, PartRelationship, CircularReferenceWarning } from '../../services/part-relationships.service';
+import { PartsService } from '../../services/parts.service';
+import { Part, PartRelationship, CircularReferenceWarning } from '../../models';
+import { PartRelationshipsService } from '../../services/part-relationships.service';
 
 @Component({
   selector: 'app-bom-editor',

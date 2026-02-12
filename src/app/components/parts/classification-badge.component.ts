@@ -48,16 +48,6 @@ export class ClassificationBadgeComponent {
       label: 'Manufactured',
       icon: 'bi-wrench',
       class: 'badge bg-warning text-dark'
-    },
-    assembly: {
-      label: 'Assembly',
-      icon: 'bi-boxes',
-      class: 'badge bg-secondary'
-    },
-    modified: {
-      label: 'Modified',
-      icon: 'bi-pencil',
-      class: 'badge bg-info text-dark'
     }
   };
 

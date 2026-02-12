@@ -60,7 +60,7 @@ export class BomBridgeService {
    */
   filterAssemblies(): Observable<UnifiedListItem[]> {
     return this.parts.parts$.pipe(
-      map(parts => this.mapParts(parts.filter(p => p.classification_type === 'assembly')))
+      map(parts => this.mapParts(parts.filter(p => p.is_assembly === true)))
     );
   }
 
@@ -69,7 +69,7 @@ export class BomBridgeService {
    */
   filterParts(): Observable<UnifiedListItem[]> {
     return this.parts.parts$.pipe(
-      map(parts => this.mapParts(parts.filter(p => p.classification_type !== 'assembly')))
+      map(parts => this.mapParts(parts.filter(p => p.is_assembly !== true)))
     );
   }
 
@@ -113,7 +113,9 @@ export class BomBridgeService {
     const part = await this.parts.createPart({
       part_number: assemblyPartNumber,
       description: template.name,
-      classification_type: 'assembly',
+      classification_type: null,
+      is_assembly: true,
+      is_modified: false,
       default_location: null,
       base_part_id: null,
       notes: `Converted from template: ${template.name}`
@@ -275,36 +277,28 @@ export class BomBridgeService {
   }
 
   /**
-   * Get badge for classification type
+   * Get badge for classification type (purchased/manufactured only)
    */
   private getClassificationBadge(type: ClassificationType | null): { text: string; color: string; icon?: string } {
     switch (type) {
-      case 'assembly':
-        return { text: 'Assembly', color: 'bg-primary', icon: 'bi-box-seam' };
       case 'manufactured':
         return { text: 'Manufactured', color: 'bg-warning text-dark', icon: 'bi-gear' };
       case 'purchased':
         return { text: 'Purchased', color: 'bg-success', icon: 'bi-cart' };
-      case 'modified':
-        return { text: 'Modified', color: 'bg-info', icon: 'bi-arrow-repeat' };
       default:
         return { text: 'Unclassified', color: 'bg-secondary' };
     }
   }
 
   /**
-   * Get icon for classification type
+   * Get icon for classification type (purchased/manufactured only)
    */
   private getClassificationIcon(type: ClassificationType | null): string {
     switch (type) {
-      case 'assembly':
-        return 'bi-box-seam';
       case 'manufactured':
         return 'bi-gear';
       case 'purchased':
         return 'bi-cart';
-      case 'modified':
-        return 'bi-arrow-repeat';
       default:
         return 'bi-circle';
     }

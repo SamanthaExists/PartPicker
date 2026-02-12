@@ -2,7 +2,8 @@ import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { PartsService, Part, ClassificationType } from '../../services/parts.service';
+import { PartsService } from '../../services/parts.service';
+import { Part, ClassificationType } from '../../models';
 import { ClassificationBadgeComponent } from './classification-badge.component';
 import { BOMEditorComponent } from './bom-editor.component';
 import { ModificationChainComponent } from './modification-chain.component';
@@ -66,6 +67,8 @@ export class PartDetailComponent implements OnInit {
         part_number: this.editForm.part_number.trim(),
         description: this.editForm.description.trim() || null,
         classification_type: this.editForm.classification_type || null,
+        is_assembly: false,
+        is_modified: false,
         default_location: this.editForm.default_location.trim() || null,
         base_part_id: null,
         notes: this.editForm.notes.trim() || null
@@ -102,19 +105,17 @@ export class PartDetailComponent implements OnInit {
   }
 
   get isAssembly(): boolean {
-    return this.part?.classification_type === 'assembly';
+    return this.part?.is_assembly === true;
   }
 
   get isModified(): boolean {
-    return this.part?.classification_type === 'modified';
+    return this.part?.is_modified === true;
   }
 
   getClassificationBadgeClass(type: ClassificationType): string {
     const classes: Record<ClassificationType, string> = {
       purchased: 'badge bg-primary',
-      manufactured: 'badge bg-warning text-dark',
-      assembly: 'badge bg-secondary',
-      modified: 'badge bg-info text-dark'
+      manufactured: 'badge bg-warning text-dark'
     };
     return classes[type];
   }

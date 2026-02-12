@@ -4,8 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { BomTemplatesService } from '../../services/bom-templates.service';
-import { PartsService, Part } from '../../services/parts.service';
-import { BOMTemplate, BOMTemplateItem, BOMTemplateWithItems } from '../../models';
+import { PartsService } from '../../services/parts.service';
+import { BOMTemplate, BOMTemplateItem, BOMTemplateWithItems, Part } from '../../models';
 import { ClassificationBadgeComponent } from '../../components/parts/classification-badge.component';
 import { ExplodedBOMDialogComponent } from '../../components/parts/exploded-bom-dialog.component';
 

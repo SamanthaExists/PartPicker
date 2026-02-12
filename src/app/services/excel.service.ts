@@ -91,54 +91,18 @@ export class ExcelService {
             });
           }
 
-          // Parse Parts sheet
-          const lineItems: ImportedLineItem[] = [];
+          // Parse Parts sheet with hierarchical BOM support
+          let lineItems: ImportedLineItem[] = [];
 
           if (partsSheet) {
             const sheet = workbook.Sheets[partsSheet];
             const json = XLSX.utils.sheet_to_json<any>(sheet);
-
-            for (const row of json) {
-              const partNumber = this.findValue(row, ['part', 'part number', 'part_number', 'partnumber', 'pn']);
-              if (!partNumber) continue;
-
-              const description = this.findValue(row, ['description', 'desc', 'name']);
-              const location = this.findValue(row, ['location', 'loc', 'bin', 'position']);
-              const qtyPerUnit = parseInt(this.findValue(row, ['qty', 'quantity', 'qty/unit', 'qty_per_unit']) || '1', 10) || 1;
-              const classification = this.findValue(row, ['classification', 'classification_type', 'type', 'class']);
-
-              lineItems.push({
-                part_number: String(partNumber).trim(),
-                description: description ? String(description).trim() : undefined,
-                location: location ? String(location).trim() : undefined,
-                qty_per_unit: qtyPerUnit,
-                total_qty_needed: qtyPerUnit * toolQty,
-                classification_type: this.parseClassification(classification),
-              });
-            }
+            lineItems = this.processHierarchicalBOM(json, toolQty);
           } else {
             // Try first sheet as parts sheet
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             const json = XLSX.utils.sheet_to_json<any>(firstSheet);
-
-            for (const row of json) {
-              const partNumber = this.findValue(row, ['part', 'part number', 'part_number', 'partnumber', 'pn']);
-              if (!partNumber) continue;
-
-              const description = this.findValue(row, ['description', 'desc', 'name']);
-              const location = this.findValue(row, ['location', 'loc', 'bin', 'position']);
-              const qtyPerUnit = parseInt(this.findValue(row, ['qty', 'quantity', 'qty/unit', 'qty_per_unit']) || '1', 10) || 1;
-              const classification = this.findValue(row, ['classification', 'classification_type', 'type', 'class']);
-
-              lineItems.push({
-                part_number: String(partNumber).trim(),
-                description: description ? String(description).trim() : undefined,
-                location: location ? String(location).trim() : undefined,
-                qty_per_unit: qtyPerUnit,
-                total_qty_needed: qtyPerUnit * toolQty,
-                classification_type: this.parseClassification(classification),
-              });
-            }
+            lineItems = this.processHierarchicalBOM(json, toolQty);
           }
 
           if (lineItems.length === 0) {
@@ -536,7 +500,7 @@ export class ExcelService {
       partsSheet['!cols'] = [{ wch: 6 }, { wch: 18 }, { wch: 35 }, { wch: 12 }, { wch: 10 }, { wch: 15 }];
       XLSX.utils.book_append_sheet(workbook, partsSheet, 'Parts');
     } else {
-      // Multi tool type
+      // Multi tool type with BOM hierarchy support
       const orderInfoData = [
         ['Order Information', ''],
         ['', ''],
@@ -546,33 +510,38 @@ export class ExcelService {
         ['Order Date', '2024-01-15'],
         ['Due Date', '2024-02-15'],
         ['', ''],
-        ['Note: Each additional sheet represents a tool type with its own BOM', ''],
+        ['Note: Each additional sheet represents a tool type with its own hierarchical BOM', ''],
+        ['TIP: Include Level column for assembly hierarchy (0=root, 1=assembly, 2+=parts)', ''],
       ];
       const orderInfoSheet = XLSX.utils.aoa_to_sheet(orderInfoData);
       XLSX.utils.book_append_sheet(workbook, orderInfoSheet, 'Order Info');
 
-      // 230Q Tool Type sheet
+      // 230Q Tool Type sheet with hierarchical BOM
       const tool230QData = [
-        ['Qty', 'Part Number', 'Description', 'Location', 'Qty/Unit', 'Classification'],
-        [2, 'ABC-123', 'Widget Assembly', 'A-01', 2, 'assembly'],
-        ['', 'DEF-456', '230Q Spring Kit', 'B-02', 1, 'purchased'],
-        ['', 'GHI-789', '230Q Gasket Set', 'C-03', 4, 'purchased'],
-        ['', 'QRS-230', '230Q Specific Part', 'E-01', 1, 'manufactured'],
+        ['Qty', 'Level', 'Part Number', 'Description', 'Location', 'Qty/Unit', 'Classification'],
+        [2, 0, '230Q-TOOL', '230Q Complete Tool Assembly', '', 1, 'assembly'],
+        ['', 1, 'FRAME-230Q', '230Q Frame Assembly', '', 1, 'assembly'],
+        ['', 2, 'ABC-123', 'Frame Plate', 'A-01', 2, 'manufactured'],
+        ['', 2, 'DEF-456', '230Q Spring Kit', 'B-02', 1, 'purchased'],
+        ['', 2, 'GHI-789', '230Q Gasket Set', 'C-03', 4, 'purchased'],
+        ['', 1, 'QRS-230', '230Q Motor Unit (standalone)', 'E-01', 1, 'purchased'],
       ];
       const tool230QSheet = XLSX.utils.aoa_to_sheet(tool230QData);
-      tool230QSheet['!cols'] = [{ wch: 6 }, { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 15 }];
+      tool230QSheet['!cols'] = [{ wch: 6 }, { wch: 6 }, { wch: 18 }, { wch: 35 }, { wch: 12 }, { wch: 10 }, { wch: 15 }];
       XLSX.utils.book_append_sheet(workbook, tool230QSheet, '230Q');
 
-      // 450Q Tool Type sheet
+      // 450Q Tool Type sheet with hierarchical BOM
       const tool450QData = [
-        ['Qty', 'Part Number', 'Description', 'Location', 'Qty/Unit', 'Classification'],
-        [1, 'ABC-123', 'Widget Assembly', 'A-01', 2, 'assembly'],
-        ['', 'TUV-450', '450Q Spring Kit', 'B-05', 1, 'purchased'],
-        ['', 'WXY-450', '450Q Gasket Set', 'C-08', 4, 'purchased'],
-        ['', 'ZAB-450', '450Q Specific Part', 'F-01', 2, 'manufactured'],
+        ['Qty', 'Level', 'Part Number', 'Description', 'Location', 'Qty/Unit', 'Classification'],
+        [1, 0, '450Q-TOOL', '450Q Complete Tool Assembly', '', 1, 'assembly'],
+        ['', 1, 'HOUSING-450Q', '450Q Housing Assembly', '', 1, 'assembly'],
+        ['', 2, 'ABC-123', 'Housing Base', 'A-01', 1, 'manufactured'],
+        ['', 2, 'TUV-450', '450Q Spring Kit', 'B-05', 2, 'purchased'],
+        ['', 1, 'WXY-450', '450Q Electronics Module (standalone)', 'C-08', 1, 'purchased'],
+        ['', 1, 'ZAB-450', '450Q Mounting Hardware', 'F-01', 2, 'purchased'],
       ];
       const tool450QSheet = XLSX.utils.aoa_to_sheet(tool450QData);
-      tool450QSheet['!cols'] = [{ wch: 6 }, { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 15 }];
+      tool450QSheet['!cols'] = [{ wch: 6 }, { wch: 6 }, { wch: 18 }, { wch: 35 }, { wch: 12 }, { wch: 10 }, { wch: 15 }];
       XLSX.utils.book_append_sheet(workbook, tool450QSheet, '450Q');
     }
 
@@ -621,13 +590,21 @@ export class ExcelService {
       ['Tool Type Sheets (e.g., "230Q", "450Q"):'],
       ['- Sheet name becomes the tool model'],
       ['- First column "Qty" in first data row = number of tools of this type'],
+      ['- Level: (OPTIONAL) Hierarchy depth for BOM structure (0=root, 1=assembly, 2+=parts)'],
       ['- Part Number: Part number (required)'],
       ['- Description: Part description (optional)'],
       ['- Location: Bin/location code (optional)'],
-      ['- Qty/Unit: Quantity needed per tool (required)'],
+      ['- Qty/Unit: Quantity needed per parent assembly (required)'],
+      ['- Classification: assembly, purchased, manufactured (optional)'],
       [''],
       ['Example: Sheet "230Q" with Qty=2 creates tools 3137-1 and 3137-2'],
       ['         Sheet "450Q" with Qty=1 creates tool 3137-3'],
+      [''],
+      ['ASSEMBLY HIERARCHY IN MULTI-TOOL FORMAT:'],
+      ['- Include the Level column to define assembly structure'],
+      ['- Assemblies are auto-created in the Parts Catalog during import'],
+      ['- Only LEAF parts (no children) are imported for picking'],
+      ['- Quantities multiply through hierarchy (same as single-bom)'],
       [''],
       [''],
       ['SINGLE TOOL TYPE WITH BOM HIERARCHY'],
@@ -644,13 +621,21 @@ export class ExcelService {
       ['- Description: Part description (optional)'],
       ['- Location: Bin/location code (optional)'],
       ['- Qty/Unit: Quantity per parent assembly (required)'],
+      ['- Classification: assembly, purchased, manufactured (optional)'],
       [''],
       ['How it works:'],
+      ['- ✅ ASSEMBLIES ARE AUTO-CREATED in the Parts Catalog during import'],
+      ['- ✅ Parent-child relationships are automatically established'],
       ['- Only LEAF parts (parts with no children) are imported for picking'],
       ['- Quantities are MULTIPLIED through the hierarchy'],
       ['  Example: Assembly qty 2 x Child qty 3 = 6 effective parts to pick'],
       ['- The top-level assembly (level 1) becomes the "Assembly Group" label'],
       ['- The Level column is optional: if omitted, the sheet works as a flat parts list'],
+      [''],
+      ['After import:'],
+      ['- View assemblies in the Unified Catalog page'],
+      ['- Order detail page shows assembly structure with diagram icon'],
+      ['- Future orders can reference the same assemblies'],
       [''],
       [''],
       ['LEGACY FORMAT'],
@@ -728,6 +713,137 @@ export class ExcelService {
     if (normalized === 'modified' || normalized === 'mod') return 'modified';
 
     return null;
+  }
+
+  /**
+   * Process hierarchical BOM data with Level column to extract:
+   * - Only leaf parts (for picking)
+   * - Assembly relationships (assembly_group field)
+   * - Multiplied quantities through hierarchy
+   */
+  private processHierarchicalBOM(rows: any[], toolQty: number = 1): ImportedLineItem[] {
+    interface HierarchyNode {
+      level: number;
+      partNumber: string;
+      description?: string;
+      location?: string;
+      qtyPerUnit: number;
+      classification?: string;
+      children: HierarchyNode[];
+      parent?: HierarchyNode;
+    }
+
+    const nodes: HierarchyNode[] = [];
+    const stack: HierarchyNode[] = []; // Track current path in hierarchy
+
+    // First pass: Build hierarchy tree
+    for (const row of rows) {
+      const levelValue = this.findValue(row, ['level', 'lvl']);
+      if (levelValue === undefined) {
+        // No Level column found, treat as flat list
+        return this.processFlatBOM(rows, toolQty);
+      }
+
+      const level = parseInt(String(levelValue), 10);
+      if (isNaN(level)) continue;
+
+      const partNumber = this.findValue(row, ['part', 'part number', 'part_number', 'partnumber', 'pn']);
+      if (!partNumber) continue;
+
+      const description = this.findValue(row, ['description', 'desc', 'name']);
+      const location = this.findValue(row, ['location', 'loc', 'bin', 'position']);
+      const qtyPerUnit = parseInt(this.findValue(row, ['qty', 'quantity', 'qty/unit', 'qty_per_unit']) || '1', 10) || 1;
+      const classification = this.findValue(row, ['classification', 'classification_type', 'type', 'class']);
+
+      const node: HierarchyNode = {
+        level,
+        partNumber: String(partNumber).trim(),
+        description: description ? String(description).trim() : undefined,
+        location: location ? String(location).trim() : undefined,
+        qtyPerUnit,
+        classification: classification ? String(classification).trim() : undefined,
+        children: [],
+      };
+
+      // Pop stack until we find the parent level
+      while (stack.length > 0 && stack[stack.length - 1].level >= level) {
+        stack.pop();
+      }
+
+      // Attach to parent if exists
+      if (stack.length > 0) {
+        const parent = stack[stack.length - 1];
+        node.parent = parent;
+        parent.children.push(node);
+      } else {
+        nodes.push(node);
+      }
+
+      stack.push(node);
+    }
+
+    // Second pass: Extract leaf parts with multiplied quantities and assembly relationships
+    const lineItems: ImportedLineItem[] = [];
+
+    const traverse = (node: HierarchyNode, parentPath: string[], accumulatedQty: number) => {
+      const currentQty = accumulatedQty * node.qtyPerUnit;
+      const currentPath = [...parentPath, node.partNumber];
+
+      if (node.children.length === 0) {
+        // Leaf part: Add to line items
+        // Assembly group is the immediate parent (level-1 assembly)
+        const assemblyGroup = parentPath.length > 0 ? parentPath[parentPath.length - 1] : undefined;
+
+        lineItems.push({
+          part_number: node.partNumber,
+          description: node.description,
+          location: node.location,
+          qty_per_unit: currentQty,
+          total_qty_needed: currentQty * toolQty,
+          assembly_group: assemblyGroup,
+          classification_type: this.parseClassification(node.classification),
+        });
+      } else {
+        // Assembly: Recurse into children
+        for (const child of node.children) {
+          traverse(child, currentPath, currentQty);
+        }
+      }
+    };
+
+    for (const root of nodes) {
+      traverse(root, [], 1);
+    }
+
+    return lineItems;
+  }
+
+  /**
+   * Process flat BOM data (no Level column)
+   */
+  private processFlatBOM(rows: any[], toolQty: number): ImportedLineItem[] {
+    const lineItems: ImportedLineItem[] = [];
+
+    for (const row of rows) {
+      const partNumber = this.findValue(row, ['part', 'part number', 'part_number', 'partnumber', 'pn']);
+      if (!partNumber) continue;
+
+      const description = this.findValue(row, ['description', 'desc', 'name']);
+      const location = this.findValue(row, ['location', 'loc', 'bin', 'position']);
+      const qtyPerUnit = parseInt(this.findValue(row, ['qty', 'quantity', 'qty/unit', 'qty_per_unit']) || '1', 10) || 1;
+      const classification = this.findValue(row, ['classification', 'classification_type', 'type', 'class']);
+
+      lineItems.push({
+        part_number: String(partNumber).trim(),
+        description: description ? String(description).trim() : undefined,
+        location: location ? String(location).trim() : undefined,
+        qty_per_unit: qtyPerUnit,
+        total_qty_needed: qtyPerUnit * toolQty,
+        classification_type: this.parseClassification(classification),
+      });
+    }
+
+    return lineItems;
   }
 
   /**

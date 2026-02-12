@@ -863,11 +863,18 @@ export class ImportComponent implements OnInit, OnDestroy {
     const partMap = new Map<string, string>(); // part_number -> part_id
 
     for (const item of lineItems) {
+      // Filter classification_type to only valid values (purchased/manufactured)
+      // 'assembly' and 'modified' are now boolean fields, not classification types
+      const classificationType =
+        item.classification_type === 'purchased' || item.classification_type === 'manufactured'
+          ? item.classification_type
+          : null;
+
       const part = await this.partsService.findOrCreatePart(
         item.part_number,
         item.description,
         item.location,
-        item.classification_type || null
+        classificationType
       );
       partMap.set(item.part_number, part.id);
 
@@ -895,7 +902,7 @@ export class ImportComponent implements OnInit, OnDestroy {
           assemblyName,
           `Assembly: ${assemblyName}`,
           null,
-          'assembly'
+          null  // Assemblies don't have a purchased/manufactured classification
         );
 
         // Create relationships for all component parts
@@ -1027,7 +1034,7 @@ export class ImportComponent implements OnInit, OnDestroy {
     const catalogParts = this.partsCatalogService.getCurrentParts();
 
     const merged = this.bomParserService.mergeMultipleBOMs(parsedBOMs, toolMappings);
-    const order = this.bomParserService.buildImportedOrder(
+    const order = await this.bomParserService.buildImportedOrder(
       merged,
       {
         soNumber: this.bomOrderInfo.soNumber,

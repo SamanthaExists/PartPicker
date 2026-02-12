@@ -24,7 +24,6 @@ A comprehensive application for managing pick lists and tracking picking progres
 ### 1. Install Dependencies
 
 ```bash
-cd AngularBootstrap
 npm install
 ```
 

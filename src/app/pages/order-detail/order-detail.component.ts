@@ -13,8 +13,8 @@ import { ExcelService } from '../../services/excel.service';
 import { UtilsService } from '../../services/utils.service';
 import { BomTemplatesService } from '../../services/bom-templates.service';
 import { ActivityLogService } from '../../services/activity-log.service';
-import { PartsService, Part } from '../../services/parts.service';
-import { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType } from '../../models';
+import { PartsService } from '../../services/parts.service';
+import { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType, Part } from '../../models';
 import { SaveAsTemplateDialogComponent } from '../../components/dialogs/save-as-template-dialog.component';
 import { PrintPickListComponent } from '../../components/picking/print-pick-list.component';
 import { PrintTagDialogComponent, TagData } from '../../components/picking/print-tag-dialog.component';
@@ -2117,7 +2117,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   }
 
   isAssemblyPart(partNumber: string): boolean {
-    return this.partsMap.get(partNumber)?.classification_type === 'assembly';
+    return this.partsMap.get(partNumber)?.is_assembly === true;
   }
 
   openBOMDialog(item: LineItemWithPicks): void {

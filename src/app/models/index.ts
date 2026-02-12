@@ -37,7 +37,8 @@ export interface LineItem {
   qty_available: number | null;
   qty_on_order: number | null;
   tool_ids: string[] | null;
-  assembly_group: string | null;
+  assembly_group: string | null; // Legacy text field (e.g., "CHILD < PARENT1 < PARENT2")
+  part_id: string | null; // Links to structured parts catalog (preferred over assembly_group)
   created_at: string;
 }
 
@@ -172,7 +173,8 @@ export interface ImportedLineItem {
   qty_per_unit: number;
   total_qty_needed: number;
   tool_ids?: string[];
-  assembly_group?: string;
+  assembly_group?: string; // Legacy text format
+  part_id?: string; // Links to structured parts catalog
   classification_type?: 'purchased' | 'manufactured' | 'assembly' | 'modified' | null;
 }
 
@@ -322,13 +324,15 @@ export interface LineItemInput {
 }
 
 // Parts Master Catalog - Enhanced part management with classification and relationships
-export type ClassificationType = 'purchased' | 'manufactured' | 'assembly' | 'modified';
+export type ClassificationType = 'purchased' | 'manufactured';
 
 export interface Part {
   id: string;
   part_number: string;
   description: string | null;
   classification_type: ClassificationType | null;
+  is_assembly: boolean;
+  is_modified: boolean;
   default_location: string | null;
   base_part_id: string | null; // For modified parts: reference to original part
   notes: string | null;

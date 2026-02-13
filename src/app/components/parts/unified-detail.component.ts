@@ -5,6 +5,7 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { BomBridgeService } from '../../services/bom-bridge.service';
 import { BomTemplatesService } from '../../services/bom-templates.service';
 import { PartsService } from '../../services/parts.service';
+import { ToastService } from '../../services/toast.service';
 import {
   UnifiedItem,
   BOMTemplateWithItems,
@@ -48,7 +49,8 @@ export class UnifiedDetailComponent implements OnInit {
     public activeModal: NgbActiveModal,
     private bridge: BomBridgeService,
     private bomTemplates: BomTemplatesService,
-    private parts: PartsService
+    private parts: PartsService,
+    private toast: ToastService
   ) {}
 
   ngOnInit(): void {
@@ -176,11 +178,11 @@ export class UnifiedDetailComponent implements OnInit {
     try {
       this.loading = true;
       const newPart = await this.bridge.convertTemplateToAssembly(this.templateData.id);
-      alert(`Successfully created assembly part: ${newPart.part_number}`);
+      this.toast.success(`Successfully created assembly part: ${newPart.part_number}`);
       this.itemUpdated.emit();
       this.activeModal.close('converted');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to convert template');
+      this.toast.error(err instanceof Error ? err.message : 'Failed to convert template');
       this.loading = false;
     }
   }
@@ -197,11 +199,11 @@ export class UnifiedDetailComponent implements OnInit {
     try {
       this.loading = true;
       const newTemplate = await this.bridge.savePartAsTemplate(this.partData.id, { name });
-      alert(`Successfully created template: ${newTemplate.name}`);
+      this.toast.success(`Successfully created template: ${newTemplate.name}`);
       this.itemUpdated.emit();
       this.activeModal.close('saved');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save as template');
+      this.toast.error(err instanceof Error ? err.message : 'Failed to save as template');
       this.loading = false;
     }
   }

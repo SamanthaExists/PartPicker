@@ -1,5 +1,6 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ToastService } from '../../services/toast.service';
 
 export interface TagData {
   partNumber: string;
@@ -119,6 +120,8 @@ export class PrintTagDialogComponent {
   tagsArray: TagData[] = [];
   isPrinting = false;
 
+  constructor(private toast: ToastService) {}
+
   get totalTags(): number {
     return this.tagsArray.length;
   }
@@ -150,7 +153,7 @@ export class PrintTagDialogComponent {
     try {
       const printWindow = window.open('', '_blank', 'width=600,height=400');
       if (!printWindow) {
-        alert('Please allow popups to print tags');
+        this.toast.warning('Please allow popups to print tags');
         this.isPrinting = false;
         return;
       }

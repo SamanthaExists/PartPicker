@@ -9,6 +9,7 @@ import { Part, PartWithStats, ClassificationType } from '../../models';
 import { PartDetailComponent } from '../../components/parts/part-detail.component';
 import { SupabaseService } from '../../services/supabase.service';
 import { UtilsService } from '../../services/utils.service';
+import { ToastService } from '../../services/toast.service';
 
 type PartSortOption = 'part-number' | 'description' | 'classification' | 'location';
 
@@ -222,7 +223,8 @@ export class PartsCatalogComponent implements OnInit, OnDestroy {
     private partsService: PartsService,
     private modalService: NgbModal,
     private supabaseService: SupabaseService,
-    private utils: UtilsService
+    private utils: UtilsService,
+    private toast: ToastService
   ) { }
 
   ngOnInit(): void {
@@ -328,7 +330,7 @@ export class PartsCatalogComponent implements OnInit, OnDestroy {
       modalRef.componentInstance.results = this.autoDetectResults;
     } catch (error) {
       console.error('Error auto-detecting assemblies:', error);
-      alert('Failed to auto-detect assemblies. Please try again.');
+      this.toast.error('Failed to auto-detect assemblies. Please try again.');
     } finally {
       this.autoDetecting = false;
     }

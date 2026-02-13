@@ -131,9 +131,12 @@ import { Order, Tool, LineItemWithPicks } from '../../models';
   `,
   styles: [`
     @media print {
-      .modal-header, .modal-footer, .modal-backdrop, .btn {
+      /* Hide modal chrome */
+      .modal-header, .modal-footer, .modal-backdrop, .btn, .border, .bg-light {
         display: none !important;
       }
+
+      /* Reset modal positioning */
       .modal, .modal-dialog, .modal-content {
         position: static !important;
         display: block !important;
@@ -144,8 +147,87 @@ import { Order, Tool, LineItemWithPicks } from '../../models';
         border: none !important;
         box-shadow: none !important;
       }
+
+      /* Print preview becomes the full page */
       #printPreview {
         border: none !important;
+        padding: 0.5in !important;
+        background: white !important;
+      }
+
+      /* Clean table styling */
+      .table {
+        font-size: 10pt;
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .table th,
+      .table td {
+        padding: 6px 8px;
+        border: 1px solid #333;
+      }
+
+      .table thead th {
+        background-color: #f0f0f0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        font-weight: bold;
+        border-bottom: 2px solid #000;
+      }
+
+      /* Location group headers */
+      .table-secondary td {
+        background-color: #e8e8e8 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        font-weight: bold;
+        border-top: 2px solid #000;
+        border-bottom: 1px solid #000;
+      }
+
+      /* Page breaks */
+      .table tbody tr {
+        page-break-inside: avoid;
+      }
+
+      .table-secondary {
+        page-break-after: avoid;
+      }
+
+      /* Header */
+      h4 {
+        margin-bottom: 0.2in;
+        font-size: 16pt;
+      }
+
+      /* Footer signature area */
+      .row.mt-4 {
+        margin-top: 0.4in !important;
+        page-break-inside: avoid;
+      }
+
+      /* Checkbox squares */
+      .border.rounded {
+        border: 1.5px solid #000 !important;
+        border-radius: 0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      /* Ensure black text */
+      body, p, span, td, th {
+        color: #000 !important;
+      }
+
+      .text-muted {
+        color: #555 !important;
+      }
+
+      .text-success {
+        color: #28a745 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
     }
   `]

@@ -9,6 +9,7 @@ import { UpdatePromptComponent } from './components/pwa/update-prompt.component'
 import { OfflineIndicatorComponent } from './components/pwa/offline-indicator.component';
 import { PasswordGateComponent } from './components/auth/password-gate.component';
 import { NamePromptComponent } from './components/auth/name-prompt.component';
+import { ToastContainerComponent } from './components/layout/toast-container.component';
 
 @Component({
   selector: 'app-root',
@@ -23,7 +24,8 @@ import { NamePromptComponent } from './components/auth/name-prompt.component';
     UpdatePromptComponent,
     OfflineIndicatorComponent,
     PasswordGateComponent,
-    NamePromptComponent
+    NamePromptComponent,
+    ToastContainerComponent
   ],
   template: `
     <app-password-gate>
@@ -133,6 +135,9 @@ import { NamePromptComponent } from './components/auth/name-prompt.component';
     <app-offline-indicator></app-offline-indicator>
     <app-install-prompt></app-install-prompt>
     <app-update-prompt></app-update-prompt>
+
+    <!-- Toast Notifications -->
+    <app-toast-container></app-toast-container>
     </app-password-gate>
   `,
   styles: [`

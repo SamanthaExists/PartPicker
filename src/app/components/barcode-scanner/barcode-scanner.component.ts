@@ -85,233 +85,41 @@ import { ToastService } from '../../services/toast.service';
     </div>
   `,
   styles: [`
-    /* Floating Action Button */
-    .barcode-fab {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      z-index: 1000;
-      width: 56px;
-      height: 56px;
-      border-radius: 16px;
-      border: none;
-      background: linear-gradient(135deg, var(--primary-color, #0f766e), var(--primary-light, #14b8a6));
-      color: white;
-      font-size: 1.4rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 16px rgba(15, 118, 110, 0.4);
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .barcode-fab:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(15, 118, 110, 0.5);
-    }
-    .barcode-fab:active {
-      transform: translateY(0);
-    }
-
-    @media (max-width: 768px) {
-      .barcode-fab {
-        bottom: 80px;
-        right: 16px;
-      }
-    }
-
-    /* Scanner Overlay */
-    .scanner-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 10000;
-      background: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      animation: fadeIn 0.2s ease;
-    }
-
-    .scanner-container {
-      width: 100%;
-      max-width: 480px;
-      margin: 16px;
-      border-radius: 16px;
-      overflow: hidden;
-      background: #1a1a2e;
-      box-shadow: 0 24px 48px rgba(0,0,0,0.5);
-    }
-
-    .scanner-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      background: #16213e;
-    }
-
-    .scanner-title {
-      margin: 0;
-      color: white;
-      font-size: 1rem;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .scanner-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .scanner-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.15);
-      background: transparent;
-      color: rgba(255,255,255,0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .scanner-btn:hover {
-      background: rgba(255,255,255,0.1);
-      color: white;
-    }
-    .scanner-btn-close:hover {
-      background: rgba(239, 68, 68, 0.2);
-      color: #ef4444;
-      border-color: rgba(239, 68, 68, 0.3);
-    }
-
-    /* Camera Viewport */
-    .scanner-viewport {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 4/3;
-      background: #000;
-      overflow: hidden;
-    }
-
-    .scanner-video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    /* Scanning Reticle */
-    .scanner-reticle {
-      position: absolute;
-      inset: 20%;
-      pointer-events: none;
-    }
-
-    .reticle-corner {
-      position: absolute;
-      width: 24px;
-      height: 24px;
-      border-color: var(--primary-light, #14b8a6);
-      border-style: solid;
-      border-width: 0;
-    }
-    .reticle-tl { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; border-radius: 4px 0 0 0; }
-    .reticle-tr { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; border-radius: 0 4px 0 0; }
-    .reticle-bl { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; border-radius: 0 0 0 4px; }
-    .reticle-br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 4px 0; }
-
-    .reticle-line {
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 50%;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--primary-light, #14b8a6), transparent);
-      animation: scanLine 2s ease-in-out infinite;
-    }
-
-    @keyframes scanLine {
-      0%, 100% { top: 20%; opacity: 0.5; }
-      50% { top: 80%; opacity: 1; }
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-
-    /* Footer */
-    .scanner-footer {
-      padding: 16px;
-      text-align: center;
-    }
-
-    .scanner-hint {
-      color: rgba(255,255,255,0.5);
-      margin: 0;
-      font-size: 0.85rem;
-    }
-
-    .scan-result {
-      animation: fadeIn 0.3s ease;
-    }
-
-    .scan-result-header {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .scan-result-icon {
-      color: #22c55e;
-      font-size: 1.2rem;
-    }
-
-    .scan-result-value {
-      color: white;
-      font-weight: 700;
-      font-family: var(--font-mono, monospace);
-      font-size: 1.1rem;
-    }
-
-    .scan-result-details {
-      margin-bottom: 12px;
-    }
-
-    .scan-result-part {
-      color: rgba(255,255,255,0.8);
-      font-size: 0.9rem;
-    }
-
-    .scan-result-location {
-      color: var(--primary-light, #14b8a6);
-      font-size: 0.85rem;
-      margin-top: 4px;
-    }
-
-    .scan-result-notfound {
-      color: #fbbf24;
-      font-size: 0.85rem;
-      margin-bottom: 12px;
-    }
-
-    .scan-result-actions {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-    }
-
-    .scanner-error {
-      color: #ef4444;
-      font-size: 0.85rem;
-      margin-top: 8px;
-    }
+    .barcode-fab{position:fixed;bottom:24px;right:24px;z-index:1000;width:56px;height:56px;border-radius:16px;border:none;background:linear-gradient(135deg,var(--primary-color,#0f766e),var(--primary-light,#14b8a6));color:#fff;font-size:1.4rem;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(15,118,110,.4);cursor:pointer;transition:transform .2s,box-shadow .2s}
+    .barcode-fab:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(15,118,110,.5)}
+    .barcode-fab:active{transform:translateY(0)}
+    @media(max-width:768px){.barcode-fab{bottom:80px;right:16px}}
+    .scanner-overlay{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.85);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease}
+    .scanner-container{width:100%;max-width:480px;margin:16px;border-radius:16px;overflow:hidden;background:#1a1a2e;box-shadow:0 24px 48px rgba(0,0,0,.5)}
+    .scanner-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#16213e}
+    .scanner-title{margin:0;color:#fff;font-size:1rem;font-weight:600;display:flex;align-items:center;gap:8px}
+    .scanner-actions{display:flex;gap:8px}
+    .scanner-btn{width:36px;height:36px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:0 0;color:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
+    .scanner-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+    .scanner-btn-close:hover{background:rgba(239,68,68,.2);color:#ef4444;border-color:rgba(239,68,68,.3)}
+    .scanner-viewport{position:relative;width:100%;aspect-ratio:4/3;background:#000;overflow:hidden}
+    .scanner-video{width:100%;height:100%;object-fit:cover}
+    .scanner-reticle{position:absolute;inset:20%;pointer-events:none}
+    .reticle-corner{position:absolute;width:24px;height:24px;border-color:var(--primary-light,#14b8a6);border-style:solid;border-width:0}
+    .reticle-tl{top:0;left:0;border-top-width:3px;border-left-width:3px;border-radius:4px 0 0 0}
+    .reticle-tr{top:0;right:0;border-top-width:3px;border-right-width:3px;border-radius:0 4px 0 0}
+    .reticle-bl{bottom:0;left:0;border-bottom-width:3px;border-left-width:3px;border-radius:0 0 0 4px}
+    .reticle-br{bottom:0;right:0;border-bottom-width:3px;border-right-width:3px;border-radius:0 0 4px 0}
+    .reticle-line{position:absolute;left:0;right:0;top:50%;height:2px;background:linear-gradient(90deg,transparent,var(--primary-light,#14b8a6),transparent);animation:scanLine 2s ease-in-out infinite}
+    @keyframes scanLine{0%,100%{top:20%;opacity:.5}50%{top:80%;opacity:1}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .scanner-footer{padding:16px;text-align:center}
+    .scanner-hint{color:rgba(255,255,255,.5);margin:0;font-size:.85rem}
+    .scan-result{animation:fadeIn .3s ease}
+    .scan-result-header{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px}
+    .scan-result-icon{color:#22c55e;font-size:1.2rem}
+    .scan-result-value{color:#fff;font-weight:700;font-family:var(--font-mono,monospace);font-size:1.1rem}
+    .scan-result-details{margin-bottom:12px}
+    .scan-result-part{color:rgba(255,255,255,.8);font-size:.9rem}
+    .scan-result-location{color:var(--primary-light,#14b8a6);font-size:.85rem;margin-top:4px}
+    .scan-result-notfound{color:#fbbf24;font-size:.85rem;margin-bottom:12px}
+    .scan-result-actions{display:flex;gap:8px;justify-content:center}
+    .scanner-error{color:#ef4444;font-size:.85rem;margin-top:8px}
   `]
 })
 export class BarcodeScannerComponent implements OnInit, OnDestroy {

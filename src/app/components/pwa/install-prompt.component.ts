@@ -6,37 +6,34 @@ import { CommonModule } from '@angular/common';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div *ngIf="showPrompt" class="install-prompt alert alert-primary alert-dismissible fade show d-flex align-items-center" role="alert">
-      <i class="bi bi-download fs-4 me-3"></i>
-      <div class="flex-grow-1">
-        <strong>Install Pick List Tracker</strong>
-        <p class="mb-0 small">Install this app on your device for quick access and offline use.</p>
+    <div *ngIf="showPrompt" class="install-prompt">
+      <div class="install-content">
+        <div class="install-info">
+          <i class="bi bi-download install-icon"></i>
+          <div>
+            <div class="install-title">Install Pick List Tracker</div>
+            <div class="install-desc">Add to home screen for quick access &amp; offline use</div>
+          </div>
+        </div>
+        <div class="install-actions">
+          <button class="btn btn-sm btn-outline-light" (click)="dismissPrompt()">Later</button>
+          <button class="btn btn-sm btn-light fw-semibold" (click)="installApp()">
+            <i class="bi bi-plus-circle me-1"></i>Install
+          </button>
+        </div>
       </div>
-      <button class="btn btn-primary btn-sm me-2" (click)="installApp()">
-        Install
-      </button>
-      <button type="button" class="btn-close" (click)="dismissPrompt()"></button>
     </div>
   `,
   styles: [`
-    .install-prompt {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-      right: 20px;
-      max-width: 500px;
-      margin: 0 auto;
-      z-index: 1050;
-      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    }
-
-    @media (max-width: 576px) {
-      .install-prompt {
-        bottom: 10px;
-        left: 10px;
-        right: 10px;
-      }
-    }
+    .install-prompt{position:fixed;bottom:0;left:0;right:0;z-index:1050;padding:12px 16px;background:linear-gradient(135deg,var(--primary-color,#0f766e),#115e59);box-shadow:0 -4px 16px rgba(0,0,0,.3);animation:slideUp .3s ease}
+    .install-content{max-width:600px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .install-info{display:flex;align-items:center;gap:12px}
+    .install-icon{font-size:1.5rem;color:#5eead4}
+    .install-title{color:#fff;font-weight:600;font-size:.95rem}
+    .install-desc{color:rgba(255,255,255,.7);font-size:.8rem}
+    .install-actions{display:flex;gap:8px;flex-shrink:0}
+    @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+    @media(max-width:576px){.install-content{justify-content:center;text-align:center}.install-info{flex-direction:column;text-align:center}}
   `]
 })
 export class InstallPromptComponent implements OnInit, OnDestroy {

@@ -4,8 +4,8 @@
   "description": "Warehouse tool picking application for tracking sales orders and inventory",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0d6efd",
+  "background_color": "#0c1222",
+  "theme_color": "#0f766e",
   "orientation": "portrait-primary",
   "icons": [
     {

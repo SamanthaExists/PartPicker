@@ -14,6 +14,7 @@ import { UtilsService } from '../../services/utils.service';
 import { BomTemplatesService } from '../../services/bom-templates.service';
 import { ActivityLogService } from '../../services/activity-log.service';
 import { PartsService } from '../../services/parts.service';
+import { FeedbackService } from '../../services/feedback.service';
 import { Order, Tool, LineItem, LineItemWithPicks, Pick, IssueType, Part } from '../../models';
 import { SaveAsTemplateDialogComponent } from '../../components/dialogs/save-as-template-dialog.component';
 import { PrintPickListComponent } from '../../components/picking/print-pick-list.component';
@@ -1138,6 +1139,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     private activityLogService: ActivityLogService,
     private partsService: PartsService,
     private modalService: NgbModal,
+    private feedbackService: FeedbackService,
     public utils: UtilsService
   ) {
     // Bind getToolPicked for child component
@@ -1326,6 +1328,9 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     this.tools = result.tools;
     this.lineItems = result.lineItems;
     this.loading = false;
+
+    // Track initial completion state for celebration detection
+    this.wasFullyPicked = this.isFullyPicked;
   }
 
   // Persist sort preference
@@ -1540,10 +1545,16 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
 
     if (hasWarnings) {
       this.overPickWarning = 'Some items may have been over-picked. Another user may have picked items at the same time. Please review the quantities.';
+      this.feedbackService.errorBuzz();
       setTimeout(() => this.overPickWarning = null, 8000);
+    } else {
+      this.feedbackService.pickSuccess();
     }
 
     this.isSubmitting = null;
+
+    // Check if batch pick completed the order
+    this.checkAndCelebrate();
   }
 
   get totalLineItems(): number {
@@ -1562,6 +1573,21 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
 
   get isFullyPicked(): boolean {
     return this.progressPercent === 100 && this.totalLineItems > 0;
+  }
+
+  /** Track previous completion state to detect the moment of completion */
+  private wasFullyPicked = false;
+
+  /** Fire celebration exactly once when order transitions to fully picked */
+  private checkAndCelebrate(): void {
+    // Need to wait a tick for pick data to refresh
+    setTimeout(() => {
+      const nowComplete = this.isFullyPicked;
+      if (nowComplete && !this.wasFullyPicked) {
+        this.feedbackService.celebrate();
+      }
+      this.wasFullyPicked = nowComplete;
+    }, 100);
   }
 
   // Tool-related helpers
@@ -1701,8 +1727,12 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     // Check for over-pick warning (concurrent pick detection)
     if (result && 'overPickWarning' in result && result.overPickWarning) {
       this.overPickWarning = result.overPickWarning;
+      this.feedbackService.errorBuzz();
       // Auto-dismiss after 8 seconds
       setTimeout(() => this.overPickWarning = null, 8000);
+    } else if (result) {
+      // Haptic feedback for successful pick
+      this.feedbackService.pickSuccess();
     }
 
     // Trigger tag printing dialog if enabled and pick was successful
@@ -1721,6 +1751,9 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     }
 
     this.isSubmitting = null;
+
+    // Check if this pick completed the entire order — celebrate!
+    this.checkAndCelebrate();
   }
 
   async handleQuickPick(item: LineItemWithPicks, tool: Tool): Promise<void> {
@@ -1745,10 +1778,16 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
 
     if (hasWarnings) {
       this.overPickWarning = 'Some items may have been over-picked. Another user may have picked items at the same time. Please review the quantities.';
+      this.feedbackService.errorBuzz();
       setTimeout(() => this.overPickWarning = null, 8000);
+    } else {
+      this.feedbackService.pickSuccess();
     }
 
     this.isSubmitting = null;
+
+    // Check if this completed the order
+    this.checkAndCelebrate();
   }
 
   handleUndoLastPick(item: LineItemWithPicks): void {
@@ -1767,6 +1806,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
 
     this.isSubmitting = this.undoPickTarget.id;
     await this.picksService.undoPick(history[0].pick.id, this.settingsService.getUserName());
+    this.feedbackService.pickUndo();
     this.isSubmitting = null;
 
     this.showUndoPickModal = false;
@@ -1776,6 +1816,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   async handleDeletePick(pick: Pick): Promise<void> {
     this.isSubmitting = pick.line_item_id;
     await this.picksService.undoPick(pick.id, this.settingsService.getUserName());
+    this.feedbackService.pickUndo();
     this.isSubmitting = null;
   }
 

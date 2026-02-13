@@ -21,10 +21,10 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
   imports: [CommonModule, RouterModule, FormsModule, PartDetailComponent],
   template: `
     <div>
-      <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+      <div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-3">
         <div>
-          <h1 class="h3 fw-bold mb-1">Items to Order</h1>
-          <p class="text-muted mb-0">Parts with insufficient stock to complete active orders</p>
+          <h1 class="page-title">Items to Order</h1>
+          <p class="page-subtitle">Parts with insufficient stock to complete active orders</p>
         </div>
         <div class="d-flex gap-2">
           <button class="btn btn-outline-secondary" (click)="handleCopyPartNumbers()" [disabled]="filteredItems.length === 0">
@@ -64,72 +64,72 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
       <div class="row g-3 mb-4" *ngIf="!loading && filteredItems.length > 0">
         <ng-container *ngIf="activeTab === 'need-to-order'">
           <div class="col-md-4">
-            <div class="card border-start border-warning border-4">
+            <div class="card stat-card accent-card accent-card-warning">
               <div class="card-body d-flex align-items-center gap-3">
-                <div class="rounded-circle bg-warning bg-opacity-10 p-2">
-                  <i class="bi bi-cart3 fs-5 text-warning"></i>
+                <div class="stat-icon icon-circle icon-circle-amber">
+                  <i class="bi bi-cart3"></i>
                 </div>
                 <div>
-                  <div class="fs-4 fw-bold">{{ statsUniqueParts }}</div>
-                  <div class="text-muted small">Unique Parts to Order</div>
+                  <div class="stat-value">{{ statsUniqueParts }}</div>
+                  <div class="stat-sublabel">Unique Parts to Order</div>
                 </div>
               </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="card border-start border-danger border-4">
+            <div class="card stat-card accent-card accent-card-danger">
               <div class="card-body d-flex align-items-center gap-3">
-                <div class="rounded-circle bg-danger bg-opacity-10 p-2">
-                  <i class="bi bi-exclamation-circle fs-5 text-danger"></i>
+                <div class="stat-icon icon-circle" style="background-color: var(--color-danger-subtle); color: var(--color-danger);">
+                  <i class="bi bi-exclamation-circle"></i>
                 </div>
                 <div>
-                  <div class="fs-4 fw-bold">{{ statsTotalQty }}</div>
-                  <div class="text-muted small">Total Qty to Order</div>
+                  <div class="stat-value">{{ statsTotalQty }}</div>
+                  <div class="stat-sublabel">Total Qty to Order</div>
                 </div>
               </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="card">
+            <div class="card stat-card">
               <div class="card-body">
-                <div class="fs-4 fw-bold">{{ statsOrdersAffected }}</div>
-                <div class="text-muted small">Orders Affected</div>
+                <div class="stat-label">Orders Affected</div>
+                <div class="stat-value">{{ statsOrdersAffected }}</div>
               </div>
             </div>
           </div>
         </ng-container>
         <ng-container *ngIf="activeTab === 'on-order'">
           <div class="col-md-4">
-            <div class="card border-start border-info border-4">
+            <div class="card stat-card accent-card accent-card-info">
               <div class="card-body d-flex align-items-center gap-3">
-                <div class="rounded-circle bg-info bg-opacity-10 p-2">
-                  <i class="bi bi-truck fs-5 text-info"></i>
+                <div class="stat-icon icon-circle icon-circle-cyan">
+                  <i class="bi bi-truck"></i>
                 </div>
                 <div>
-                  <div class="fs-4 fw-bold">{{ statsUniqueParts }}</div>
-                  <div class="text-muted small">Unique Parts On Order</div>
+                  <div class="stat-value">{{ statsUniqueParts }}</div>
+                  <div class="stat-sublabel">Unique Parts On Order</div>
                 </div>
               </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="card border-start border-info border-4">
+            <div class="card stat-card accent-card accent-card-info">
               <div class="card-body d-flex align-items-center gap-3">
-                <div class="rounded-circle bg-info bg-opacity-10 p-2">
-                  <i class="bi bi-box-seam fs-5 text-info"></i>
+                <div class="stat-icon icon-circle icon-circle-cyan">
+                  <i class="bi bi-box-seam"></i>
                 </div>
                 <div>
-                  <div class="fs-4 fw-bold">{{ statsTotalOnOrderQty }}</div>
-                  <div class="text-muted small">Total Qty On Order</div>
+                  <div class="stat-value">{{ statsTotalOnOrderQty }}</div>
+                  <div class="stat-sublabel">Total Qty On Order</div>
                 </div>
               </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="card">
+            <div class="card stat-card">
               <div class="card-body">
-                <div class="fs-4 fw-bold">{{ statsOrdersAffected }}</div>
-                <div class="text-muted small">Orders Affected</div>
+                <div class="stat-label">Orders Affected</div>
+                <div class="stat-value">{{ statsOrdersAffected }}</div>
               </div>
             </div>
           </div>
@@ -137,7 +137,7 @@ const ITEMS_TO_ORDER_SORT_KEY = 'items-to-order-sort-preference';
       </div>
 
       <!-- Filters -->
-      <div class="card mb-4" *ngIf="currentItems.length > 0">
+      <div class="card filter-bar" *ngIf="currentItems.length > 0">
         <div class="card-body">
           <div class="d-flex flex-column gap-3">
             <!-- Search Bar -->

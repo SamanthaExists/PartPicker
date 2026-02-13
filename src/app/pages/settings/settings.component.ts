@@ -16,9 +16,9 @@ import { UserSettings } from '../../models';
   imports: [CommonModule, FormsModule],
   template: `
     <div>
-      <div class="mb-4">
-        <h1 class="h3 fw-bold mb-1">Settings</h1>
-        <p class="text-muted mb-0">Configure your preferences and manage data</p>
+      <div class="page-header">
+        <h1 class="page-title">Settings</h1>
+        <p class="page-subtitle">Configure your preferences and manage data</p>
       </div>
 
       <div class="row">

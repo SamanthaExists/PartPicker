@@ -19,10 +19,10 @@ type PartSortOption = 'part-number' | 'description' | 'classification' | 'locati
   template: `
     <div class="container-fluid py-3">
       <!-- Header -->
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
+      <div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
         <div>
-          <h1 class="h3 mb-1">Parts Catalog</h1>
-          <p class="text-muted small mb-0">Manage your parts catalog with classifications and relationships</p>
+          <h1 class="page-title">Parts Catalog</h1>
+          <p class="page-subtitle">Manage your parts catalog with classifications and relationships</p>
         </div>
         <div class="d-flex gap-2">
           <button class="btn btn-outline-secondary">
@@ -42,7 +42,7 @@ type PartSortOption = 'part-number' | 'description' | 'classification' | 'locati
       </div>
 
       <!-- Filters -->
-      <div class="card mb-3">
+      <div class="card filter-bar">
         <div class="card-body">
           <div class="row g-3">
             <!-- Search -->
@@ -181,28 +181,22 @@ type PartSortOption = 'part-number' | 'description' | 'classification' | 'locati
   `,
   styles: [`
     .hover-shadow {
-      transition: box-shadow 0.2s ease-in-out;
+      transition: box-shadow var(--transition-base, 0.2s ease);
     }
     .hover-shadow:hover {
-      box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.15);
+      box-shadow: var(--shadow-md);
     }
     .min-w-0 {
       min-width: 0;
     }
     .btn-ghost-secondary {
-      color: #6c757d;
+      color: var(--text-muted);
       background-color: transparent;
       border: none;
     }
     .btn-ghost-secondary:hover {
-      color: #495057;
-      background-color: rgba(0, 0, 0, 0.05);
-    }
-    .text-truncate-2 {
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+      color: var(--text-secondary);
+      background-color: var(--surface-inset);
     }
   `]
 })

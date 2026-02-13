@@ -216,10 +216,10 @@ interface AssemblyGroup {
     <!-- List View -->
     <ng-template #listView>
       <!-- Header -->
-      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
+      <div class="page-header d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3">
         <div>
-          <h1 class="h3 fw-bold mb-1">Templates</h1>
-          <p class="text-muted mb-0">Manage BOM templates for quick order creation</p>
+          <h1 class="page-title">Templates</h1>
+          <p class="page-subtitle">Manage BOM templates for quick order creation</p>
         </div>
         <div class="d-flex gap-2">
           <button class="btn btn-outline-secondary" (click)="openExtractDialog()">
@@ -234,34 +234,34 @@ interface AssemblyGroup {
       <!-- Stats -->
       <div class="row g-3 mb-4">
         <div class="col-6 col-lg-3">
-          <div class="card">
+          <div class="card stat-card">
             <div class="card-body">
-              <div class="h4 fw-bold mb-0">{{ templates.length }}</div>
-              <small class="text-muted">Total Templates</small>
+              <div class="stat-label">Total Templates</div>
+              <div class="stat-value">{{ templates.length }}</div>
             </div>
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card">
+          <div class="card stat-card">
             <div class="card-body">
-              <div class="h4 fw-bold mb-0">{{ bomCount }}</div>
-              <small class="text-muted">BOM</small>
+              <div class="stat-label">BOM</div>
+              <div class="stat-value">{{ bomCount }}</div>
             </div>
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card">
+          <div class="card stat-card">
             <div class="card-body">
-              <div class="h4 fw-bold mb-0">{{ assemblyCount }}</div>
-              <small class="text-muted">Assembly</small>
+              <div class="stat-label">Assembly</div>
+              <div class="stat-value">{{ assemblyCount }}</div>
             </div>
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card">
+          <div class="card stat-card">
             <div class="card-body">
-              <div class="h4 fw-bold mb-0">{{ uniqueModels.length }}</div>
-              <small class="text-muted">Tool Models</small>
+              <div class="stat-label">Tool Models</div>
+              <div class="stat-value">{{ uniqueModels.length }}</div>
             </div>
           </div>
         </div>
@@ -553,52 +553,24 @@ interface AssemblyGroup {
     }
 
     .border-purple {
-      border-color: #6f42c1 !important;
+      border-color: var(--color-purple) !important;
     }
 
-    /* Icon circles */
-    .icon-circle {
-      width: 2.5rem;
-      height: 2.5rem;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1rem;
-    }
-
-    .icon-circle-blue {
-      background-color: rgba(13, 110, 253, 0.1);
-      color: #0d6efd;
-    }
-
-    .icon-circle-purple {
-      background-color: rgba(111, 66, 193, 0.1);
-      color: #6f42c1;
-    }
-
-    .icon-circle-gray {
-      background-color: rgba(108, 117, 125, 0.1);
-      color: #6c757d;
-    }
+    /* Override global icon-circle for template scope (already defined globally) */
 
     /* Purple theme */
     .text-purple {
-      color: #6f42c1;
+      color: var(--color-purple);
     }
 
     .bg-purple {
-      background-color: #6f42c1 !important;
+      background-color: var(--color-purple) !important;
     }
 
     /* Assembly group header rows */
     .assembly-group-header td {
-      background-color: rgba(111, 66, 193, 0.08) !important;
-      border-left: 3px solid #6f42c1;
-    }
-
-    :host-context([data-bs-theme="dark"]) .assembly-group-header td {
-      background-color: rgba(111, 66, 193, 0.15) !important;
+      background-color: var(--color-purple-subtle) !important;
+      border-left: 3px solid var(--color-purple);
     }
 
     /* Tab bar horizontal scroll */

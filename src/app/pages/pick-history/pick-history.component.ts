@@ -81,13 +81,13 @@ const PAGE_SIZE = 50;
   template: `
     <div class="space-y-4">
       <!-- Header -->
-      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3">
+      <div class="page-header d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3">
         <div>
-          <h1 class="h3 fw-bold d-flex align-items-center gap-2 mb-1">
+          <h1 class="page-title d-flex align-items-center gap-2">
             <i class="bi bi-clock-history"></i>
             Activity History
           </h1>
-          <p class="text-muted mb-0">View picks and issues by date range</p>
+          <p class="page-subtitle">View picks and issues by date range</p>
         </div>
       </div>
 
@@ -195,68 +195,68 @@ const PAGE_SIZE = 50;
       <!-- Results -->
       <ng-container *ngIf="hasSearched">
         <!-- Summary Stats (filter-reactive via summaryStats) -->
-        <div class="row g-3">
+        <div class="row g-3 mb-4">
           <div class="col-6 col-sm">
-            <div class="card">
+            <div class="card stat-card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ summaryStats.pickCount | number }}</div>
-                <p class="text-muted small mb-0">Picks</p>
+                <div class="stat-value" style="font-size: 1.5rem;">{{ summaryStats.pickCount | number }}</div>
+                <div class="stat-label">Picks</div>
               </div>
             </div>
           </div>
           <div class="col-6 col-sm">
-            <div class="card">
+            <div class="card stat-card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ summaryStats.totalQty | number }}</div>
-                <p class="text-muted small mb-0">Qty Picked</p>
+                <div class="stat-value" style="font-size: 1.5rem;">{{ summaryStats.totalQty | number }}</div>
+                <div class="stat-label">Qty Picked</div>
               </div>
             </div>
           </div>
           <div class="col-6 col-sm">
-            <div class="card">
+            <div class="card stat-card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ summaryStats.uniqueParts }}</div>
-                <p class="text-muted small mb-0">Unique Parts</p>
+                <div class="stat-value" style="font-size: 1.5rem;">{{ summaryStats.uniqueParts }}</div>
+                <div class="stat-label">Unique Parts</div>
               </div>
             </div>
           </div>
           <div class="col-6 col-sm">
-            <div class="card">
+            <div class="card stat-card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ summaryStats.uniqueUsers }}</div>
-                <p class="text-muted small mb-0">Users</p>
+                <div class="stat-value" style="font-size: 1.5rem;">{{ summaryStats.uniqueUsers }}</div>
+                <div class="stat-label">Users</div>
               </div>
             </div>
           </div>
           <div class="col-6 col-sm">
-            <div class="card">
+            <div class="card stat-card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ summaryStats.issueCount }}</div>
-                <p class="text-muted small mb-0">Issues</p>
+                <div class="stat-value" style="font-size: 1.5rem;">{{ summaryStats.issueCount }}</div>
+                <div class="stat-label">Issues</div>
               </div>
             </div>
           </div>
           <div class="col-6 col-sm">
-            <div class="card">
+            <div class="card stat-card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold text-danger">{{ summaryStats.undoCount }}</div>
-                <p class="text-muted small mb-0">Undos</p>
+                <div class="stat-value text-danger" style="font-size: 1.5rem;">{{ summaryStats.undoCount }}</div>
+                <div class="stat-label">Undos</div>
               </div>
             </div>
           </div>
           <div class="col-6 col-sm">
-            <div class="card">
+            <div class="card stat-card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold">{{ summaryStats.partChangesCount }}</div>
-                <p class="text-muted small mb-0">Part Changes</p>
+                <div class="stat-value" style="font-size: 1.5rem;">{{ summaryStats.partChangesCount }}</div>
+                <div class="stat-label">Part Changes</div>
               </div>
             </div>
           </div>
           <div class="col-6 col-sm">
-            <div class="card">
+            <div class="card stat-card">
               <div class="card-body py-3">
-                <div class="fs-4 fw-bold text-primary">{{ summaryStats.importsCount }}</div>
-                <p class="text-muted small mb-0">Imports</p>
+                <div class="stat-value text-primary" style="font-size: 1.5rem;">{{ summaryStats.importsCount }}</div>
+                <div class="stat-label">Imports</div>
               </div>
             </div>
           </div>

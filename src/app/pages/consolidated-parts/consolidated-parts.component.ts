@@ -27,10 +27,10 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
   imports: [CommonModule, RouterModule, FormsModule, MultiOrderPickDialogComponent, ReportPartIssueDialogComponent, PartDetailComponent, ClassificationBadgeComponent, PrintTagDialogComponent],
   template: `
     <div>
-      <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+      <div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-3">
         <div>
-          <h1 class="h3 fw-bold mb-1">Part Picker</h1>
-          <p class="text-muted mb-0">View all parts needed across active orders</p>
+          <h1 class="page-title">Part Picker</h1>
+          <p class="page-subtitle">View all parts needed across active orders</p>
         </div>
         <div class="d-flex gap-2">
           <button class="btn btn-outline-primary" (click)="copyPartNumbers()" [disabled]="filteredParts.length === 0">
@@ -47,45 +47,45 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
       <!-- Stats Cards - Clickable -->
       <div class="row g-3 mb-4">
         <div class="col-6 col-lg-3">
-          <div class="card cursor-pointer" [class.border-primary]="filter === 'all'" (click)="setFilter('all')">
+          <div class="card stat-card cursor-pointer" [class.border-primary]="filter === 'all'" (click)="setFilter('all')">
             <div class="card-body">
-              <p class="text-muted small mb-1">Total Parts</p>
-              <h3 class="mb-0 fw-bold">{{ filteredParts.length }}</h3>
-              <small class="text-muted">&nbsp;</small>
+              <div class="stat-label">Total Parts</div>
+              <div class="stat-value">{{ filteredParts.length }}</div>
+              <div class="stat-sublabel">&nbsp;</div>
             </div>
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card cursor-pointer" [class.border-warning]="filter === 'low_stock'" (click)="setFilter('low_stock')">
+          <div class="card stat-card cursor-pointer" [class.border-warning]="filter === 'low_stock'" (click)="setFilter('low_stock')">
             <div class="card-body">
-              <p class="text-muted small mb-1">Low Stock</p>
-              <h3 class="mb-0 fw-bold text-warning">{{ lowStockCount }}</h3>
-              <small class="text-muted">Available &lt; Needed</small>
+              <div class="stat-label">Low Stock</div>
+              <div class="stat-value text-warning">{{ lowStockCount }}</div>
+              <div class="stat-sublabel">Available &lt; Needed</div>
             </div>
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card cursor-pointer" [class.border-danger]="filter === 'out_of_stock'" (click)="setFilter('out_of_stock')">
+          <div class="card stat-card cursor-pointer" [class.border-danger]="filter === 'out_of_stock'" (click)="setFilter('out_of_stock')">
             <div class="card-body">
-              <p class="text-muted small mb-1">Out of Stock</p>
-              <h3 class="mb-0 fw-bold text-danger">{{ outOfStockCount }}</h3>
-              <small class="text-muted">Qty Available = 0</small>
+              <div class="stat-label">Out of Stock</div>
+              <div class="stat-value text-danger">{{ outOfStockCount }}</div>
+              <div class="stat-sublabel">Qty Available = 0</div>
             </div>
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card cursor-pointer" [class.border-success]="filter === 'complete'" (click)="setFilter('complete')">
+          <div class="card stat-card cursor-pointer" [class.border-success]="filter === 'complete'" (click)="setFilter('complete')">
             <div class="card-body">
-              <p class="text-muted small mb-1">Complete</p>
-              <h3 class="mb-0 fw-bold text-success">{{ completeCount }}</h3>
-              <small class="text-muted">Fully picked</small>
+              <div class="stat-label">Complete</div>
+              <div class="stat-value text-success">{{ completeCount }}</div>
+              <div class="stat-sublabel">Fully picked</div>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Filters -->
-      <div class="card mb-4">
+      <div class="card filter-bar">
         <div class="card-body">
           <div class="row g-3">
             <div class="col-md-6">
@@ -250,7 +250,7 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
                   [class.table-danger]="getQtyAvailable(part) === 0 && part.remaining > 0">
                 <td>
                   <div class="d-flex align-items-center gap-2">
-                    <span class="text-primary" style="cursor: pointer;" (click)="openPartDetail(part.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ part.part_number }}</span>
+                    <span class="font-mono text-primary fw-medium" style="cursor: pointer;" (click)="openPartDetail(part.part_number, $event)" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ part.part_number }}</span>
                     <button class="btn btn-sm btn-ghost p-0 text-muted" (click)="copyPartNumber(part.part_number, $event)" title="Copy Part Number">
                       <i class="bi" [ngClass]="copiedPartNumber === part.part_number ? 'bi-check-lg text-success' : 'bi-copy'"></i>
                     </button>
@@ -414,28 +414,22 @@ type FilterType = 'all' | 'remaining' | 'complete' | 'low_stock' | 'out_of_stock
   styles: [`
     .cursor-pointer {
       cursor: pointer;
-      transition: border-color 0.15s ease-in-out;
+      transition: border-color var(--transition-fast, 0.15s ease-in-out);
     }
     .cursor-pointer:hover {
-      border-color: var(--bs-primary) !important;
+      border-color: var(--brand-primary) !important;
     }
     .location-group-header td {
-      background-color: rgba(13, 110, 253, 0.08) !important;
-      border-left: 3px solid #0d6efd;
-    }
-    :host-context([data-bs-theme="dark"]) .location-group-header td {
-      background-color: rgba(13, 110, 253, 0.15) !important;
+      background-color: var(--brand-primary-subtle) !important;
+      border-left: 3px solid var(--brand-primary);
     }
     .assembly-group-header td {
-      background-color: rgba(111, 66, 193, 0.08) !important;
-      border-left: 3px solid #6f42c1;
+      background-color: var(--color-purple-subtle) !important;
+      border-left: 3px solid var(--color-purple);
     }
-    :host-context([data-bs-theme="dark"]) .assembly-group-header td {
-      background-color: rgba(111, 66, 193, 0.15) !important;
-    }
-    .text-purple { color: #6f42c1; }
-    .bg-purple-subtle { background-color: rgba(111, 66, 193, 0.1); }
-    .border-purple { border-color: #6f42c1 !important; }
+    .text-purple { color: var(--color-purple); }
+    .bg-purple-subtle { background-color: var(--color-purple-subtle); }
+    .border-purple { border-color: var(--color-purple) !important; }
   `]
 })
 export class ConsolidatedPartsComponent implements OnInit, OnDestroy {

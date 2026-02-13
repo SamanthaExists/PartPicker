@@ -99,12 +99,12 @@ interface PickHistoryItem {
       </div>
 
       <!-- Header -->
-      <div class="mb-3">
+      <div class="page-header">
         <a routerLink="/orders" class="text-decoration-none small">
           <i class="bi bi-arrow-left me-1"></i> Back to Orders
         </a>
         <div class="d-flex flex-wrap align-items-center gap-3 mt-2">
-          <h1 class="h4 fw-bold mb-0">SO-{{ order.so_number }}</h1>
+          <h1 class="page-title mb-0">SO-{{ order.so_number }}</h1>
           <select class="form-select form-select-sm w-auto" [(ngModel)]="order.status" (change)="handleStatusChange()">
             <option value="active">Active</option>
             <option value="complete">Complete</option>
@@ -401,13 +401,23 @@ interface PickHistoryItem {
                     <!-- Assembly Group Header (when sorting by assembly) -->
                     <tr *ngIf="sortMode === 'assembly' && shouldShowAssemblyHeader(item, idx)" class="assembly-group-header">
                       <td colspan="8" class="py-2">
-                        <div class="d-flex align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
                           <i class="bi bi-box-seam text-purple"></i>
-                          <strong>{{ item.assembly_group || 'No Assembly' }}</strong>
-                          <span class="badge bg-secondary">{{ getAssemblyGroupCount(item) }} parts</span>
-                          <span class="badge bg-success" *ngIf="isAssemblyGroupComplete(item)">
-                            <i class="bi bi-check-circle me-1"></i>Complete
+                          <strong class="text-purple">{{ item.assembly_group || 'No Assembly' }}</strong>
+                          <span class="pill-badge pill-purple">{{ getAssemblyGroupCount(item) }} parts</span>
+                          <span class="pill-badge pill-complete" *ngIf="isAssemblyGroupComplete(item)">
+                            <i class="bi bi-check-circle"></i> Complete
                           </span>
+                          <span class="pill-badge pill-partial" *ngIf="!isAssemblyGroupComplete(item) && getAssemblyGroupPickedCount(item) > 0">
+                            {{ getAssemblyGroupPickedCount(item) }}/{{ getAssemblyGroupCount(item) }} picked
+                          </span>
+                          <div class="ms-auto d-flex align-items-center gap-2" *ngIf="!isAssemblyGroupComplete(item)">
+                            <div class="progress" style="width: 80px; height: 6px;">
+                              <div class="progress-bar" [style.width.%]="getAssemblyGroupProgress(item)"
+                                   [style.background-color]="'var(--color-purple)'"></div>
+                            </div>
+                            <span class="small text-muted">{{ getAssemblyGroupProgress(item) }}%</span>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -497,7 +507,9 @@ interface PickHistoryItem {
                       </td>
                       <!-- Total -->
                       <td class="text-center">
-                        <span class="badge" [ngClass]="isItemComplete(item) ? 'bg-success' : (isItemPartial(item) ? 'bg-warning text-dark' : 'bg-secondary')">
+                        <span class="pill-badge"
+                              [ngClass]="isItemComplete(item) ? 'pill-complete' : (isItemPartial(item) ? 'pill-partial' : 'pill-pending')">
+                          <i *ngIf="isItemComplete(item)" class="bi bi-check-circle-fill" style="font-size: 0.65rem;"></i>
                           {{ item.total_picked }}/{{ item.total_qty_needed }}
                         </span>
                       </td>
@@ -1001,41 +1013,27 @@ interface PickHistoryItem {
 
     .modal.show { display: block !important; }
 
-    .table-success { background-color: rgba(25, 135, 84, 0.1) !important; }
-    .table-warning { background-color: rgba(255, 193, 7, 0.1) !important; }
-    .table-danger { background-color: rgba(220, 53, 69, 0.1) !important; }
-    .table-info { background-color: rgba(13, 202, 240, 0.15) !important; }
-
-    [data-bs-theme="dark"] .table-success { background-color: rgba(25, 135, 84, 0.35) !important; }
-    [data-bs-theme="dark"] .table-warning { background-color: rgba(255, 193, 7, 0.25) !important; }
-    [data-bs-theme="dark"] .table-danger { background-color: rgba(220, 53, 69, 0.25) !important; }
-    [data-bs-theme="dark"] .table-info { background-color: rgba(13, 202, 240, 0.2) !important; }
-    [data-bs-theme="dark"] .table-secondary { background-color: rgba(108, 117, 125, 0.2) !important; color: rgba(255, 255, 255, 0.75) !important; }
+    .table-success { background-color: var(--color-success-subtle) !important; }
+    .table-warning { background-color: var(--color-warning-subtle) !important; }
+    .table-danger { background-color: var(--color-danger-subtle) !important; }
+    .table-info { background-color: var(--color-info-subtle) !important; }
 
     .assembly-group-header td {
-      background-color: rgba(111, 66, 193, 0.08) !important;
-      border-left: 3px solid #6f42c1;
-    }
-
-    :host-context([data-bs-theme="dark"]) .assembly-group-header td {
-      background-color: rgba(111, 66, 193, 0.15) !important;
+      background-color: var(--color-purple-subtle) !important;
+      border-left: 3px solid var(--color-purple);
     }
 
     .text-purple {
-      color: #6f42c1;
+      color: var(--color-purple);
     }
 
     .keyboard-selected {
-      outline: 2px solid #0d6efd !important;
+      outline: 2px solid var(--brand-primary) !important;
       outline-offset: -2px;
     }
 
     .keyboard-selected td {
-      background-color: rgba(13, 110, 253, 0.08) !important;
-    }
-
-    :host-context([data-bs-theme="dark"]) .keyboard-selected td {
-      background-color: rgba(13, 110, 253, 0.15) !important;
+      background-color: var(--brand-primary-subtle) !important;
     }
   `]
 })
@@ -1455,6 +1453,21 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     return this.sortedLineItems
       .filter(i => (i.assembly_group || '') === group)
       .every(i => this.isItemComplete(i));
+  }
+
+  getAssemblyGroupPickedCount(item: LineItemWithPicks): number {
+    const group = item.assembly_group || '';
+    return this.sortedLineItems
+      .filter(i => (i.assembly_group || '') === group)
+      .filter(i => this.isItemComplete(i)).length;
+  }
+
+  getAssemblyGroupProgress(item: LineItemWithPicks): number {
+    const group = item.assembly_group || '';
+    const items = this.sortedLineItems.filter(i => (i.assembly_group || '') === group);
+    if (items.length === 0) return 0;
+    const complete = items.filter(i => this.isItemComplete(i)).length;
+    return Math.round((complete / items.length) * 100);
   }
 
   // Sort mode with localStorage persistence

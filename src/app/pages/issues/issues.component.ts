@@ -31,35 +31,35 @@ interface UnifiedIssue {
   imports: [CommonModule, RouterModule, FormsModule],
   template: `
     <div>
-      <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+      <div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-3">
         <div>
-          <h1 class="h3 fw-bold mb-1">Issues</h1>
-          <p class="text-muted mb-0">Track and resolve picking issues</p>
+          <h1 class="page-title">Issues</h1>
+          <p class="page-subtitle">Track and resolve picking issues</p>
         </div>
       </div>
 
       <!-- Stats -->
       <div class="row g-3 mb-4">
         <div class="col-6 col-lg-3">
-          <div class="card border-danger">
+          <div class="card stat-card border-danger">
             <div class="card-body">
-              <p class="text-muted small mb-1">Open Issues</p>
-              <h3 class="mb-0 fw-bold text-danger">{{ openIssuesCount }}</h3>
+              <div class="stat-label">Open Issues</div>
+              <div class="stat-value text-danger">{{ openIssuesCount }}</div>
             </div>
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card border-success">
+          <div class="card stat-card border-success">
             <div class="card-body">
-              <p class="text-muted small mb-1">Resolved</p>
-              <h3 class="mb-0 fw-bold text-success">{{ resolvedIssuesCount }}</h3>
+              <div class="stat-label">Resolved</div>
+              <div class="stat-value text-success">{{ resolvedIssuesCount }}</div>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Filters -->
-      <div class="card mb-4">
+      <div class="card filter-bar">
         <div class="card-body">
           <div class="d-flex flex-wrap gap-2">
             <button class="btn btn-sm"

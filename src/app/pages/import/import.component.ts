@@ -22,9 +22,9 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
   imports: [CommonModule, RouterModule, FormsModule, TemplateSelectDialogComponent, DuplicatePartsDialogComponent],
   template: `
     <div>
-      <div class="mb-4">
-        <h1 class="h3 fw-bold mb-1">Import Order</h1>
-        <p class="text-muted mb-0">Upload an Excel or CSV file to import a sales order</p>
+      <div class="page-header">
+        <h1 class="page-title">Import Order</h1>
+        <p class="page-subtitle">Upload an Excel or CSV file to import a sales order</p>
       </div>
 
       <!-- Unclassified Parts Alert -->
@@ -549,24 +549,20 @@ import { DuplicatePartsDialogComponent } from '../../components/dialogs/duplicat
   `,
   styles: [`
     .dropzone {
-      border: 2px dashed var(--bs-border-color);
-      border-radius: 0.5rem;
+      border: 2px dashed var(--surface-border-strong);
+      border-radius: var(--radius-lg);
       padding: 3rem;
       text-align: center;
-      transition: all 0.2s ease;
+      transition: all var(--transition-fast);
     }
 
     .dropzone.dragover {
-      border-color: #0d6efd;
-      background-color: rgba(13, 110, 253, 0.05);
+      border-color: var(--brand-primary);
+      background-color: var(--brand-primary-subtle);
     }
 
     .dropzone:hover {
-      border-color: var(--bs-secondary-color);
-    }
-
-    .font-mono {
-      font-family: monospace;
+      border-color: var(--text-faint);
     }
 
     .spin {

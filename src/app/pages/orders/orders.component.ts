@@ -16,10 +16,10 @@ type SortOption = 'created' | 'due-date' | 'so-number';
   imports: [CommonModule, RouterModule, FormsModule],
   template: `
     <div>
-      <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+      <div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-3">
         <div>
-          <h1 class="h3 fw-bold mb-1">Orders</h1>
-          <p class="text-muted mb-0">Manage your sales orders and track picking progress</p>
+          <h1 class="page-title">Orders</h1>
+          <p class="page-subtitle">Manage your sales orders and track picking progress</p>
         </div>
         <div class="d-flex gap-2">
           <button class="btn btn-outline-secondary" (click)="handleExportOrders()">
@@ -35,7 +35,7 @@ type SortOption = 'created' | 'due-date' | 'so-number';
       </div>
 
       <!-- Filters -->
-      <div class="card mb-4">
+      <div class="card filter-bar">
         <div class="card-body">
           <div class="row g-3 align-items-center">
             <div class="col-md-4">

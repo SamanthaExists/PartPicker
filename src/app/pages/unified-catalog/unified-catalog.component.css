@@ -1,8 +1,8 @@
-/* Icon Circle Styles */
+/* Icon Circle Styles — using design system tokens */
 .icon-circle {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: var(--radius-md, 0.5rem);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -17,75 +17,41 @@
 }
 
 .icon-circle-blue {
-  background-color: rgba(13, 110, 253, 0.1);
-  color: #0d6efd;
+  background-color: var(--brand-primary-subtle, rgba(37, 99, 235, 0.08));
+  color: var(--brand-primary, #2563eb);
 }
 
 .icon-circle-purple {
-  background-color: rgba(111, 66, 193, 0.1);
-  color: #6f42c1;
+  background-color: var(--color-purple-subtle, rgba(124, 58, 237, 0.08));
+  color: var(--color-purple, #7c3aed);
 }
 
 .icon-circle-green {
-  background-color: rgba(25, 135, 84, 0.1);
-  color: #198754;
+  background-color: var(--color-success-subtle, rgba(22, 163, 74, 0.08));
+  color: var(--color-success, #16a34a);
 }
 
 .icon-circle-amber {
-  background-color: rgba(255, 193, 7, 0.15);
-  color: #d39e00;
+  background-color: var(--color-warning-subtle, rgba(217, 119, 6, 0.08));
+  color: var(--color-warning, #d97706);
 }
 
 .icon-circle-cyan {
-  background-color: rgba(13, 202, 240, 0.1);
-  color: #0dcaf0;
+  background-color: var(--color-info-subtle, rgba(8, 145, 178, 0.08));
+  color: var(--color-info, #0891b2);
 }
 
 .icon-circle-gray {
-  background-color: rgba(108, 117, 125, 0.1);
-  color: #6c757d;
+  background-color: var(--surface-inset, #f1f5f9);
+  color: var(--text-muted, #6b7280);
 }
 
 /* Card Hover Effect */
 .hover-shadow {
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: box-shadow var(--transition-base, 0.2s ease), transform var(--transition-base, 0.2s ease);
 }
 
 .hover-shadow:hover {
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
-}
-
-/* Text Truncation */
-.text-truncate-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Responsive Tab Scroll */
-.nav-tabs {
-  overflow-x: auto;
-  overflow-y: hidden;
-  flex-wrap: nowrap;
-  -webkit-overflow-scrolling: touch;
-}
-
-.nav-tabs::-webkit-scrollbar {
-  height: 4px;
-}
-
-.nav-tabs::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-.nav-tabs::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-}
-
-.nav-tabs::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }

@@ -13,10 +13,12 @@ import { OrderWithProgress, RecentActivity, ConsolidatedPart, ItemToOrder } from
   standalone: true,
   imports: [CommonModule, RouterModule],
   template: `
-    <div class="space-y-4">
-      <div class="mb-4">
-        <h1 class="h3 fw-bold">Dashboard</h1>
-        <p class="text-muted">Overview of your pick list progress</p>
+    <div>
+      <div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <p class="page-subtitle">Overview of your pick list progress</p>
+        </div>
       </div>
 
       <!-- Stats Grid -->
@@ -26,8 +28,8 @@ import { OrderWithProgress, RecentActivity, ConsolidatedPart, ItemToOrder } from
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-start">
                 <div>
-                  <p class="text-muted small mb-1">{{ stat.title }}</p>
-                  <h3 class="mb-0 fw-bold">{{ loading ? '...' : stat.value | number }}</h3>
+                  <div class="stat-label">{{ stat.title }}</div>
+                  <div class="stat-value">{{ loading ? '...' : stat.value | number }}</div>
                 </div>
                 <div class="stat-icon" [ngClass]="stat.bgColor">
                   <i class="bi" [ngClass]="stat.icon" [class]="stat.color"></i>

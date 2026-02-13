@@ -9,6 +9,7 @@ import { BomTemplatesService } from '../../services/bom-templates.service';
 import { PartsService } from '../../services/parts.service';
 import { UnifiedListItem, ClassificationType } from '../../models';
 import { UnifiedDetailComponent } from '../../components/parts/unified-detail.component';
+import { PartDetailComponent } from '../../components/parts/part-detail.component';
 
 type ViewTab = 'all' | 'templates' | 'assemblies' | 'parts';
 type SortOption = 'name' | 'type' | 'recent';
@@ -40,6 +41,10 @@ export class UnifiedCatalogComponent implements OnInit, OnDestroy {
 
   // Loading
   loading = false;
+
+  // Template creation dialog state
+  showTemplateDialog = false;
+  templateForm = { name: '', tool_model: '', template_type: 'bom' as 'bom' | 'assembly' };
 
   // Subscriptions
   private subscriptions: Subscription[] = [];
@@ -193,26 +198,66 @@ export class UnifiedCatalogComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Show new template dialog
+   * Show new template dialog (inline form)
    */
   showNewTemplateDialog(): void {
-    // TODO: Implement
-    console.log('New template');
+    this.templateForm = { name: '', tool_model: '', template_type: 'bom' as 'bom' | 'assembly' };
+    this.showTemplateDialog = true;
   }
 
   /**
-   * Show new assembly dialog
+   * Save new template from inline dialog
+   */
+  async handleSaveTemplate(): Promise<void> {
+    if (!this.templateForm.name.trim()) return;
+
+    await this.bomTemplates.createTemplate(
+      this.templateForm.name.trim(),
+      this.templateForm.tool_model.trim() || undefined,
+      this.templateForm.template_type
+    );
+
+    this.showTemplateDialog = false;
+    this.loadData(); // Refresh the list
+  }
+
+  /**
+   * Cancel template dialog
+   */
+  cancelTemplateDialog(): void {
+    this.showTemplateDialog = false;
+  }
+
+  /**
+   * Show new assembly dialog — opens part detail modal with assembly preset
    */
   showNewAssemblyDialog(): void {
-    // TODO: Implement
-    console.log('New assembly');
+    const modalRef = this.modalService.open(PartDetailComponent, {
+      size: 'xl',
+      backdrop: 'static'
+    });
+    modalRef.componentInstance.isNew = true;
+    modalRef.componentInstance.presetClassification = 'assembly';
+
+    modalRef.result.then(
+      () => this.loadData(),
+      () => {} // dismissed
+    );
   }
 
   /**
-   * Show new part dialog
+   * Show new part dialog — opens part detail modal in create mode
    */
   showNewPartDialog(): void {
-    // TODO: Implement
-    console.log('New part');
+    const modalRef = this.modalService.open(PartDetailComponent, {
+      size: 'xl',
+      backdrop: 'static'
+    });
+    modalRef.componentInstance.isNew = true;
+
+    modalRef.result.then(
+      () => this.loadData(),
+      () => {} // dismissed
+    );
   }
 }

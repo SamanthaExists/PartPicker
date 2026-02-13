@@ -6,12 +6,15 @@ import { OrdersService } from '../../services/orders.service';
 import { RecentActivityService } from '../../services/picks.service';
 import { ConsolidatedPartsService, ItemsToOrderService } from '../../services/consolidated-parts.service';
 import { UtilsService } from '../../services/utils.service';
+import { DashboardChartsService, DailyPickCount, TopPicker, CompletionTrendPoint } from '../../services/dashboard-charts.service';
 import { OrderWithProgress, RecentActivity, ConsolidatedPart, ItemToOrder } from '../../models';
+import { BarChartComponent, BarChartDataPoint } from '../../components/charts/bar-chart.component';
+import { LineChartComponent, LineChartDataPoint } from '../../components/charts/line-chart.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, BarChartComponent, LineChartComponent],
   template: `
     <div>
       <div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-3">
@@ -181,6 +184,90 @@ import { OrderWithProgress, RecentActivity, ConsolidatedPart, ItemToOrder } from
           </div>
         </div>
       </div>
+
+      <!-- Analytics Charts Section -->
+      <div class="mt-5 mb-4">
+        <h2 class="h5 fw-semibold mb-3">
+          <i class="bi bi-graph-up me-2"></i>
+          This Week's Activity
+        </h2>
+      </div>
+
+      <div class="row g-4 mb-4">
+        <!-- Daily Pick Activity Chart -->
+        <div class="col-lg-8">
+          <div class="card h-100">
+            <div class="card-header">
+              <span class="fw-semibold">Last 7 Days Pick Activity</span>
+            </div>
+            <div class="card-body">
+              <div *ngIf="chartsLoading" class="text-center py-5 text-muted">
+                <div class="spinner-border spinner-border-sm me-2"></div>
+                Loading chart...
+              </div>
+              <div *ngIf="!chartsLoading && dailyPicksData.length === 0" class="text-center py-5 text-muted">
+                No pick activity in the last 7 days
+              </div>
+              <app-bar-chart 
+                *ngIf="!chartsLoading && dailyPicksData.length > 0"
+                [data]="dailyPicksData"
+                orientation="vertical"
+                [showValues]="true">
+              </app-bar-chart>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Pickers Leaderboard -->
+        <div class="col-lg-4">
+          <div class="card h-100">
+            <div class="card-header">
+              <span class="fw-semibold">Top Pickers This Week</span>
+            </div>
+            <div class="card-body">
+              <div *ngIf="chartsLoading" class="text-center py-5 text-muted">
+                <div class="spinner-border spinner-border-sm me-2"></div>
+                Loading...
+              </div>
+              <div *ngIf="!chartsLoading && topPickersData.length === 0" class="text-center py-5 text-muted">
+                No picks recorded this week
+              </div>
+              <app-bar-chart 
+                *ngIf="!chartsLoading && topPickersData.length > 0"
+                [data]="topPickersData"
+                orientation="horizontal"
+                [showValues]="true">
+              </app-bar-chart>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pick Completion Trend -->
+      <div class="row g-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <span class="fw-semibold">Pick Completion Trend (Last 14 Days)</span>
+            </div>
+            <div class="card-body">
+              <div *ngIf="chartsLoading" class="text-center py-5 text-muted">
+                <div class="spinner-border spinner-border-sm me-2"></div>
+                Loading chart...
+              </div>
+              <div *ngIf="!chartsLoading && completionTrendData.length === 0" class="text-center py-5 text-muted">
+                No active orders to track completion
+              </div>
+              <app-line-chart 
+                *ngIf="!chartsLoading && completionTrendData.length > 0"
+                [data]="completionTrendData"
+                [minValue]="0"
+                [maxValue]="100">
+              </app-line-chart>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   `
 })
@@ -198,6 +285,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   copiedPartNumber: string | null = null;
 
+  // Chart data
+  dailyPicksData: BarChartDataPoint[] = [];
+  topPickersData: BarChartDataPoint[] = [];
+  completionTrendData: LineChartDataPoint[] = [];
+  chartsLoading = true;
+
   private subscriptions: Subscription[] = [];
 
   constructor(
@@ -205,6 +298,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private activityService: RecentActivityService,
     private partsService: ConsolidatedPartsService,
     private itemsToOrderService: ItemsToOrderService,
+    private chartsService: DashboardChartsService,
     public utils: UtilsService
   ) { }
 
@@ -234,6 +328,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.itemsToOrderLoading = loading;
       })
     );
+
+    // Load chart data
+    this.loadCharts();
   }
 
   ngOnDestroy(): void {
@@ -310,5 +407,38 @@ export class DashboardComponent implements OnInit, OnDestroy {
         bgColor: 'bg-info bg-opacity-10',
       },
     ];
+  }
+
+  async loadCharts(): Promise<void> {
+    this.chartsLoading = true;
+    
+    try {
+      // Load all chart data in parallel
+      const [dailyPicks, topPickers, completionTrend] = await Promise.all([
+        this.chartsService.getLast7DaysPickActivity(),
+        this.chartsService.getTopPickersThisWeek(),
+        this.chartsService.getCompletionTrend()
+      ]);
+
+      // Transform data for bar chart component
+      this.dailyPicksData = dailyPicks.map(d => ({
+        label: d.dayLabel,
+        value: d.count
+      }));
+
+      this.topPickersData = topPickers.map(p => ({
+        label: p.picked_by,
+        value: p.count
+      }));
+
+      this.completionTrendData = completionTrend.map(t => ({
+        label: t.date,
+        value: t.percentage
+      }));
+    } catch (error) {
+      console.error('Error loading charts:', error);
+    } finally {
+      this.chartsLoading = false;
+    }
   }
 }

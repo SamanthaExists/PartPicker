@@ -59,3 +59,5 @@ Thumbs.db
 # Build artifacts
 build_log.txt
 nul
+src/environments/environment.ts
+src/environments/environment.prod.ts

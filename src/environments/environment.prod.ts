@@ -1,5 +1,7 @@
 export const environment = {
   production: true,
-  supabaseUrl: 'https://uewypezgyyyfanltoyfv.supabase.co',
-  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVld3lwZXpneXl5ZmFubHRveWZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1NDI0NTgsImV4cCI6MjA4NTExODQ1OH0.01oMpnVsWlpJr6P_mqKdpK-q-kEz1E1TEMo4gNn_gLg'
+  // DO NOT use Josh's live database! This should point to a separate prod deploy.
+  // Live project ref: uewypezgyyyfanltoyfv (DO NOT CONNECT TO THIS)
+  supabaseUrl: 'https://REPLACE_WITH_DEV_PROJECT.supabase.co',
+  supabaseAnonKey: 'REPLACE_WITH_DEV_ANON_KEY'
 };

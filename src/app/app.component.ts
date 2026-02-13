@@ -11,6 +11,7 @@ import { PasswordGateComponent } from './components/auth/password-gate.component
 import { NamePromptComponent } from './components/auth/name-prompt.component';
 import { ToastContainerComponent } from './components/layout/toast-container.component';
 import { KeyboardHelpComponent } from './components/layout/keyboard-help.component';
+import { BarcodeScannerComponent } from './components/barcode-scanner/barcode-scanner.component';
 
 @Component({
   selector: 'app-root',
@@ -27,7 +28,8 @@ import { KeyboardHelpComponent } from './components/layout/keyboard-help.compone
     PasswordGateComponent,
     NamePromptComponent,
     ToastContainerComponent,
-    KeyboardHelpComponent
+    KeyboardHelpComponent,
+    BarcodeScannerComponent
   ],
   template: `
     <app-password-gate>
@@ -143,6 +145,9 @@ import { KeyboardHelpComponent } from './components/layout/keyboard-help.compone
 
     <!-- Keyboard Help -->
     <app-keyboard-help></app-keyboard-help>
+
+    <!-- Barcode Scanner FAB + Overlay -->
+    <app-barcode-scanner></app-barcode-scanner>
     </app-password-gate>
   `,
   styles: [`

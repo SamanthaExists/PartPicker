@@ -3,6 +3,8 @@ import { BehaviorSubject } from 'rxjs';
 import { SupabaseService } from './supabase.service';
 import { Issue, IssueWithDetails, IssueType, IssueStatus } from '../models';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { DemoModeService } from './demo-mode.service';
+import { DemoDataService } from './demo-data.service';
 
 @Injectable({
   providedIn: 'root'
@@ -18,7 +20,11 @@ export class IssuesService implements OnDestroy {
   loading$ = this.loadingSubject.asObservable();
   error$ = this.errorSubject.asObservable();
 
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private demoMode: DemoModeService,
+    private demoData: DemoDataService
+  ) {}
 
   ngOnDestroy(): void {
     this.cleanup();
@@ -35,17 +41,23 @@ export class IssuesService implements OnDestroy {
     this.cleanup();
     this.currentOrderId = orderId;
     await this.fetchIssues(orderId);
-    this.setupRealtimeSubscription(orderId);
+    if (!this.demoMode.isDemoMode()) {
+      this.setupRealtimeSubscription(orderId);
+    }
   }
 
   async loadAllIssues(): Promise<void> {
     this.cleanup();
     this.currentOrderId = null;
     await this.fetchAllIssues();
-    this.setupGlobalRealtimeSubscription();
+    if (!this.demoMode.isDemoMode()) {
+      this.setupGlobalRealtimeSubscription();
+    }
   }
 
   private setupRealtimeSubscription(orderId: string): void {
+    if (this.demoMode.isDemoMode()) return;
+    
     this.subscription = this.supabase.channel(`issues-${orderId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'issues', filter: `order_id=eq.${orderId}` }, () => {
         if (this.currentOrderId) {
@@ -56,6 +68,8 @@ export class IssuesService implements OnDestroy {
   }
 
   private setupGlobalRealtimeSubscription(): void {
+    if (this.demoMode.isDemoMode()) return;
+    
     this.subscription = this.supabase.channel('all-issues')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'issues' }, () => {
         this.fetchAllIssues();
@@ -67,6 +81,26 @@ export class IssuesService implements OnDestroy {
     try {
       this.loadingSubject.next(true);
       this.errorSubject.next(null);
+
+      if (this.demoMode.isDemoMode()) {
+        const issues = this.demoData.getIssues(orderId);
+        const issuesWithDetails: IssueWithDetails[] = issues.map(issue => {
+          const lineItems = this.demoData.getLineItems(orderId);
+          const orders = this.demoData.getOrders();
+          const lineItem = lineItems.find(li => li.id === issue.line_item_id);
+          const order = orders.find(o => o.id === issue.order_id);
+          
+          return {
+            ...issue,
+            line_item: lineItem,
+            order: order,
+          };
+        });
+
+        this.issuesSubject.next(issuesWithDetails);
+        this.loadingSubject.next(false);
+        return;
+      }
 
       const { data, error } = await this.supabase.from('issues')
         .select(`
@@ -97,6 +131,26 @@ export class IssuesService implements OnDestroy {
     try {
       this.loadingSubject.next(true);
       this.errorSubject.next(null);
+
+      if (this.demoMode.isDemoMode()) {
+        const issues = this.demoData.getIssues();
+        const issuesWithDetails: IssueWithDetails[] = issues.map(issue => {
+          const lineItems = this.demoData.getLineItems();
+          const orders = this.demoData.getOrders();
+          const lineItem = lineItems.find(li => li.id === issue.line_item_id);
+          const order = orders.find(o => o.id === issue.order_id);
+          
+          return {
+            ...issue,
+            line_item: lineItem,
+            order: order,
+          };
+        });
+
+        this.issuesSubject.next(issuesWithDetails);
+        this.loadingSubject.next(false);
+        return;
+      }
 
       const { data, error } = await this.supabase.from('issues')
         .select(`

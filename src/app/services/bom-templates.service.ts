@@ -3,6 +3,8 @@ import { BehaviorSubject } from 'rxjs';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { SupabaseService } from './supabase.service';
 import { BOMTemplate, BOMTemplateItem, BOMTemplateWithItems, LineItem, ImportedLineItem } from '../models';
+import { DemoModeService } from './demo-mode.service';
+import { DemoDataService } from './demo-data.service';
 
 /**
  * Generate a fingerprint string for a set of BOM items.
@@ -30,9 +32,15 @@ export class BomTemplatesService implements OnDestroy {
   loading$ = this.loadingSubject.asObservable();
   error$ = this.errorSubject.asObservable();
 
-  constructor(private supabase: SupabaseService) {
+  constructor(
+    private supabase: SupabaseService,
+    private demoMode: DemoModeService,
+    private demoData: DemoDataService
+  ) {
     this.fetchTemplates();
-    this.setupRealtimeSubscription();
+    if (!this.demoMode.isDemoMode()) {
+      this.setupRealtimeSubscription();
+    }
   }
 
   ngOnDestroy(): void {
@@ -42,6 +50,8 @@ export class BomTemplatesService implements OnDestroy {
   }
 
   private setupRealtimeSubscription(): void {
+    if (this.demoMode.isDemoMode()) return;
+    
     this.subscription = this.supabase.channel('bom-templates-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bom_templates' }, () => this.fetchTemplates())
       .subscribe();
@@ -83,6 +93,13 @@ export class BomTemplatesService implements OnDestroy {
       this.loadingSubject.next(true);
       this.errorSubject.next(null);
 
+      if (this.demoMode.isDemoMode()) {
+        const templates = this.demoData.getBOMTemplates();
+        this.templatesSubject.next(templates);
+        this.loadingSubject.next(false);
+        return;
+      }
+
       const { data, error: fetchError } = await this.supabase.from('bom_templates')
         .select('*')
         .order('name');
@@ -101,6 +118,18 @@ export class BomTemplatesService implements OnDestroy {
    */
   async getTemplateWithItems(templateId: string): Promise<BOMTemplateWithItems | null> {
     try {
+      if (this.demoMode.isDemoMode()) {
+        const templates = this.demoData.getBOMTemplates();
+        const template = templates.find(t => t.id === templateId);
+        if (!template) return null;
+        
+        const items = this.demoData.getBOMTemplateItems(templateId);
+        return {
+          ...template,
+          items,
+        };
+      }
+
       const templateRes = await this.supabase.from('bom_templates').select('*').eq('id', templateId).single();
       if (templateRes.error) throw templateRes.error;
 

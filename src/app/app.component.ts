@@ -12,6 +12,7 @@ import { NamePromptComponent } from './components/auth/name-prompt.component';
 import { ToastContainerComponent } from './components/layout/toast-container.component';
 import { KeyboardHelpComponent } from './components/layout/keyboard-help.component';
 import { BarcodeScannerComponent } from './components/barcode-scanner/barcode-scanner.component';
+import { DemoBannerComponent } from './components/demo-banner/demo-banner.component';
 
 @Component({
   selector: 'app-root',
@@ -29,11 +30,13 @@ import { BarcodeScannerComponent } from './components/barcode-scanner/barcode-sc
     NamePromptComponent,
     ToastContainerComponent,
     KeyboardHelpComponent,
-    BarcodeScannerComponent
+    BarcodeScannerComponent,
+    DemoBannerComponent
   ],
   template: `
     <app-password-gate>
     <app-name-prompt></app-name-prompt>
+    <app-demo-banner></app-demo-banner>
     <div class="d-flex min-vh-100">
       <!-- Sidebar -->
       <aside class="sidebar d-none d-lg-flex flex-column">

@@ -3,6 +3,8 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { SupabaseService } from './supabase.service';
 import { Order, OrderWithProgress, Tool, LineItem, ImportedOrder } from '../models';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { DemoModeService } from './demo-mode.service';
+import { DemoDataService } from './demo-data.service';
 
 @Injectable({
   providedIn: 'root'
@@ -17,9 +19,15 @@ export class OrdersService implements OnDestroy {
   loading$ = this.loadingSubject.asObservable();
   error$ = this.errorSubject.asObservable();
 
-  constructor(private supabase: SupabaseService) {
+  constructor(
+    private supabase: SupabaseService,
+    private demoMode: DemoModeService,
+    private demoData: DemoDataService
+  ) {
     this.fetchOrders();
-    this.setupRealtimeSubscription();
+    if (!this.demoMode.isDemoMode()) {
+      this.setupRealtimeSubscription();
+    }
   }
 
   ngOnDestroy(): void {
@@ -40,7 +48,39 @@ export class OrdersService implements OnDestroy {
       this.loadingSubject.next(true);
       this.errorSubject.next(null);
 
-      // Fetch orders with tools and server-computed progress in a single query
+      if (this.demoMode.isDemoMode()) {
+        // Demo mode: return mock data
+        const orders = this.demoData.getOrders();
+        const ordersWithProgress: OrderWithProgress[] = orders.map(order => {
+          const tools = this.demoData.getTools(order.id);
+          const lineItems = this.demoData.getLineItems(order.id);
+          
+          let totalItems = 0;
+          let pickedItems = 0;
+          
+          lineItems.forEach(item => {
+            totalItems += item.qty_per_unit * tools.length;
+            const picks = this.demoData.getPicks(item.id);
+            pickedItems += picks.reduce((sum, p) => sum + p.qty_picked, 0);
+          });
+          
+          const progressPercent = totalItems > 0 ? Math.round((pickedItems / totalItems) * 100) : 0;
+          
+          return {
+            ...order,
+            tools,
+            total_items: totalItems,
+            picked_items: pickedItems,
+            progress_percent: progressPercent,
+          };
+        });
+
+        this.ordersSubject.next(ordersWithProgress);
+        this.loadingSubject.next(false);
+        return;
+      }
+
+      // Real mode: fetch from Supabase
       const { data: ordersData, error: ordersError } = await this.supabase.from('orders')
         .select(`
           *,
@@ -208,6 +248,15 @@ export class OrdersService implements OnDestroy {
   // Get a single order with its tools and line items
   async getOrder(orderId: string): Promise<{ order: Order | null; tools: Tool[]; lineItems: LineItem[] }> {
     try {
+      if (this.demoMode.isDemoMode()) {
+        const orders = this.demoData.getOrders();
+        const order = orders.find(o => o.id === orderId) || null;
+        const tools = this.demoData.getTools(orderId);
+        const lineItems = this.demoData.getLineItems(orderId);
+        
+        return { order, tools, lineItems };
+      }
+
       const [orderRes, toolsRes, itemsRes] = await Promise.all([
         this.supabase.from('orders').select('*').eq('id', orderId).single(),
         this.supabase.from('tools').select('*').eq('order_id', orderId).order('tool_number'),

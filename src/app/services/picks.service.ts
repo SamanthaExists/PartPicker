@@ -3,6 +3,8 @@ import { BehaviorSubject } from 'rxjs';
 import { SupabaseService } from './supabase.service';
 import { Pick, LineItemWithPicks, RecentActivity } from '../models';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { DemoModeService } from './demo-mode.service';
+import { DemoDataService } from './demo-data.service';
 
 @Injectable({
   providedIn: 'root'
@@ -20,7 +22,11 @@ export class PicksService implements OnDestroy {
   loading$ = this.loadingSubject.asObservable();
   error$ = this.errorSubject.asObservable();
 
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private demoMode: DemoModeService,
+    private demoData: DemoDataService
+  ) {}
 
   ngOnDestroy(): void {
     this.cleanup();
@@ -38,10 +44,14 @@ export class PicksService implements OnDestroy {
     this.currentOrderId = orderId;
 
     await this.fetchPicks(orderId);
-    this.setupRealtimeSubscription(orderId);
+    if (!this.demoMode.isDemoMode()) {
+      this.setupRealtimeSubscription(orderId);
+    }
   }
 
   private setupRealtimeSubscription(orderId: string): void {
+    if (this.demoMode.isDemoMode()) return;
+    
     this.subscription = this.supabase.channel(`picks-${orderId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'picks' }, () => {
         if (this.currentOrderId) {
@@ -56,7 +66,49 @@ export class PicksService implements OnDestroy {
       this.loadingSubject.next(true);
       this.errorSubject.next(null);
 
-      // Fetch line items for this order
+      if (this.demoMode.isDemoMode()) {
+        // Demo mode: use mock data
+        const lineItemsData = this.demoData.getLineItems(orderId);
+        const lineItemIds = lineItemsData.map(item => item.id);
+        
+        let picksData: Pick[] = [];
+        lineItemIds.forEach(lineItemId => {
+          const picks = this.demoData.getPicks(lineItemId);
+          picksData.push(...picks);
+        });
+        
+        // Sort by picked_at descending
+        picksData.sort((a, b) => new Date(b.picked_at).getTime() - new Date(a.picked_at).getTime());
+        
+        this.picksSubject.next(picksData);
+
+        // Group picks by line item
+        const picksByLineItem = new Map<string, Pick[]>();
+        for (const pick of picksData) {
+          const existing = picksByLineItem.get(pick.line_item_id) || [];
+          existing.push(pick);
+          picksByLineItem.set(pick.line_item_id, existing);
+        }
+
+        // Create line items with picks
+        const itemsWithPicks: LineItemWithPicks[] = lineItemsData.map(item => {
+          const itemPicks = picksByLineItem.get(item.id) || [];
+          const activePicks = itemPicks.filter(p => !p.undone_at);
+          const totalPicked = activePicks.reduce((sum, p) => sum + p.qty_picked, 0);
+          return {
+            ...item,
+            picks: itemPicks,
+            total_picked: totalPicked,
+            remaining: Math.max(0, item.total_qty_needed - totalPicked),
+          };
+        });
+
+        this.lineItemsWithPicksSubject.next(itemsWithPicks);
+        this.loadingSubject.next(false);
+        return;
+      }
+
+      // Real mode: fetch from Supabase
       const { data: lineItemsData, error: lineItemsError } = await this.supabase.from('line_items')
         .select('*')
         .eq('order_id', orderId)
@@ -132,7 +184,45 @@ export class PicksService implements OnDestroy {
     notes?: string
   ): Promise<(Pick & { overPickWarning?: string }) | null> {
     try {
-      // Check current state before picking to detect concurrent picks
+      if (this.demoMode.isDemoMode()) {
+        // Demo mode: add to in-memory data
+        const lineItems = this.demoData.getLineItems();
+        const lineItem = lineItems.find(li => li.id === lineItemId);
+        const existingPicks = this.demoData.getPicks(lineItemId);
+        
+        const currentTotal = existingPicks
+          .filter(p => !p.undone_at)
+          .reduce((sum, p) => sum + p.qty_picked, 0);
+        const newTotal = currentTotal + qtyPicked;
+        const needed = lineItem?.total_qty_needed || 0;
+
+        const newPick = this.demoData.addPick({
+          line_item_id: lineItemId,
+          tool_id: toolId,
+          qty_picked: qtyPicked,
+          picked_by: pickedBy || null,
+          notes: notes || null,
+          picked_at: new Date().toISOString(),
+          undone_at: null,
+          undone_by: null,
+        });
+
+        // Refresh the view
+        if (this.currentOrderId) {
+          await this.fetchPicks(this.currentOrderId);
+        }
+
+        if (newTotal > needed) {
+          return {
+            ...newPick,
+            overPickWarning: `Over-picked! ${newTotal} picked but only ${needed} needed.`,
+          };
+        }
+
+        return newPick;
+      }
+
+      // Real mode: use Supabase
       const { data: lineItem } = await this.supabase.from('line_items')
         .select('total_qty_needed')
         .eq('id', lineItemId)

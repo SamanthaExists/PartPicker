@@ -237,7 +237,6 @@ export class UnifiedCatalogComponent implements OnInit, OnDestroy {
       backdrop: 'static'
     });
     modalRef.componentInstance.isNew = true;
-    modalRef.componentInstance.presetClassification = 'assembly';
 
     modalRef.result.then(
       () => this.loadData(),
